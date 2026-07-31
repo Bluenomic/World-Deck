@@ -117,8 +117,14 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   const IconComponent = (Icons as any)[categoryConfig.iconName] || Icons.FileText;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 z-50 animate-in fade-in duration-150">
-      <div className="app-bg-secondary border app-border w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden app-text-main transition-colors">
+    <div 
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 z-50 backdrop-animate-appear cursor-pointer"
+      onClick={onClose}
+    >
+      <div 
+        className="app-bg-secondary border app-border w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden app-text-main transition-colors modal-animate-appear cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Action Bar */}
         <div className="px-4 py-2.5 app-bg-main border-b app-border flex items-center justify-between text-xs app-text-muted">

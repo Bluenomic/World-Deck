@@ -7,8 +7,14 @@ interface HelpGuideModalProps {
 
 export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({ onClose }) => {
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-      <div className="app-bg-secondary border app-border w-full max-w-2xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden app-text-main transition-colors">
+    <div 
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 backdrop-animate-appear cursor-pointer"
+      onClick={onClose}
+    >
+      <div 
+        className="app-bg-secondary border app-border w-full max-w-2xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden app-text-main transition-colors modal-animate-appear cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Header */}
         <div className="px-6 py-4 app-bg-main border-b app-border flex items-center justify-between">

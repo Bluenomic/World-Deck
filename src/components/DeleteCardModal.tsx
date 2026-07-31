@@ -20,8 +20,14 @@ export const DeleteCardModal: React.FC<DeleteCardModalProps> = ({
   const count = cardsToDelete.length;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
-      <div className="app-bg-secondary border app-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+    <div 
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 backdrop-animate-appear cursor-pointer"
+      onClick={onClose}
+    >
+      <div 
+        className="app-bg-secondary border app-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 modal-animate-appear cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Header Icon */}
         <div className="flex items-center gap-3">
