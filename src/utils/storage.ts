@@ -1,6 +1,6 @@
 import type { WorldProject } from '../types';
 
-const DB_NAME = 'WorldArchiveDatabase_v1';
+const DB_NAME = 'WorldDeckDatabase_v1';
 const DB_VERSION = 1;
 const STORE_NAME = 'app_state';
 
@@ -39,8 +39,8 @@ export const saveAppState = async (worlds: WorldProject[], activeWorldId: string
 
   // 2. Backup to LocalStorage (with try-catch for quota safety)
   try {
-    localStorage.setItem('worldarchive_worlds_v2', JSON.stringify(worlds));
-    localStorage.setItem('worldarchive_active_id_v2', activeWorldId);
+    localStorage.setItem('worlddeck_worlds_v2', JSON.stringify(worlds));
+    localStorage.setItem('worlddeck_active_id_v2', activeWorldId);
   } catch (err) {
     // Quota exceeded in localStorage, IndexedDB already has the full backup
     console.warn('LocalStorage quota limit reached, saved to IndexedDB instead.');
@@ -83,8 +83,8 @@ export const loadAppState = async (): Promise<{ worlds: WorldProject[]; activeWo
 
   // 2. Fallback to LocalStorage if IndexedDB fails or is empty
   try {
-    const savedWorlds = localStorage.getItem('worldarchive_worlds_v2') || localStorage.getItem('worldweaver_worlds_v2');
-    const savedActiveId = localStorage.getItem('worldarchive_active_id_v2') || localStorage.getItem('worldweaver_active_id_v2');
+    const savedWorlds = localStorage.getItem('worlddeck_worlds_v2') || localStorage.getItem('worldarchive_worlds_v2') || localStorage.getItem('worldweaver_worlds_v2');
+    const savedActiveId = localStorage.getItem('worlddeck_active_id_v2') || localStorage.getItem('worldarchive_active_id_v2') || localStorage.getItem('worldweaver_active_id_v2');
 
     if (savedWorlds) {
       const parsed = JSON.parse(savedWorlds);

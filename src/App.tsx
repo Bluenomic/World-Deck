@@ -23,7 +23,7 @@ import { DeleteCardModal } from './components/DeleteCardModal';
 import { CanvasModal } from './components/CanvasModal';
 import confetti from 'canvas-confetti';
 
-const STORAGE_THEME_KEY = 'worldarchive_theme_v1';
+const STORAGE_THEME_KEY = 'worlddeck_theme_v1';
 
 export const App: React.FC = () => {
   // Theme State
@@ -102,7 +102,7 @@ export const App: React.FC = () => {
             const projects = await readAllProjectsFromDirectory(handle);
             if (projects.length > 0) {
               setWorlds(projects);
-              const savedActiveId = localStorage.getItem('worldarchive_active_id_v2');
+              const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
               if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
                 setActiveWorldId(savedActiveId);
               } else {
@@ -145,7 +145,7 @@ export const App: React.FC = () => {
   // Auto save activeWorldId to LocalStorage
   useEffect(() => {
     if (!isLoaded) return;
-    localStorage.setItem('worldarchive_active_id_v2', activeWorldId);
+    localStorage.setItem('worlddeck_active_id_v2', activeWorldId);
   }, [activeWorldId, isLoaded]);
 
   // Auto save active world directly to linked local directory
@@ -173,7 +173,7 @@ export const App: React.FC = () => {
         const projects = await readAllProjectsFromDirectory(handle);
         if (projects.length > 0) {
           setWorlds(projects);
-          const savedActiveId = localStorage.getItem('worldarchive_active_id_v2');
+          const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
           if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
             setActiveWorldId(savedActiveId);
           } else {
@@ -203,7 +203,7 @@ export const App: React.FC = () => {
         const projects = await readAllProjectsFromDirectory(localDirectoryHandle);
         if (projects.length > 0) {
           setWorlds(projects);
-          const savedActiveId = localStorage.getItem('worldarchive_active_id_v2');
+          const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
           if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
             setActiveWorldId(savedActiveId);
           } else {
@@ -650,7 +650,7 @@ export const App: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-xl font-extrabold app-text-main tracking-tight">World Archive Workspace</h2>
+            <h2 className="text-xl font-extrabold app-text-main tracking-tight">World Deck Workspace</h2>
             <p className="text-xs app-text-muted leading-relaxed px-2">
               {!localDirectoryHandle
                 ? "Pilih folder lokal di komputer Anda untuk menyimpan seluruh proyek dunia Anda. Semua perubahan akan disimpan secara otomatis ke folder tersebut."

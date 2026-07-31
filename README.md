@@ -1,6 +1,6 @@
-# World Archive
+# World Deck
 
-World Archive is an interactive canvas-based worldbuilding application. Designed for writers, game designers, and world builders who want to visually map and connect elements of their fictional worlds -- from characters, factions, locations, and items to key events.
+World Deck is an interactive canvas-based worldbuilding application. Designed for writers, game designers, and world builders who want to visually map and connect elements of their fictional worlds -- from characters, factions, locations, and items to key events.
 
 ## Features
 
