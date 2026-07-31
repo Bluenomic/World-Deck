@@ -13,6 +13,7 @@ interface CardEditorModalProps {
   onClose: () => void;
   onNavigateToCard?: (cardId: string) => void;
   onAddConnection: (sourceId: string, targetId: string, label: string) => void;
+  onDiscard?: (cardId: string) => void;
 }
 
 export const CardEditorModal: React.FC<CardEditorModalProps> = ({
@@ -24,7 +25,9 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   onClose,
   onNavigateToCard,
   onAddConnection,
+  onDiscard,
 }) => {
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [title, setTitle] = useState(card.title);
   const [subtitle, setSubtitle] = useState(card.subtitle || '');
   const [category, setCategory] = useState<CardCategory>(card.category);
@@ -109,6 +112,34 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     }
   };
 
+  const handleCloseRequest = () => {
+    // Check if the card was originally empty (newly created blank card)
+    const isOriginalEmpty =
+      !card.title &&
+      !card.subtitle &&
+      !card.summary &&
+      !card.content &&
+      !card.imageUrl &&
+      (!card.tags || card.tags.length === 0) &&
+      (!card.attributes || card.attributes.length === 0);
+
+    // Check if the current form inputs are also completely empty
+    const isCurrentEmpty =
+      !title.trim() &&
+      !subtitle.trim() &&
+      !summary.trim() &&
+      !content.trim() &&
+      !imageUrl.trim() &&
+      tags.length === 0 &&
+      attributes.length === 0;
+
+    if (isOriginalEmpty && isCurrentEmpty) {
+      setShowExitConfirm(true);
+    } else {
+      onClose();
+    }
+  };
+
   const cardConnections = connections.filter(
     (c) => c.sourceId === card.id || c.targetId === card.id
   );
@@ -119,10 +150,14 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   return (
     <div 
       className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 z-50 backdrop-animate-appear cursor-pointer"
-      onClick={onClose}
+      onClick={() => {
+        if (!showExitConfirm) {
+          handleCloseRequest();
+        }
+      }}
     >
       <div 
-        className="app-bg-secondary border app-border w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden app-text-main transition-colors modal-animate-appear cursor-default"
+        className="app-bg-secondary border app-border w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden app-text-main transition-colors modal-animate-appear cursor-default relative"
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -145,7 +180,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleCloseRequest}
               className="p-1 rounded-md app-bg-hover app-text-muted hover:app-text-main"
             >
               <Icons.X size={18} />
@@ -578,7 +613,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
           <div className="pt-4 border-t app-border flex items-center justify-end gap-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleCloseRequest}
               className="px-4 py-2 rounded-lg border app-border app-text-muted hover:app-text-main text-xs font-semibold"
             >
               Batal
@@ -593,6 +628,60 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
           </div>
         </form>
       </div>
+
+      {showExitConfirm && (
+        <div 
+          className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-[60] cursor-default backdrop-animate-appear"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="app-bg-secondary border app-border rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-5 modal-animate-appear text-center">
+            <div className="mx-auto w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center">
+              <Icons.AlertTriangle size={24} />
+            </div>
+            <div className="space-y-1.5">
+              <h4 className="text-base font-bold app-text-main">Simpan atau Buang Kartu?</h4>
+              <p className="text-xs app-text-muted leading-relaxed">
+                Kartu baru ini masih kosong. Apakah Anda ingin membuang kartu ini atau tetap menyimpannya di canvas?
+              </p>
+            </div>
+            <div className="flex flex-col gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDiscard) {
+                    onDiscard(card.id);
+                  } else {
+                    onDelete(card.id);
+                  }
+                }}
+                className="w-full py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-md transition-colors"
+              >
+                Hapus Kartu
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onSave({
+                    ...card,
+                    title: 'Kartu Tanpa Judul',
+                    updatedAt: Date.now(),
+                  });
+                }}
+                className="w-full py-2 rounded-lg app-bg-main border app-border hover:app-bg-hover app-text-main text-xs font-semibold transition-colors"
+              >
+                Simpan Kartu Kosong
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowExitConfirm(false)}
+                className="w-full py-2 rounded-lg text-xs app-text-muted hover:app-text-main font-semibold transition-colors"
+              >
+                Batal (Kembali Edit)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

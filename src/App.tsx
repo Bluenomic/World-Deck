@@ -286,6 +286,22 @@ export const App: React.FC = () => {
     handleRequestDeleteCards([cardId]);
   };
 
+  // Discard Card Instantly without double confirmation (for newly created blank cards)
+  const handleDiscardCard = (cardId: string) => {
+    updateActiveWorld((prev) => ({
+      ...prev,
+      updatedAt: Date.now(),
+      cards: prev.cards.filter((c) => c.id !== cardId),
+      connections: prev.connections.filter(
+        (conn) => conn.sourceId !== cardId && conn.targetId !== cardId
+      ),
+    }));
+    if (selectedCardId === cardId) {
+      setSelectedCardId(null);
+    }
+    setEditingCard(null);
+  };
+
   // Add Connection between 2 cards
   const handleAddConnection = (sourceId: string, targetId: string, label: string = 'Terhubung') => {
     const existing = activeWorld.connections.find(
@@ -571,6 +587,7 @@ export const App: React.FC = () => {
           onClose={() => setEditingCard(null)}
           onNavigateToCard={handleNavigateToCard}
           onAddConnection={handleAddConnection}
+          onDiscard={handleDiscardCard}
         />
       )}
 
