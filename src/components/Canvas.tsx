@@ -1,12 +1,15 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import type { WorldCard, CardConnection, CardCategory } from '../types';
+import type { WorldCard, WorldDeck, CardConnection, CardCategory } from '../types';
 import { WorldCardNode } from './WorldCardNode';
+import { AddCardFromGalleryModal } from './AddCardFromGalleryModal';
 import { getBezierPath } from '../utils/helpers';
 import { loadCanvasViewport, saveCanvasViewport } from '../utils/storage';
 import * as Icons from 'lucide-react';
 
 interface CanvasProps {
   cards: WorldCard[];
+  allWorldCards?: WorldCard[];
+  allWorldDecks?: WorldDeck[];
   connections: CardConnection[];
   selectedCardId: string | null;
   selectedCategory: CardCategory | 'all';
@@ -17,11 +20,14 @@ interface CanvasProps {
   onAddConnection: (sourceId: string, targetId: string) => void;
   onEditConnection: (connection: CardConnection) => void;
   onAddCardAtPosition: (x: number, y: number) => void;
+  onAddCardsToCanvasAtPosition?: (cardIds: string[], position: { x: number; y: number }) => void;
   onDeleteCardsRequest: (cardIds: string[]) => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
   cards,
+  allWorldCards = [],
+  allWorldDecks = [],
   connections,
   selectedCardId,
   selectedCategory,
@@ -32,6 +38,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onAddConnection,
   onEditConnection,
   onAddCardAtPosition,
+  onAddCardsToCanvasAtPosition,
   onDeleteCardsRequest,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -79,6 +86,10 @@ export const Canvas: React.FC<CanvasProps> = ({
     canvasX: 0,
     canvasY: 0,
   });
+
+  // Add Card From Gallery Modal State
+  const [showAddFromGalleryModal, setShowAddFromGalleryModal] = useState<boolean>(false);
+  const [galleryTargetPos, setGalleryTargetPos] = useState<{ x: number; y: number }>({ x: 300, y: 300 });
 
   // Card Dragging State
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
@@ -961,6 +972,19 @@ export const Canvas: React.FC<CanvasProps> = ({
               <Icons.Plus size={14} strokeWidth={2.5} />
               <span>Tambah Kartu Baru</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setGalleryTargetPos({ x: contextMenu.canvasX, y: contextMenu.canvasY });
+                setShowAddFromGalleryModal(true);
+                setContextMenu((prev) => ({ ...prev, visible: false }));
+              }}
+              className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-purple-400 cursor-pointer"
+            >
+              <Icons.FolderPlus size={14} strokeWidth={2.5} />
+              <span>Tambah Kartu dari Galeri</span>
+            </button>
           </div>
 
           <div className="py-1">
@@ -1014,6 +1038,20 @@ export const Canvas: React.FC<CanvasProps> = ({
           </div>
         </div>
       )}
+
+      <AddCardFromGalleryModal
+        isOpen={showAddFromGalleryModal}
+        onClose={() => setShowAddFromGalleryModal(false)}
+        allCards={allWorldCards}
+        allDecks={allWorldDecks}
+        activeCanvasId={targetCanvasId}
+        targetPosition={galleryTargetPos}
+        onAddCardsToCanvas={(cardIds, pos) => {
+          if (onAddCardsToCanvasAtPosition) {
+            onAddCardsToCanvasAtPosition(cardIds, pos);
+          }
+        }}
+      />
     </div>
   );
 };

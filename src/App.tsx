@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { WorldProject, WorldCard, CardConnection, ViewMode, CardCategory, AppTheme } from './types';
+import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme } from './types';
 import { SAMPLE_WORLD } from './data/sampleWorld';
 import { generateId, downloadProjectJson } from './utils/helpers';
 import { saveLocalFileHandle, loadLocalFileHandle, loadWorkspacePreferences, saveWorkspacePreferences } from './utils/storage';
@@ -21,6 +21,7 @@ import { HelpGuideModal } from './components/HelpGuideModal';
 import { WorldManagerModal } from './components/WorldManagerModal';
 import { DeleteCardModal } from './components/DeleteCardModal';
 import { CanvasModal } from './components/CanvasModal';
+import { DeckModal } from './components/DeckModal';
 import confetti from 'canvas-confetti';
 
 const STORAGE_THEME_KEY = 'worlddeck_theme_v1';
@@ -77,6 +78,8 @@ export const App: React.FC = () => {
 
   // Modals
   const [editingCard, setEditingCard] = useState<WorldCard | null>(null);
+  const [editingDeck, setEditingDeck] = useState<WorldDeck | null>(null);
+  const [showDeckModal, setShowDeckModal] = useState<boolean>(false);
   const [editingConnection, setEditingConnection] = useState<CardConnection | null>(null);
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
   const [showWorldManager, setShowWorldManager] = useState<boolean>(false);
@@ -342,6 +345,119 @@ export const App: React.FC = () => {
     }));
 
     setEditingCard(newCard);
+  };
+
+  // Add New Card from Library / Deck
+  const handleAddCardFromLibrary = (deckId?: string) => {
+    const newCard: WorldCard = {
+      id: generateId('card'),
+      title: '',
+      subtitle: '',
+      category: selectedCategory === 'all' ? 'character' : selectedCategory,
+      summary: '',
+      content: '',
+      tags: [],
+      attributes: [],
+      x: 300,
+      y: 300,
+      canvasId: activeCanvasId,
+      deckId,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    updateActiveWorld((prev) => ({
+      ...prev,
+      updatedAt: Date.now(),
+      cards: [...prev.cards, newCard],
+    }));
+
+    setEditingCard(newCard);
+  };
+
+  // Add Multiple Cards to Canvas from Gallery at Position
+  const handleAddCardsToCanvasAtPosition = (cardIds: string[], position: { x: number; y: number }) => {
+    const COLS = 3;
+    const SPACING_X = 260;
+    const SPACING_Y = 220;
+
+    updateActiveWorld((prev) => {
+      let index = 0;
+      const updatedCards = prev.cards.map((c) => {
+        if (cardIds.includes(c.id)) {
+          const col = index % COLS;
+          const row = Math.floor(index / COLS);
+          index++;
+          return {
+            ...c,
+            canvasId: activeCanvasId,
+            x: position.x + col * SPACING_X,
+            y: position.y + row * SPACING_Y,
+          };
+        }
+        return c;
+      });
+
+      return {
+        ...prev,
+        updatedAt: Date.now(),
+        cards: updatedCards,
+      };
+    });
+
+    confetti({ particleCount: 40, spread: 50 });
+  };
+
+  // Deck Management Actions
+  const handleSaveDeck = (name: string, description: string, color: string) => {
+    updateActiveWorld((prev) => {
+      const existingDecks = prev.decks || [];
+      if (editingDeck) {
+        return {
+          ...prev,
+          updatedAt: Date.now(),
+          decks: existingDecks.map((d) =>
+            d.id === editingDeck.id ? { ...d, name, description, color, updatedAt: Date.now() } : d
+          ),
+        };
+      } else {
+        const newDeck: WorldDeck = {
+          id: generateId('deck'),
+          name,
+          description,
+          color,
+          cardIds: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        return {
+          ...prev,
+          updatedAt: Date.now(),
+          decks: [...existingDecks, newDeck],
+        };
+      }
+    });
+    setEditingDeck(null);
+    setShowDeckModal(false);
+  };
+
+  const handleDeleteDeck = (deckId: string) => {
+    if (window.confirm('Hapus Deck ini? Kartu di dalamnya tidak akan terhapus.')) {
+      updateActiveWorld((prev) => ({
+        ...prev,
+        updatedAt: Date.now(),
+        decks: (prev.decks || []).filter((d) => d.id !== deckId),
+        cards: prev.cards.map((c) => (c.deckId === deckId ? { ...c, deckId: undefined } : c)),
+      }));
+    }
+  };
+
+  const handleAssignCardToDeck = (cardId: string, deckId?: string) => {
+    updateActiveWorld((prev) => ({
+      ...prev,
+      updatedAt: Date.now(),
+      cards: prev.cards.map((c) => (c.id === cardId ? { ...c, deckId } : c)),
+    }));
   };
 
   // Save Card from Editor
@@ -758,6 +874,8 @@ export const App: React.FC = () => {
                   c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                   c.summary.toLowerCase().includes(searchQuery.toLowerCase())
               )}
+              allWorldCards={activeWorld.cards}
+              allWorldDecks={activeWorld.decks || []}
               selectedCategory={selectedCategory}
               connections={activeCanvasConnections}
               selectedCardId={selectedCardId}
@@ -767,17 +885,29 @@ export const App: React.FC = () => {
               onAddConnection={(src, tgt) => handleAddConnection(src, tgt, 'Terhubung')}
               onEditConnection={(conn) => setEditingConnection(conn)}
               onAddCardAtPosition={handleAddCardAtPosition}
+              onAddCardsToCanvasAtPosition={handleAddCardsToCanvasAtPosition}
               onDeleteCardsRequest={handleRequestDeleteCards}
             />
           )}
 
           {viewMode === 'library' && (
             <LibraryView
-              cards={activeCanvasCards}
+              cards={activeWorld.cards}
+              decks={activeWorld.decks || []}
               selectedCategory={selectedCategory}
               searchQuery={searchQuery}
               onCardClick={(card) => setEditingCard(card)}
-              onAddCard={() => handleAddCardAtPosition()}
+              onAddCard={(deckId) => handleAddCardFromLibrary(deckId)}
+              onCreateDeckRequest={() => {
+                setEditingDeck(null);
+                setShowDeckModal(true);
+              }}
+              onEditDeckRequest={(deck) => {
+                setEditingDeck(deck);
+                setShowDeckModal(true);
+              }}
+              onDeleteDeckRequest={handleDeleteDeck}
+              onAssignCardToDeck={handleAssignCardToDeck}
             />
           )}
 
@@ -870,6 +1000,17 @@ export const App: React.FC = () => {
         initialValue={canvasModalConfig.initialValue}
         onClose={() => setCanvasModalConfig((prev) => ({ ...prev, isOpen: false }))}
         onSubmit={handleCanvasModalSubmit}
+      />
+
+      {/* Deck Creator / Editor Modal */}
+      <DeckModal
+        isOpen={showDeckModal}
+        onClose={() => {
+          setShowDeckModal(false);
+          setEditingDeck(null);
+        }}
+        deck={editingDeck}
+        onSaveDeck={handleSaveDeck}
       />
     </div>
   );

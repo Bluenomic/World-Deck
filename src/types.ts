@@ -19,6 +19,16 @@ export interface WorldCanvas {
   createdAt: number;
 }
 
+export interface WorldDeck {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  cardIds: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface WorldCard {
   id: string;
   title: string;
@@ -33,6 +43,7 @@ export interface WorldCard {
   y: number;
   pinned?: boolean;
   canvasId?: string;
+  deckId?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -67,6 +78,7 @@ export interface WorldProject {
   cards: WorldCard[];
   connections: CardConnection[];
   canvases?: WorldCanvas[];
+  decks?: WorldDeck[];
   createdAt: number;
   updatedAt: number;
 }
