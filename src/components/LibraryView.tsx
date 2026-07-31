@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import type { WorldCard, WorldDeck, CardCategory } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import * as Icons from 'lucide-react';
+
 
 interface LibraryViewProps {
   cards: WorldCard[];
@@ -31,12 +32,23 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [activeTab, setActiveTab] = useState<'all' | 'decks' | 'cards'>('all');
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
 
+  // Drag and Drop States for Decks
+  const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
+  const [hoveredDeckId, setHoveredDeckId] = useState<string | null>(null);
+  const [successDeckId, setSuccessDeckId] = useState<string | null>(null);
+  
+  // Drag and Drop States for Removing card from Deck
+  const [isNearTop, setIsNearTop] = useState<boolean>(false);
+  const [isHoveredRemoveZone, setIsHoveredRemoveZone] = useState<boolean>(false);
+  const [isSuccessRemove, setIsSuccessRemove] = useState<boolean>(false);
+
+  const draggedCardIdRef = useRef<string | null>(null);
+
   // Get active deck if user navigated inside a deck
   const activeDeck = decks.find((d) => d.id === activeDeckId) || null;
 
   // Filter cards based on search, category, and active deck navigation
   const filteredCards = cards.filter((card) => {
-    // If inside a specific deck view
     if (activeDeckId) {
       const isInDeck = card.deckId === activeDeckId || (activeDeck?.cardIds || []).includes(card.id);
       if (!isInDeck) return false;
@@ -56,8 +68,346 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     (deck.description && deck.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const showDecksInGrid = !activeDeckId && (activeTab === 'all' || activeTab === 'decks');
+  const showCardsInGrid = activeDeckId || activeTab === 'all' || activeTab === 'cards';
+
+  // Cards to display in grid (In 'Semua' tab, only show standalone cards not inside any deck)
+  const cardsToDisplay = filteredCards.filter((card) => {
+    if (activeDeckId) return true;
+    if (activeTab === 'all') return !card.deckId;
+    return true;
+  });
+
+  const totalItemsCount =
+    (showDecksInGrid ? filteredDecks.length : 0) + (showCardsInGrid ? cardsToDisplay.length : 0);
+
+  // Determine if remove zone should be visible (only inside deck + dragging + near top/hovered/success)
+  const shouldShowRemoveZone =
+    activeDeck && (isSuccessRemove || (draggedCardId && (isNearTop || isHoveredRemoveZone)));
+
+  // Container drag over to detect cursor approaching top area inside a deck
+  const handleContainerDragOver = (e: React.DragEvent) => {
+    if (activeDeck && (draggedCardId || draggedCardIdRef.current)) {
+      const containerTop = e.currentTarget.getBoundingClientRect().top;
+      const relativeY = e.clientY - containerTop;
+      if (relativeY < 280) {
+        if (!isNearTop) setIsNearTop(true);
+      } else {
+        if (isNearTop) setIsNearTop(false);
+      }
+    }
+  };
+
+  // Handle Drag & Drop handlers into Deck
+  const handleDragOver = (e: React.DragEvent, deckId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (hoveredDeckId !== deckId) {
+      setHoveredDeckId(deckId);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent, deckId: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (
+      e.clientX <= rect.left ||
+      e.clientX >= rect.right ||
+      e.clientY <= rect.top ||
+      e.clientY >= rect.bottom
+    ) {
+      if (hoveredDeckId === deckId) {
+        setHoveredDeckId(null);
+      }
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, deckId: string) => {
+    e.preventDefault();
+    const cardId = e.dataTransfer.getData('text/plain') || draggedCardIdRef.current || draggedCardId;
+    if (cardId) {
+      onAssignCardToDeck(cardId, deckId);
+      setSuccessDeckId(deckId);
+
+      setTimeout(() => setSuccessDeckId(null), 1200);
+    }
+    setHoveredDeckId(null);
+    setDraggedCardId(null);
+    setIsNearTop(false);
+    draggedCardIdRef.current = null;
+  };
+
+  // Handle Drag & Drop handlers to REMOVE card from Deck back to Galeri
+  const handleRemoveFromDeckDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!isHoveredRemoveZone) {
+      setIsHoveredRemoveZone(true);
+    }
+  };
+
+  const handleRemoveFromDeckDragLeave = (e: React.DragEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (
+      e.clientX <= rect.left ||
+      e.clientX >= rect.right ||
+      e.clientY <= rect.top ||
+      e.clientY >= rect.bottom
+    ) {
+      setIsHoveredRemoveZone(false);
+    }
+  };
+
+  const handleRemoveFromDeckDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const cardId = e.dataTransfer.getData('text/plain') || draggedCardIdRef.current || draggedCardId;
+    if (cardId) {
+      onAssignCardToDeck(cardId, undefined);
+      setIsSuccessRemove(true);
+
+      setTimeout(() => setIsSuccessRemove(false), 1200);
+    }
+    setIsHoveredRemoveZone(false);
+    setIsNearTop(false);
+    setDraggedCardId(null);
+    draggedCardIdRef.current = null;
+  };
+
+  const renderDeckItem = (deck: WorldDeck) => {
+    const deckCards = cards.filter(
+      (c) => c.deckId === deck.id || (deck.cardIds || []).includes(c.id)
+    );
+    const deckColor = deck.color || '#a855f7';
+    const isHovered = hoveredDeckId === deck.id;
+    const isSuccess = successDeckId === deck.id;
+    const isDraggingAnyCard = !!draggedCardId;
+
+    return (
+      <div
+        key={`deck-${deck.id}`}
+        onClick={() => setActiveDeckId(deck.id)}
+        onDragOver={(e) => handleDragOver(e, deck.id)}
+        onDragLeave={(e) => handleDragLeave(e, deck.id)}
+        onDrop={(e) => handleDrop(e, deck.id)}
+        className={`app-bg-secondary border rounded-2xl p-4 shadow-md transition-all duration-300 cursor-pointer group flex flex-col justify-between space-y-3 relative overflow-hidden ${
+          isSuccess
+            ? 'border-emerald-400 ring-4 ring-emerald-500/40 bg-emerald-950/20 scale-105 shadow-2xl'
+            : isHovered
+            ? 'border-purple-400 ring-4 ring-purple-500/50 bg-purple-950/40 -translate-y-1.5 scale-105 shadow-2xl shadow-purple-500/30'
+            : isDraggingAnyCard
+            ? 'border-purple-500/40 hover:border-purple-400 shadow-purple-900/20 animate-pulse'
+            : 'app-border hover:border-purple-400'
+        }`}
+      >
+        {/* Top Accent Line */}
+        <div
+          className={`absolute top-0 left-0 right-0 h-1 transition-all ${
+            isHovered ? 'h-1.5 bg-purple-400' : ''
+          }`}
+          style={{ backgroundColor: isHovered ? '#c084fc' : deckColor }}
+        />
+
+        {/* Drop Zone Overlay Hint (pointer-events-none prevents flicker) */}
+        {isHovered && (
+          <div className="absolute inset-0 bg-purple-950/85 backdrop-blur-xs z-20 flex flex-col items-center justify-center p-3 text-center space-y-1.5 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+            <Icons.FolderInput size={28} className="text-purple-300 animate-bounce" />
+            <span className="text-xs font-bold text-white drop-shadow">
+              Lepaskan Kartu di Sini
+            </span>
+            <span className="text-[10px] text-purple-200">
+              Masukan ke Deck "{deck.name}"
+            </span>
+          </div>
+        )}
+
+        {/* Success Overlay Hint */}
+        {isSuccess && (
+          <div className="absolute inset-0 bg-emerald-950/90 backdrop-blur-xs z-20 flex flex-col items-center justify-center p-3 text-center space-y-1 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+            <Icons.CheckCircle2 size={32} className="text-emerald-400 animate-bounce" />
+            <span className="text-xs font-bold text-emerald-300 drop-shadow">
+              Kartu Berhasil Dimasukkan!
+            </span>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform duration-300 ${
+                  isHovered ? 'scale-125 rotate-6' : 'group-hover:scale-110'
+                }`}
+                style={{ backgroundColor: deckColor }}
+              >
+                <Icons.Folder size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold app-text-main group-hover:text-purple-400 transition-colors line-clamp-1">
+                  {deck.name}
+                </h4>
+                <span className="text-[10px] font-semibold app-text-muted">
+                  {deckCards.length} Kartu
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {deck.description && (
+            <p className="text-[11px] app-text-muted line-clamp-2 leading-relaxed">
+              {deck.description}
+            </p>
+          )}
+        </div>
+
+        {deckCards.length > 0 ? (
+          <div className="pt-2 border-t app-border flex items-center justify-between text-[10px] app-text-muted">
+            <div className="flex -space-x-1.5 overflow-hidden">
+              {deckCards.slice(0, 4).map((c, idx) => {
+                const cfg = CATEGORY_CONFIGS[c.category] || CATEGORY_CONFIGS.character;
+                return (
+                  <div
+                    key={c.id || idx}
+                    className="w-5 h-5 rounded-full border border-slate-900 flex items-center justify-center text-[9px] font-bold text-white shadow-sm"
+                    style={{ backgroundColor: cfg.color }}
+                    title={c.title}
+                  >
+                    {c.title ? c.title.charAt(0).toUpperCase() : '?'}
+                  </div>
+                );
+              })}
+            </div>
+            <span className="group-hover:text-purple-400 font-semibold transition-colors flex items-center gap-0.5">
+              Buka Deck ➔
+            </span>
+          </div>
+        ) : (
+          <div className="pt-2 border-t app-border text-[10px] app-text-muted flex items-center justify-between">
+            <span>Deck Kosong</span>
+            <span className="group-hover:text-purple-400 font-semibold transition-colors">
+              + Tambah Kartu
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderCardItem = (card: WorldCard) => {
+    const cfg = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
+    const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle || (() => null);
+    const assignedDeck = decks.find((d) => d.id === card.deckId || (d.cardIds || []).includes(card.id));
+    const isBeingDragged = draggedCardId === card.id;
+
+    return (
+      <div
+        key={`card-${card.id}`}
+        draggable={true}
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/plain', card.id);
+          e.dataTransfer.effectAllowed = 'move';
+          draggedCardIdRef.current = card.id;
+          setDraggedCardId(card.id);
+        }}
+        onDragEnd={() => {
+          setDraggedCardId(null);
+          setHoveredDeckId(null);
+          setIsHoveredRemoveZone(false);
+          setIsNearTop(false);
+          draggedCardIdRef.current = null;
+        }}
+        onClick={() => onCardClick(card)}
+        className={`app-bg-secondary border rounded-2xl overflow-hidden shadow-md transition-all cursor-grab active:cursor-grabbing group flex flex-col relative ${
+          isBeingDragged
+            ? 'opacity-40 scale-95 border-purple-500 border-dashed shadow-2xl ring-2 ring-purple-500/50'
+            : 'app-border hover:border-purple-400 hover:-translate-y-0.5'
+        }`}
+      >
+        {/* Category Header Bar */}
+        <div className="px-3 py-2 app-bg-main border-b app-border flex items-center justify-between gap-2">
+          <div
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${cfg.bgGradient} ${cfg.borderColor}`}
+            style={{ color: cfg.color }}
+          >
+            <IconComp size={11} />
+            <span>{cfg.label}</span>
+          </div>
+
+          <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity" title="Geser kartu">
+            <Icons.GripHorizontal size={14} className="app-text-muted cursor-grab" />
+          </div>
+        </div>
+
+        {/* Image */}
+        {card.imageUrl && (
+          <div className="h-32 w-full overflow-hidden relative">
+            <img
+              src={card.imageUrl}
+              alt={card.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
+          <div className="space-y-1">
+            <h3 className="text-xs font-bold app-text-main group-hover:text-purple-400 transition-colors">
+              {card.title || 'Kartu Tanpa Judul'}
+            </h3>
+            {card.subtitle && (
+              <p className="text-[11px] app-text-muted">
+                {card.subtitle}
+              </p>
+            )}
+            <p className="text-[11px] app-text-muted line-clamp-2 leading-relaxed pt-1">
+              {card.summary || 'Belum ada ringkasan...'}
+            </p>
+          </div>
+
+          {/* Footer Info & Assigned Deck Badge */}
+          <div className="pt-2 border-t app-border flex items-center justify-between">
+            {assignedDeck ? (
+              <span
+                className="text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 shadow-xs"
+                style={{
+                  borderColor: assignedDeck.color || '#8b5cf6',
+                  color: assignedDeck.color || '#a855f7',
+                  backgroundColor: `${assignedDeck.color || '#8b5cf6'}15`,
+                }}
+              >
+                <Icons.Folder size={10} />
+                <span className="truncate max-w-[90px]">{assignedDeck.name}</span>
+              </span>
+            ) : (
+              <span className="text-[10px] app-text-muted italic">Mandiri</span>
+            )}
+
+            {card.tags && card.tags.length > 0 && (
+              <div className="flex items-center gap-1">
+                {card.tags.slice(0, 2).map((tag, i) => (
+                  <span
+                    key={i}
+                    className="text-[9px] px-1.5 py-0.5 rounded app-bg-main app-text-muted border app-border"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="flex-1 app-bg-main p-6 overflow-y-auto app-text-main transition-colors">
+    <div
+      onDragOver={handleContainerDragOver}
+      className="flex-1 app-bg-main p-6 overflow-y-auto app-text-main transition-colors"
+    >
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* Header Banner */}
@@ -70,7 +420,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               </h2>
             </div>
             <p className="text-xs app-text-muted mt-1">
-              Arsip galeri terstruktur untuk mengelompokkan kartu entitas dan Deck folder dunia Anda.
+              Arsip galeri terstruktur. Anda dapat menggeser <span className="text-purple-400 font-semibold">(drag & drop)</span> kartu langsung ke dalam Deck folder.
             </p>
           </div>
 
@@ -133,7 +483,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               <button
                 type="button"
                 onClick={() => onEditDeckRequest(activeDeck)}
-                className="px-2.5 py-1.5 rounded-lg app-bg-main border app-border hover:border-slate-500 text-xs font-semibold app-text-muted hover:app-text-main transition-colors flex items-center gap-1"
+                className="px-2.5 py-1.5 rounded-lg app-bg-main border app-border hover:border-slate-500 text-xs font-semibold app-text-muted hover:app-text-main transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <Icons.Edit3 size={13} />
                 <span>Edit Deck</span>
@@ -144,7 +494,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   onDeleteDeckRequest(activeDeck.id);
                   setActiveDeckId(null);
                 }}
-                className="px-2.5 py-1.5 rounded-lg app-bg-main border app-border hover:border-rose-500 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-1"
+                className="px-2.5 py-1.5 rounded-lg app-bg-main border app-border hover:border-rose-500 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <Icons.Trash2 size={13} />
                 <span>Hapus Deck</span>
@@ -194,254 +544,63 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
         )}
 
-        {/* DECKS GRID SECTION (If not inside a specific deck & tab allows) */}
-        {!activeDeckId && (activeTab === 'all' || activeTab === 'decks') && (
-          <div className="space-y-3">
-            {activeTab === 'all' && decks.length > 0 && (
-              <div className="flex items-center justify-between pt-1">
-                <h3 className="text-xs font-bold app-text-muted uppercase tracking-wider flex items-center gap-1.5">
-                  <Icons.Folder size={14} className="text-purple-400" />
-                  <span>Daftar Deck ({filteredDecks.length})</span>
-                </h3>
+        {/* Remove Card From Deck Drop Zone Bar (Only visible when dragging a card & cursor approaches top inside a Deck) */}
+        {shouldShowRemoveZone && (
+          <div
+            onDragOver={handleRemoveFromDeckDragOver}
+            onDragLeave={handleRemoveFromDeckDragLeave}
+            onDrop={handleRemoveFromDeckDrop}
+            className={`w-full py-3 px-4 rounded-2xl border-2 border-dashed transition-all duration-300 flex items-center justify-center gap-2.5 select-none cursor-pointer animate-in fade-in slide-in-from-top-3 ${
+              isSuccessRemove
+                ? 'border-emerald-400 bg-emerald-950/40 text-emerald-300 scale-[1.01] ring-4 ring-emerald-500/40 shadow-xl'
+                : isHoveredRemoveZone
+                ? 'border-amber-400 bg-amber-950/50 text-amber-300 scale-[1.01] ring-4 ring-amber-500/40 shadow-xl'
+                : 'border-amber-500/60 bg-amber-950/30 text-amber-300 animate-pulse'
+            }`}
+          >
+            {isSuccessRemove ? (
+              <div className="flex items-center gap-2 pointer-events-none">
+                <Icons.CheckCircle2 size={18} className="text-emerald-400 animate-bounce shrink-0" />
+                <span className="text-xs font-bold text-emerald-300">
+                  Kartu Dikeluarkan dari Deck
+                </span>
               </div>
-            )}
-
-            {filteredDecks.length === 0 ? (
-              activeTab === 'decks' && (
-                <div className="text-center py-12 app-bg-secondary rounded-2xl border app-border app-text-muted space-y-3">
-                  <Icons.FolderPlus size={36} className="mx-auto text-purple-400 opacity-50" />
-                  <p className="text-xs">Belum ada Deck / Folder yang dibuat.</p>
-                  <button
-                    type="button"
-                    onClick={onCreateDeckRequest}
-                    className="px-3.5 py-2 app-accent-bg text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
-                  >
-                    + Buat Deck Pertama
-                  </button>
-                </div>
-              )
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {filteredDecks.map((deck) => {
-                  const deckCards = cards.filter(
-                    (c) => c.deckId === deck.id || (deck.cardIds || []).includes(c.id)
-                  );
-                  const deckColor = deck.color || '#a855f7';
-
-                  return (
-                    <div
-                      key={deck.id}
-                      onClick={() => setActiveDeckId(deck.id)}
-                      className="app-bg-secondary border app-border hover:border-purple-400 rounded-2xl p-4 shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-3 relative overflow-hidden"
-                    >
-                      {/* Top Accent Line */}
-                      <div
-                        className="absolute top-0 left-0 right-0 h-1"
-                        style={{ backgroundColor: deckColor }}
-                      />
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div
-                              className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform"
-                              style={{ backgroundColor: deckColor }}
-                            >
-                              <Icons.Folder size={18} />
-                            </div>
-                            <div>
-                              <h4 className="text-xs font-bold app-text-main group-hover:text-purple-400 transition-colors line-clamp-1">
-                                {deck.name}
-                              </h4>
-                              <span className="text-[10px] font-semibold app-text-muted">
-                                {deckCards.length} Kartu
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {deck.description && (
-                          <p className="text-[11px] app-text-muted line-clamp-2 leading-relaxed">
-                            {deck.description}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Card previews inside deck */}
-                      {deckCards.length > 0 ? (
-                        <div className="pt-2 border-t app-border flex items-center justify-between text-[10px] app-text-muted">
-                          <div className="flex -space-x-1.5 overflow-hidden">
-                            {deckCards.slice(0, 4).map((c, idx) => {
-                              const cfg = CATEGORY_CONFIGS[c.category] || CATEGORY_CONFIGS.character;
-                              return (
-                                <div
-                                  key={c.id || idx}
-                                  className="w-5 h-5 rounded-full border border-slate-900 flex items-center justify-center text-[9px] font-bold text-white shadow-sm"
-                                  style={{ backgroundColor: cfg.color }}
-                                  title={c.title}
-                                >
-                                  {c.title ? c.title.charAt(0).toUpperCase() : '?'}
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <span className="group-hover:text-purple-400 font-semibold transition-colors flex items-center gap-0.5">
-                            Buka Deck ➔
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="pt-2 border-t app-border text-[10px] app-text-muted flex items-center justify-between">
-                          <span>Deck Kosong</span>
-                          <span className="group-hover:text-purple-400 font-semibold transition-colors">
-                            + Tambah Kartu
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="flex items-center gap-2 pointer-events-none">
+                <Icons.FolderOutput
+                  size={18}
+                  className={`shrink-0 transition-transform ${
+                    isHoveredRemoveZone ? 'animate-bounce text-amber-300' : 'text-amber-400'
+                  }`}
+                />
+                <span className="text-xs font-bold">
+                  {isHoveredRemoveZone
+                    ? '✨ Lepaskan untuk Mengeluarkan Kartu'
+                    : '📤 Keluarkan Kartu dari Deck'}
+                </span>
               </div>
             )}
           </div>
         )}
 
-        {/* CARDS GRID SECTION */}
-        {!activeDeckId && activeTab === 'all' && cards.length > 0 && (
-          <div className="pt-3 border-t app-border">
-            <h3 className="text-xs font-bold app-text-muted uppercase tracking-wider flex items-center gap-1.5 mb-3">
-              <Icons.FileText size={14} className="text-purple-400" />
-              <span>Daftar Kartu ({filteredCards.length})</span>
-            </h3>
+        {/* UNIFIED GRID DISPLAY SECTION */}
+        {totalItemsCount === 0 ? (
+          <div className="text-center py-16 app-bg-secondary rounded-2xl border app-border app-text-muted space-y-3">
+            <Icons.FileText size={36} className="mx-auto app-text-muted opacity-50" />
+            <p className="text-xs">Tidak ada item atau kartu ditemukan dalam galeri ini.</p>
+            <button
+              type="button"
+              onClick={() => onAddCard(activeDeckId || undefined)}
+              className="px-3.5 py-2 app-accent-bg text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
+            >
+              + Buat Kartu Baru
+            </button>
           </div>
-        )}
-
-        {(activeDeckId || activeTab === 'all' || activeTab === 'cards') && (
-          filteredCards.length === 0 ? (
-            (activeTab === 'cards' || activeDeckId) && (
-              <div className="text-center py-16 app-bg-secondary rounded-2xl border app-border app-text-muted space-y-3">
-                <Icons.FileText size={36} className="mx-auto app-text-muted opacity-50" />
-                <p className="text-xs">Tidak ada kartu ditemukan dalam tampilan ini.</p>
-                <button
-                  type="button"
-                  onClick={() => onAddCard(activeDeckId || undefined)}
-                  className="px-3.5 py-2 app-accent-bg text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
-                >
-                  + Buat Kartu Baru
-                </button>
-              </div>
-            )
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredCards.map((card) => {
-                const cfg = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
-                const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle || (() => null);
-                const assignedDeck = decks.find((d) => d.id === card.deckId || (d.cardIds || []).includes(card.id));
-
-                return (
-                  <div
-                    key={card.id}
-                    onClick={() => onCardClick(card)}
-                    className="app-bg-secondary border app-border hover:border-purple-400 rounded-2xl overflow-hidden shadow-md transition-all cursor-pointer group flex flex-col"
-                  >
-                    {/* Header Pill Bar */}
-                    <div className="px-3 py-2 app-bg-main border-b app-border flex items-center justify-between gap-2">
-                      <div
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${cfg.bgGradient} ${cfg.borderColor}`}
-                        style={{ color: cfg.color }}
-                      >
-                        <IconComp size={11} />
-                        <span>{cfg.label}</span>
-                      </div>
-
-                      {/* Deck Selector Dropdown Badge */}
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="relative group/deck"
-                      >
-                        <select
-                          value={card.deckId || ''}
-                          onChange={(e) => onAssignCardToDeck(card.id, e.target.value || undefined)}
-                          className="bg-slate-900/80 border app-border text-[10px] font-semibold rounded px-1.5 py-0.5 app-text-muted hover:app-text-main focus:outline-none cursor-pointer max-w-[110px] truncate"
-                          title="Pilih Deck / Folder untuk kartu ini"
-                        >
-                          <option value="">(Tanpa Deck)</option>
-                          {decks.map((d) => (
-                            <option key={d.id} value={d.id}>
-                              📁 {d.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Image */}
-                    {card.imageUrl && (
-                      <div className="h-32 w-full overflow-hidden relative">
-                        <img
-                          src={card.imageUrl}
-                          alt={card.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90"
-                          loading="lazy"
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {/* Content */}
-                    <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
-                      <div className="space-y-1">
-                        <h3 className="text-xs font-bold app-text-main group-hover:text-purple-400 transition-colors">
-                          {card.title || 'Kartu Tanpa Judul'}
-                        </h3>
-                        {card.subtitle && (
-                          <p className="text-[11px] app-text-muted">
-                            {card.subtitle}
-                          </p>
-                        )}
-                        <p className="text-[11px] app-text-muted line-clamp-2 leading-relaxed pt-1">
-                          {card.summary || 'Belum ada ringkasan...'}
-                        </p>
-                      </div>
-
-                      {/* Footer Info */}
-                      <div className="pt-2 border-t app-border flex items-center justify-between">
-                        {assignedDeck ? (
-                          <span
-                            className="text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1"
-                            style={{
-                              borderColor: assignedDeck.color || '#8b5cf6',
-                              color: assignedDeck.color || '#a855f7',
-                              backgroundColor: `${assignedDeck.color || '#8b5cf6'}15`,
-                            }}
-                          >
-                            <Icons.Folder size={10} />
-                            <span className="truncate max-w-[90px]">{assignedDeck.name}</span>
-                          </span>
-                        ) : (
-                          <span className="text-[10px] app-text-muted">Lokal</span>
-                        )}
-
-                        {card.tags && card.tags.length > 0 && (
-                          <div className="flex items-center gap-1">
-                            {card.tags.slice(0, 2).map((tag, i) => (
-                              <span
-                                key={i}
-                                className="text-[9px] px-1.5 py-0.5 rounded app-bg-main app-text-muted border app-border"
-                              >
-                                #{tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {showDecksInGrid && filteredDecks.map(renderDeckItem)}
+            {showCardsInGrid && cardsToDisplay.map(renderCardItem)}
+          </div>
         )}
       </div>
     </div>

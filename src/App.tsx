@@ -22,7 +22,7 @@ import { WorldManagerModal } from './components/WorldManagerModal';
 import { DeleteCardModal } from './components/DeleteCardModal';
 import { CanvasModal } from './components/CanvasModal';
 import { DeckModal } from './components/DeckModal';
-import confetti from 'canvas-confetti';
+
 
 const STORAGE_THEME_KEY = 'worlddeck_theme_v1';
 
@@ -200,7 +200,7 @@ export const App: React.FC = () => {
           setWorlds([SAMPLE_WORLD]);
           setActiveWorldId(SAMPLE_WORLD.id);
         }
-        confetti({ particleCount: 100, spread: 70 });
+
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
@@ -230,7 +230,7 @@ export const App: React.FC = () => {
           setWorlds([SAMPLE_WORLD]);
           setActiveWorldId(SAMPLE_WORLD.id);
         }
-        confetti({ particleCount: 100, spread: 70 });
+
       }
     } catch (err) {
       alert('Gagal mengaktifkan kembali izin akses folder.');
@@ -410,7 +410,7 @@ export const App: React.FC = () => {
       };
     });
 
-    confetti({ particleCount: 40, spread: 50 });
+
   };
 
   // Deck Management Actions
@@ -458,11 +458,23 @@ export const App: React.FC = () => {
   };
 
   const handleAssignCardToDeck = (cardId: string, deckId?: string) => {
-    updateActiveWorld((prev) => ({
-      ...prev,
-      updatedAt: Date.now(),
-      cards: prev.cards.map((c) => (c.id === cardId ? { ...c, deckId } : c)),
-    }));
+    updateActiveWorld((prev) => {
+      const updatedCards = prev.cards.map((c) => (c.id === cardId ? { ...c, deckId } : c));
+      const updatedDecks = (prev.decks || []).map((d) => {
+        const cleanCardIds = (d.cardIds || []).filter((id) => id !== cardId);
+        if (d.id === deckId) {
+          return { ...d, cardIds: [...cleanCardIds, cardId] };
+        }
+        return { ...d, cardIds: cleanCardIds };
+      });
+
+      return {
+        ...prev,
+        updatedAt: Date.now(),
+        cards: updatedCards,
+        decks: updatedDecks,
+      };
+    });
   };
 
   // Save Card from Editor
@@ -577,7 +589,7 @@ export const App: React.FC = () => {
   const handleCreateWorld = (newWorld: WorldProject) => {
     setWorlds((prev) => [...prev, newWorld]);
     setActiveWorldId(newWorld.id);
-    confetti({ particleCount: 70, spread: 60 });
+
   };
 
   const handleDeleteWorld = (worldId: string) => {
@@ -613,7 +625,7 @@ export const App: React.FC = () => {
     };
 
     setWorlds((prev) => [...prev, duplicated]);
-    confetti({ particleCount: 50, spread: 50 });
+
   };
 
   // Canvas Management Actions
@@ -719,7 +731,7 @@ export const App: React.FC = () => {
   // Export JSON
   const handleExport = () => {
     downloadProjectJson(activeWorld);
-    confetti({ particleCount: 50, spread: 60, origin: { y: 0.1 } });
+
   };
 
   // Import JSON
@@ -740,7 +752,7 @@ export const App: React.FC = () => {
           };
           setWorlds((prev) => [...prev, newWorld]);
           setActiveWorldId(newWorld.id);
-          confetti({ particleCount: 100, spread: 70, origin: { y: 0.2 } });
+
           alert(`Berhasil mengimpor dunia: ${newWorld.name}`);
         } else {
           alert('Format berkas JSON tidak valid.');
@@ -761,7 +773,7 @@ export const App: React.FC = () => {
         connections: [],
         updatedAt: Date.now(),
       }));
-      confetti({ particleCount: 80, spread: 60 });
+
     }
   };
 
