@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { WorldCard, CardCategory } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import * as Icons from 'lucide-react';
@@ -11,6 +11,8 @@ interface SidebarFilterProps {
   onSearchChange: (q: string) => void;
   selectedCardId: string | null;
   onCardClick: (card: WorldCard) => void;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
 export const SidebarFilter: React.FC<SidebarFilterProps> = ({
@@ -21,9 +23,9 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
   onSearchChange,
   selectedCardId,
   onCardClick,
+  isOpen,
+  onToggle,
 }) => {
-  const [isOpen, setIsOpen] = useState(true);
-
   const filteredCards = cards.filter((card) => {
     const matchesCategory =
       selectedCategory === 'all' || card.category === selectedCategory;
@@ -39,7 +41,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
       {/* Mobile Toggle Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={onToggle}
         className="md:hidden fixed top-16 left-3 z-40 p-2 rounded-lg app-bg-secondary border app-border app-text-main shadow-lg"
       >
         <Icons.Menu size={18} />
@@ -47,8 +49,8 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
 
       {/* Sidebar Panel */}
       <aside
-        className={`fixed md:relative top-0 left-0 h-full w-72 app-bg-secondary border-r app-border flex flex-col z-30 transition-all duration-200 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        className={`sidebar-panel-transition transform absolute top-0 left-0 h-full w-72 app-bg-secondary border-r app-border flex flex-col z-30 ${
+          isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full shadow-none'
         }`}
       >
         {/* Sidebar Header / Search */}
@@ -57,9 +59,19 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
             <span className="text-[10px] font-bold uppercase tracking-wider app-text-muted">
               Workspace Navigation
             </span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded app-bg-main app-text-muted font-mono border app-border">
-              {filteredCards.length}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] px-1.5 py-0.2 rounded app-bg-main app-text-muted font-mono border app-border">
+                {filteredCards.length}
+              </span>
+              <button
+                type="button"
+                onClick={onToggle}
+                className="p-1 rounded hover:app-bg-hover app-text-muted hover:app-text-main transition-colors"
+                title="Sembunyikan Sidebar (Ctrl + \)"
+              >
+                <Icons.PanelLeftClose size={14} />
+              </button>
+            </div>
           </div>
 
           {/* Quick Search Bar */}

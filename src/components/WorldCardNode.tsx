@@ -141,7 +141,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       <button
         type="button"
         title="Tarik koneksi (Kanan)"
-        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full app-accent-bg text-white flex items-center justify-center shadow-lg border border-purple-300 opacity-0 group-hover:opacity-100 transition-all z-40 cursor-crosshair scale-90 hover:scale-110"
+        className="connection-handle-trigger -right-5 top-1/2 -translate-y-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();
           onStartConnection(card.id, e);
@@ -151,14 +151,16 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
           onStartConnection(card.id, e);
         }}
       >
-        <Icons.Plus size={13} strokeWidth={3} />
+        <div className="connection-handle-visual">
+          <Icons.Plus size={13} strokeWidth={3} />
+        </div>
       </button>
 
       {/* Left */}
       <button
         type="button"
         title="Tarik koneksi (Kiri)"
-        className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full app-accent-bg text-white flex items-center justify-center shadow-lg border border-purple-300 opacity-0 group-hover:opacity-100 transition-all z-40 cursor-crosshair scale-90 hover:scale-110"
+        className="connection-handle-trigger -left-5 top-1/2 -translate-y-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();
           onStartConnection(card.id, e);
@@ -168,14 +170,16 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
           onStartConnection(card.id, e);
         }}
       >
-        <Icons.Plus size={13} strokeWidth={3} />
+        <div className="connection-handle-visual">
+          <Icons.Plus size={13} strokeWidth={3} />
+        </div>
       </button>
 
       {/* Top */}
       <button
         type="button"
         title="Tarik koneksi (Atas)"
-        className="absolute left-1/2 -top-3 -translate-x-1/2 w-6 h-6 rounded-full app-accent-bg text-white flex items-center justify-center shadow-lg border border-purple-300 opacity-0 group-hover:opacity-100 transition-all z-40 cursor-crosshair scale-90 hover:scale-110"
+        className="connection-handle-trigger left-1/2 -top-5 -translate-x-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();
           onStartConnection(card.id, e);
@@ -185,14 +189,16 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
           onStartConnection(card.id, e);
         }}
       >
-        <Icons.Plus size={13} strokeWidth={3} />
+        <div className="connection-handle-visual">
+          <Icons.Plus size={13} strokeWidth={3} />
+        </div>
       </button>
 
       {/* Bottom */}
       <button
         type="button"
         title="Tarik koneksi (Bawah)"
-        className="absolute left-1/2 -bottom-3 -translate-x-1/2 w-6 h-6 rounded-full app-accent-bg text-white flex items-center justify-center shadow-lg border border-purple-300 opacity-0 group-hover:opacity-100 transition-all z-40 cursor-crosshair scale-90 hover:scale-110"
+        className="connection-handle-trigger left-1/2 -bottom-5 -translate-x-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();
           onStartConnection(card.id, e);
@@ -202,7 +208,9 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
           onStartConnection(card.id, e);
         }}
       >
-        <Icons.Plus size={13} strokeWidth={3} />
+        <div className="connection-handle-visual">
+          <Icons.Plus size={13} strokeWidth={3} />
+        </div>
       </button>
     </div>
   );

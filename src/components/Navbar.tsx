@@ -23,6 +23,8 @@ interface NavbarProps {
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -43,6 +45,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   canRedo,
   onUndo,
   onRedo,
+  isSidebarOpen,
+  onToggleSidebar,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -64,6 +68,16 @@ export const Navbar: React.FC<NavbarProps> = ({
       
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-xs">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="p-1.5 rounded-lg app-text-muted hover:app-text-main app-bg-hover transition-colors mr-1 cursor-pointer"
+            title={isSidebarOpen ? "Sembunyikan Sidebar (Ctrl + \\)" : "Tampilkan Sidebar (Ctrl + \\)"}
+          >
+            {isSidebarOpen ? <Icons.PanelLeftClose size={16} /> : <Icons.PanelLeft size={16} />}
+          </button>
+        )}
         <button
           type="button"
           onClick={onOpenWorldManager}
@@ -187,23 +201,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>Tambah Kartu</span>
         </button>
 
-        {/* Theme Selector */}
-        <div className="flex items-center gap-1 app-bg-secondary border app-border rounded-lg px-2 py-1 text-xs">
-          <Icons.Palette size={14} className="app-accent-text" />
-          <select
-            value={currentTheme}
-            onChange={(e) => onThemeChange(e.target.value as AppTheme)}
-            className="bg-transparent app-text-main text-xs focus:outline-none cursor-pointer"
-            title="Pilih Tema Warna Aplikasi"
-          >
-            <option value="notion-dark" className="app-bg-secondary app-text-main">🖤 Notion Dark</option>
-            <option value="notion-light" className="app-bg-secondary app-text-main">📄 Notion Light</option>
-            <option value="cyberpunk" className="app-bg-secondary app-text-main">🌆 Cyberpunk</option>
-            <option value="dracula" className="app-bg-secondary app-text-main">🧛 Dracula</option>
-            <option value="nordic" className="app-bg-secondary app-text-main">❄️ Nordic Slate</option>
-          </select>
-        </div>
-
         {/* Consolidated Actions Dropdown Menu */}
         <div className="relative" ref={menuRef}>
           <button
@@ -218,7 +215,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {isMenuOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-48 app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 z-50 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 space-y-0.5">
+            <div className="absolute right-0 top-full mt-1.5 w-52 app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 z-50 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 space-y-0.5">
               
               <button
                 type="button"
@@ -253,6 +250,28 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
                 className="hidden"
               />
+
+              <div className="my-1 border-t app-border opacity-50" />
+
+              {/* Theme Selector inside Dropdown */}
+              <div className="w-full px-3 py-2 flex items-center justify-between hover:app-bg-hover transition-colors text-xs font-semibold">
+                <div className="flex items-center gap-2">
+                  <Icons.Palette size={14} className="app-accent-text" />
+                  <span>Tema Warna</span>
+                </div>
+                <select
+                  value={currentTheme}
+                  onChange={(e) => onThemeChange(e.target.value as AppTheme)}
+                  className="bg-transparent app-text-main text-xs focus:outline-none cursor-pointer max-w-[120px] text-right font-medium"
+                  title="Pilih Tema Warna Aplikasi"
+                >
+                  <option value="notion-dark" className="app-bg-secondary app-text-main">Notion Dark</option>
+                  <option value="notion-light" className="app-bg-secondary app-text-main">Notion Light</option>
+                  <option value="cyberpunk" className="app-bg-secondary app-text-main">Cyberpunk</option>
+                  <option value="dracula" className="app-bg-secondary app-text-main">Dracula</option>
+                  <option value="nordic" className="app-bg-secondary app-text-main">Nordic Slate</option>
+                </select>
+              </div>
 
               <div className="my-1 border-t app-border opacity-50" />
 

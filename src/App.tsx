@@ -117,6 +117,7 @@ export const App: React.FC = () => {
 
   // UI State
   const [viewMode, setViewMode] = useState<ViewMode>('canvas');
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CardCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -177,7 +178,7 @@ export const App: React.FC = () => {
     }
   };
 
-  // Global Keyboard Shortcuts for Undo (Ctrl+Z) & Redo (Ctrl+Y / Ctrl+Shift+Z)
+  // Global Keyboard Shortcuts for Undo (Ctrl+Z) & Redo (Ctrl+Y / Ctrl+Shift+Z) and Toggle Sidebar (Ctrl+\ / Ctrl+B)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -194,6 +195,9 @@ export const App: React.FC = () => {
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         handleRedo();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '\\' || e.key.toLowerCase() === 'b')) {
+        e.preventDefault();
+        setIsSidebarOpen((prev) => !prev);
       }
     };
 
@@ -455,6 +459,8 @@ export const App: React.FC = () => {
         canRedo={historyIndex < historyStack.length - 1}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={viewMode === 'canvas' ? () => setIsSidebarOpen(!isSidebarOpen) : undefined}
       />
 
       {/* Main Workspace Area */}
@@ -472,6 +478,8 @@ export const App: React.FC = () => {
             onCardClick={(card) => {
               setSelectedCardId(card.id);
             }}
+            isOpen={isSidebarOpen}
+            onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
           />
         )}
 
