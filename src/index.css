@@ -1,0 +1,173 @@
+@import url('https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css');
+
+/* Theme CSS Variables */
+:root {
+  --bg-primary: #191919;
+  --bg-secondary: #202020;
+  --bg-hover: #2c2c2c;
+  --border: #2f2f2f;
+  --border-light: #383838;
+  --text-primary: #efefef;
+  --text-muted: #9b9b9b;
+  --accent: #2383e2;
+  --grid-dot: #404040;
+  --line-stroke: #666666;
+  --line-stroke-highlight: #2383e2;
+}
+
+body.theme-notion-dark {
+  --bg-primary: #191919;
+  --bg-secondary: #202020;
+  --bg-hover: #2c2c2c;
+  --border: #2f2f2f;
+  --border-light: #383838;
+  --text-primary: #efefef;
+  --text-muted: #9b9b9b;
+  --accent: #2383e2;
+  --grid-dot: #3a3a3a;
+  --line-stroke: #666666;
+  --line-stroke-highlight: #2383e2;
+  background-color: #191919;
+  color: #efefef;
+}
+
+body.theme-notion-light {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f7f5;
+  --bg-hover: #efefe6;
+  --border: #e3e3e1;
+  --border-light: #d3d3d1;
+  --text-primary: #37352f;
+  --text-muted: #787774;
+  --accent: #2383e2;
+  --grid-dot: #cccccc;
+  --line-stroke: #666666;
+  --line-stroke-highlight: #2383e2;
+  background-color: #ffffff;
+  color: #37352f;
+}
+
+body.theme-cyberpunk {
+  --bg-primary: #080b12;
+  --bg-secondary: #101625;
+  --bg-hover: #1b263b;
+  --border: #263859;
+  --border-light: #3b4d75;
+  --text-primary: #f0f4fc;
+  --text-muted: #7a8fae;
+  --accent: #a855f7;
+  --grid-dot: #1f2f4d;
+  --line-stroke: #00f0ff;
+  --line-stroke-highlight: #ff007f;
+  background-color: #080b12;
+  color: #f0f4fc;
+}
+
+body.theme-dracula {
+  --bg-primary: #282a36;
+  --bg-secondary: #343746;
+  --bg-hover: #44475a;
+  --border: #44475a;
+  --border-light: #6272a4;
+  --text-primary: #f8f8f2;
+  --text-muted: #95a3cf;
+  --accent: #bd93f9;
+  --grid-dot: #44475a;
+  --line-stroke: #8b9cdb;
+  --line-stroke-highlight: #ff79c6;
+  background-color: #282a36;
+  color: #f8f8f2;
+}
+
+body.theme-nordic {
+  --bg-primary: #2e3440;
+  --bg-secondary: #3b4252;
+  --bg-hover: #434c5e;
+  --border: #4c566a;
+  --border-light: #5e6b85;
+  --text-primary: #eceff4;
+  --text-muted: #d8dee9;
+  --accent: #88c0d0;
+  --grid-dot: #434c5e;
+  --line-stroke: #88c0d0;
+  --line-stroke-highlight: #ebcb8b;
+  background-color: #2e3440;
+  color: #eceff4;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Theme Helper Classes */
+.app-bg-main {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.app-bg-secondary {
+  background-color: var(--bg-secondary) !important;
+  transition: background-color 0.2s ease;
+}
+
+.app-bg-hover:hover {
+  background-color: var(--bg-hover) !important;
+}
+
+.app-border {
+  border-color: var(--border) !important;
+  transition: border-color 0.2s ease;
+}
+
+.app-text-main {
+  color: var(--text-primary) !important;
+}
+
+.app-text-muted {
+  color: var(--text-muted) !important;
+}
+
+.app-accent-text {
+  color: var(--accent) !important;
+}
+
+.app-accent-bg {
+  background-color: var(--accent) !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(150, 150, 150, 0.45);
+}
+
+/* Notion Callout Box */
+.notion-callout {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+}

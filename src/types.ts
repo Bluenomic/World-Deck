@@ -1,0 +1,78 @@
+export type CardCategory = 
+  | 'character'
+  | 'faction'
+  | 'location'
+  | 'lore'
+  | 'timeline'
+  | 'item'
+  | 'realm';
+
+export interface CustomAttribute {
+  id: string;
+  key: string;
+  value: string;
+}
+
+export interface WorldCard {
+  id: string;
+  title: string;
+  subtitle?: string;
+  category: CardCategory;
+  summary: string;
+  content: string;
+  imageUrl?: string;
+  tags: string[];
+  attributes: CustomAttribute[];
+  x: number;
+  y: number;
+  pinned?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type RelationType = 
+  | 'ally'
+  | 'enemy'
+  | 'member'
+  | 'leader'
+  | 'located_in'
+  | 'creator'
+  | 'owner'
+  | 'caused_by'
+  | 'involved_in'
+  | 'custom';
+
+export interface CardConnection {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  label: string;
+  type?: RelationType;
+  description?: string;
+}
+
+export interface WorldProject {
+  id: string;
+  name: string;
+  description: string;
+  author?: string;
+  version: string;
+  cards: WorldCard[];
+  connections: CardConnection[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type ViewMode = 'canvas' | 'library' | 'timeline' | 'relations';
+
+export type AppTheme = 'notion-dark' | 'notion-light' | 'cyberpunk' | 'dracula' | 'nordic';
+
+export interface CategoryConfig {
+  id: CardCategory;
+  label: string;
+  iconName: string;
+  color: string; // Tailwind color name or hex
+  bgGradient: string;
+  borderColor: string;
+  glowColor: string;
+}
