@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import type { WorldCard, CardConnection, CardCategory } from '../types';
 import { WorldCardNode } from './WorldCardNode';
 import { getBezierPath } from '../utils/helpers';
+import { loadCanvasViewport, saveCanvasViewport } from '../utils/storage';
 import * as Icons from 'lucide-react';
 
 interface CanvasProps {
@@ -9,6 +10,7 @@ interface CanvasProps {
   connections: CardConnection[];
   selectedCardId: string | null;
   selectedCategory: CardCategory | 'all';
+  activeCanvasId?: string;
   onSelectCard: (card: WorldCard | null) => void;
   onDoubleClickCard: (card: WorldCard) => void;
   onUpdateCardPosition: (id: string, x: number, y: number) => void;
@@ -23,6 +25,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   connections,
   selectedCardId,
   selectedCategory,
+  activeCanvasId,
   onSelectCard,
   onDoubleClickCard,
   onUpdateCardPosition,
@@ -32,12 +35,22 @@ export const Canvas: React.FC<CanvasProps> = ({
   onDeleteCardsRequest,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const targetCanvasId = activeCanvasId || 'default';
   
-  // Pan and Zoom State
-  const [zoom, setZoom] = useState<number>(1);
-  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 40, y: 40 });
+  // Pan and Zoom State (initialized from saved preferences)
+  const [zoom, setZoom] = useState<number>(() => loadCanvasViewport(targetCanvasId).zoom);
+  const [pan, setPan] = useState<{ x: number; y: number }>(() => loadCanvasViewport(targetCanvasId).pan);
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Restore saved viewport when activeCanvasId changes
+  useEffect(() => {
+    const saved = loadCanvasViewport(targetCanvasId);
+    setZoom(saved.zoom);
+    setPan(saved.pan);
+    zoomRef.current = saved.zoom;
+    panRef.current = saved.pan;
+  }, [targetCanvasId]);
 
   // Spacebar Navigation State
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
@@ -182,6 +195,28 @@ export const Canvas: React.FC<CanvasProps> = ({
   useEffect(() => {
     panRef.current = pan;
   }, [pan]);
+
+  // Auto-save viewport preferences when zoom or pan changes (debounced)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      saveCanvasViewport(targetCanvasId, { zoom, pan });
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [zoom, pan, targetCanvasId]);
+
+  // Ensure latest viewport is saved before tab unload or component unmount
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveCanvasViewport(targetCanvasId, { zoom: zoomRef.current, pan: panRef.current });
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      saveCanvasViewport(targetCanvasId, { zoom: zoomRef.current, pan: panRef.current });
+    };
+  }, [targetCanvasId]);
 
   // Precise Cursor-Centric Focal Zoom
   const zoomAtPoint = useCallback((targetZoom: number, clientX: number, clientY: number) => {

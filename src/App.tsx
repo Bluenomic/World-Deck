@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { WorldProject, WorldCard, CardConnection, ViewMode, CardCategory, AppTheme } from './types';
 import { SAMPLE_WORLD } from './data/sampleWorld';
 import { generateId, downloadProjectJson } from './utils/helpers';
-import { saveLocalFileHandle, loadLocalFileHandle } from './utils/storage';
+import { saveLocalFileHandle, loadLocalFileHandle, loadWorkspacePreferences, saveWorkspacePreferences } from './utils/storage';
 import * as Icons from 'lucide-react';
 import {
   readAllProjectsFromDirectory,
@@ -54,13 +54,26 @@ export const App: React.FC = () => {
   const [worlds, setWorlds] = useState<WorldProject[]>([SAMPLE_WORLD]);
   const [activeWorldId, setActiveWorldId] = useState<string>(SAMPLE_WORLD.id);
 
-  // UI State
-  const [viewMode, setViewMode] = useState<ViewMode>('canvas');
+  // UI State initialized from workspace preferences
+  const [viewMode, setViewMode] = useState<ViewMode>(() => loadWorkspacePreferences().viewMode || 'canvas');
   const [activeCanvasId, setActiveCanvasId] = useState<string>('default');
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => loadWorkspacePreferences().isSidebarOpen);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CardCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  const handleToggleSidebar = () => {
+    setIsSidebarOpen((prev) => {
+      const next = !prev;
+      saveWorkspacePreferences({ isSidebarOpen: next });
+      return next;
+    });
+  };
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    saveWorkspacePreferences({ viewMode: mode });
+  };
 
   // Modals
   const [editingCard, setEditingCard] = useState<WorldCard | null>(null);
@@ -287,7 +300,7 @@ export const App: React.FC = () => {
         handleRedo();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === '\\' || e.key.toLowerCase() === 'b')) {
         e.preventDefault();
-        setIsSidebarOpen((prev) => !prev);
+        handleToggleSidebar();
       }
     };
 
@@ -691,7 +704,7 @@ export const App: React.FC = () => {
       <Navbar
         projectName={activeWorld.name}
         viewMode={viewMode}
-        onViewModeChange={setViewMode}
+        onViewModeChange={handleViewModeChange}
         currentTheme={currentTheme}
         onThemeChange={setCurrentTheme}
         onExport={handleExport}
@@ -706,7 +719,7 @@ export const App: React.FC = () => {
         onUndo={handleUndo}
         onRedo={handleRedo}
         isSidebarOpen={isSidebarOpen}
-        onToggleSidebar={viewMode === 'canvas' ? () => setIsSidebarOpen(!isSidebarOpen) : undefined}
+        onToggleSidebar={viewMode === 'canvas' ? handleToggleSidebar : undefined}
       />
 
       {/* Main Workspace Area */}
@@ -725,7 +738,7 @@ export const App: React.FC = () => {
               setSelectedCardId(card.id);
             }}
             isOpen={isSidebarOpen}
-            onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+            onToggle={handleToggleSidebar}
             canvases={activeWorldCanvases}
             activeCanvasId={activeCanvasId}
             onCanvasSelect={setActiveCanvasId}
@@ -739,6 +752,7 @@ export const App: React.FC = () => {
         <main className="flex-1 relative overflow-hidden flex flex-col">
           {viewMode === 'canvas' && (
             <Canvas
+              activeCanvasId={activeCanvasId}
               cards={activeCanvasCards.filter(
                 (c) =>
                   c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

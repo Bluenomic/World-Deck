@@ -84,3 +84,17 @@ export interface CategoryConfig {
   borderColor: string;
   glowColor: string;
 }
+
+export interface CanvasViewport {
+  zoom: number;
+  pan: { x: number; y: number };
+}
+
+export interface WorkspacePreferences {
+  isSidebarOpen: boolean;
+  sidebarWidth: number;
+  categoriesHeight: number;
+  canvasesHeight: number;
+  viewMode?: ViewMode;
+  canvasViewports?: Record<string, CanvasViewport>;
+}

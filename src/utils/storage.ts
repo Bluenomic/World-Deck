@@ -1,4 +1,76 @@
-import type { WorldProject } from '../types';
+import type { WorldProject, WorkspacePreferences, CanvasViewport } from '../types';
+
+const WORKSPACE_PREFS_KEY = 'worlddeck_workspace_prefs_v1';
+
+export const DEFAULT_WORKSPACE_PREFERENCES: WorkspacePreferences = {
+  isSidebarOpen: true,
+  sidebarWidth: 288,
+  categoriesHeight: 30,
+  canvasesHeight: 30,
+  viewMode: 'canvas',
+  canvasViewports: {},
+};
+
+/**
+ * Loads workspace preferences from LocalStorage
+ */
+export const loadWorkspacePreferences = (): WorkspacePreferences => {
+  try {
+    const saved = localStorage.getItem(WORKSPACE_PREFS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        ...DEFAULT_WORKSPACE_PREFERENCES,
+        ...parsed,
+      };
+    }
+  } catch (err) {
+    console.warn('Failed to load workspace preferences:', err);
+  }
+  return DEFAULT_WORKSPACE_PREFERENCES;
+};
+
+/**
+ * Saves partial workspace preferences to LocalStorage
+ */
+export const saveWorkspacePreferences = (prefs: Partial<WorkspacePreferences>) => {
+  try {
+    const current = loadWorkspacePreferences();
+    const updated = { ...current, ...prefs };
+    localStorage.setItem(WORKSPACE_PREFS_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.warn('Failed to save workspace preferences:', err);
+  }
+};
+
+/**
+ * Saves canvas viewport (zoom & pan) for a specific canvas ID to LocalStorage
+ */
+export const saveCanvasViewport = (canvasId: string, viewport: CanvasViewport) => {
+  try {
+    const current = loadWorkspacePreferences();
+    const updatedViewports = {
+      ...(current.canvasViewports || {}),
+      [canvasId]: viewport,
+    };
+    saveWorkspacePreferences({ canvasViewports: updatedViewports });
+  } catch (err) {
+    console.warn('Failed to save canvas viewport:', err);
+  }
+};
+
+/**
+ * Loads canvas viewport (zoom & pan) for a specific canvas ID from LocalStorage
+ */
+export const loadCanvasViewport = (canvasId: string): CanvasViewport => {
+  try {
+    const prefs = loadWorkspacePreferences();
+    if (prefs.canvasViewports && prefs.canvasViewports[canvasId]) {
+      return prefs.canvasViewports[canvasId];
+    }
+  } catch (err) {}
+  return { zoom: 1, pan: { x: 40, y: 40 } };
+};
 
 const DB_NAME = 'WorldDeckDatabase_v1';
 const DB_VERSION = 1;

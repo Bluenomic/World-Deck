@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import type { WorldCard, CardCategory, WorldCanvas } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
+import { loadWorkspacePreferences, saveWorkspacePreferences } from '../utils/storage';
 import * as Icons from 'lucide-react';
 
 interface SidebarFilterProps {
@@ -42,10 +43,10 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // Resizable Panel Heights in percentage
-  const [categoriesHeight, setCategoriesHeight] = useState<number>(30); // Default 30%
-  const [canvasesHeight, setCanvasesHeight] = useState<number>(30);     // Default 30%
-  // The third panel (cardsHeight) gets the rest: 100 - categoriesHeight - canvasesHeight
+  // Resizable Panel Heights in percentage & Sidebar Width in px from preferences
+  const [categoriesHeight, setCategoriesHeight] = useState<number>(() => loadWorkspacePreferences().categoriesHeight);
+  const [canvasesHeight, setCanvasesHeight] = useState<number>(() => loadWorkspacePreferences().canvasesHeight);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => loadWorkspacePreferences().sidebarWidth);
 
   const filteredCards = cards.filter((card) => {
     const matchesCategory =
@@ -64,17 +65,21 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
     const startCanHeight = canvasesHeight;
     const containerHeight = containerRef.current?.getBoundingClientRect().height || 500;
 
+    let currentCat = startCatHeight;
+    let currentCan = startCanHeight;
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaY = moveEvent.clientY - startY;
       const deltaPercent = (deltaY / containerHeight) * 100;
 
       if (divider === 'first') {
         const newCatHeight = Math.max(15, Math.min(50, startCatHeight + deltaPercent));
+        currentCat = newCatHeight;
         setCategoriesHeight(newCatHeight);
       } else {
         const newCanHeight = Math.max(15, Math.min(50, startCanHeight + deltaPercent));
-        // Keep categoriesHeight constant, adjust canvasesHeight
-        if (categoriesHeight + newCanHeight < 80) {
+        if (startCatHeight + newCanHeight < 80) {
+          currentCan = newCanHeight;
           setCanvasesHeight(newCanHeight);
         }
       }
@@ -83,6 +88,33 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
     const handleMouseUp = () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      saveWorkspacePreferences({
+        categoriesHeight: currentCat,
+        canvasesHeight: currentCan,
+      });
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseDownWidthResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    let currentWidth = startWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(220, Math.min(500, startWidth + deltaX));
+      currentWidth = newWidth;
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      saveWorkspacePreferences({ sidebarWidth: currentWidth });
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -102,10 +134,22 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
 
       {/* Sidebar Panel */}
       <aside
-        className={`sidebar-panel-transition transform absolute top-0 left-0 h-full w-72 app-bg-secondary border-r app-border flex flex-col z-30 ${
+        style={{
+          width: typeof window !== 'undefined' && window.innerWidth < 768 ? undefined : `${sidebarWidth}px`,
+        }}
+        className={`sidebar-panel-transition transform absolute top-0 left-0 h-full app-bg-secondary border-r app-border flex flex-col z-30 ${
           isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full shadow-none'
         }`}
       >
+        {/* Right Edge Resizer Handle for Sidebar Width */}
+        <div
+          onMouseDown={handleMouseDownWidthResize}
+          className="hidden md:block absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-purple-500/40 transition-colors z-40 group -mr-1"
+          title="Seret untuk mengubah lebar sidebar"
+        >
+          <div className="w-[2px] h-full bg-transparent group-hover:bg-purple-400 mx-auto" />
+        </div>
+
         {/* Sidebar Header / Search */}
         <div className="p-3 border-b app-border space-y-2.5 shrink-0">
           <div className="flex items-center justify-between px-1">
