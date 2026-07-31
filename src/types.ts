@@ -13,6 +13,12 @@ export interface CustomAttribute {
   value: string;
 }
 
+export interface WorldCanvas {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
 export interface WorldCard {
   id: string;
   title: string;
@@ -26,6 +32,7 @@ export interface WorldCard {
   x: number;
   y: number;
   pinned?: boolean;
+  canvasId?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -59,6 +66,7 @@ export interface WorldProject {
   version: string;
   cards: WorldCard[];
   connections: CardConnection[];
+  canvases?: WorldCanvas[];
   createdAt: number;
   updatedAt: number;
 }

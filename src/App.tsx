@@ -20,6 +20,7 @@ import { ConnectionModal } from './components/ConnectionModal';
 import { HelpGuideModal } from './components/HelpGuideModal';
 import { WorldManagerModal } from './components/WorldManagerModal';
 import { DeleteCardModal } from './components/DeleteCardModal';
+import { CanvasModal } from './components/CanvasModal';
 import confetti from 'canvas-confetti';
 
 const STORAGE_THEME_KEY = 'worldarchive_theme_v1';
@@ -52,6 +53,39 @@ export const App: React.FC = () => {
   // Worlds & Active World State
   const [worlds, setWorlds] = useState<WorldProject[]>([SAMPLE_WORLD]);
   const [activeWorldId, setActiveWorldId] = useState<string>(SAMPLE_WORLD.id);
+
+  // UI State
+  const [viewMode, setViewMode] = useState<ViewMode>('canvas');
+  const [activeCanvasId, setActiveCanvasId] = useState<string>('default');
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<CardCategory | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Modals
+  const [editingCard, setEditingCard] = useState<WorldCard | null>(null);
+  const [editingConnection, setEditingConnection] = useState<CardConnection | null>(null);
+  const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
+  const [showWorldManager, setShowWorldManager] = useState<boolean>(false);
+  const [cardsToDelete, setCardsToDelete] = useState<WorldCard[] | null>(null);
+  const [canvasModalConfig, setCanvasModalConfig] = useState<{
+    isOpen: boolean;
+    mode: 'create' | 'rename';
+    canvasId?: string;
+    title: string;
+    submitLabel: string;
+    initialValue: string;
+  }>({
+    isOpen: false,
+    mode: 'create',
+    title: 'Buat Kanvas Baru',
+    submitLabel: 'Buat Kanvas',
+    initialValue: '',
+  });
+
+  // Undo & Redo History State
+  const [historyStack, setHistoryStack] = useState<WorldProject[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
   // Async Load State on Startup from IndexedDB & LocalStorage
   useEffect(() => {
@@ -96,6 +130,17 @@ export const App: React.FC = () => {
 
   // Derived Active World
   const activeWorld = worlds.find((w) => w.id === activeWorldId) || worlds[0] || SAMPLE_WORLD;
+
+  // Derived active canvas cards and connections
+  const activeWorldCanvases = activeWorld.canvases && activeWorld.canvases.length > 0
+    ? activeWorld.canvases
+    : [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }];
+
+  const activeCanvasCards = activeWorld.cards.filter((c) => (c.canvasId || 'default') === activeCanvasId);
+  const activeCanvasCardIds = activeCanvasCards.map((c) => c.id);
+  const activeCanvasConnections = activeWorld.connections.filter(
+    (conn) => activeCanvasCardIds.includes(conn.sourceId) && activeCanvasCardIds.includes(conn.targetId)
+  );
 
   // Auto save activeWorldId to LocalStorage
   useEffect(() => {
@@ -176,23 +221,7 @@ export const App: React.FC = () => {
     }
   };
 
-  // UI State
-  const [viewMode, setViewMode] = useState<ViewMode>('canvas');
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<CardCategory | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Modals
-  const [editingCard, setEditingCard] = useState<WorldCard | null>(null);
-  const [editingConnection, setEditingConnection] = useState<CardConnection | null>(null);
-  const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
-  const [showWorldManager, setShowWorldManager] = useState<boolean>(false);
-  const [cardsToDelete, setCardsToDelete] = useState<WorldCard[] | null>(null);
-
-  // Undo & Redo History State
-  const [historyStack, setHistoryStack] = useState<WorldProject[]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
   // Helper to update active world in worlds array with history recording
   const updateActiveWorld = (updater: (prevWorld: WorldProject) => WorldProject) => {
@@ -288,6 +317,7 @@ export const App: React.FC = () => {
       attributes: [],
       x,
       y,
+      canvasId: activeCanvasId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -452,6 +482,96 @@ export const App: React.FC = () => {
     confetti({ particleCount: 50, spread: 50 });
   };
 
+  // Canvas Management Actions
+  const handleCreateCanvas = (name: string) => {
+    const newCanvasId = generateId('canvas');
+    const newCanvas = {
+      id: newCanvasId,
+      name: name || 'Kanvas Baru',
+      createdAt: Date.now(),
+    };
+    updateActiveWorld((prev) => ({
+      ...prev,
+      canvases: [...(prev.canvases || [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }]), newCanvas],
+      updatedAt: Date.now(),
+    }));
+    setActiveCanvasId(newCanvasId);
+  };
+
+  const handleRenameCanvas = (canvasId: string, newName: string) => {
+    updateActiveWorld((prev) => {
+      const canvases = prev.canvases && prev.canvases.length > 0
+        ? prev.canvases
+        : [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }];
+      return {
+        ...prev,
+        canvases: canvases.map((c) => (c.id === canvasId ? { ...c, name: newName } : c)),
+        updatedAt: Date.now(),
+      };
+    });
+  };
+
+  const handleTriggerCreateCanvas = () => {
+    setCanvasModalConfig({
+      isOpen: true,
+      mode: 'create',
+      title: 'Buat Kanvas Baru',
+      submitLabel: 'Buat Kanvas',
+      initialValue: '',
+    });
+  };
+
+  const handleTriggerRenameCanvas = (canvasId: string, currentName: string) => {
+    setCanvasModalConfig({
+      isOpen: true,
+      mode: 'rename',
+      canvasId,
+      title: 'Ubah Nama Kanvas',
+      submitLabel: 'Simpan Nama',
+      initialValue: currentName,
+    });
+  };
+
+  const handleCanvasModalSubmit = (name: string) => {
+    if (canvasModalConfig.mode === 'create') {
+      handleCreateCanvas(name);
+    } else if (canvasModalConfig.mode === 'rename' && canvasModalConfig.canvasId) {
+      handleRenameCanvas(canvasModalConfig.canvasId, name);
+    }
+  };
+
+  const handleDeleteCanvas = (canvasId: string) => {
+    const canvases = activeWorld.canvases && activeWorld.canvases.length > 0
+      ? activeWorld.canvases
+      : [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }];
+    if (canvases.length <= 1) {
+      alert('Anda harus menyisakan setidaknya satu kanvas.');
+      return;
+    }
+    if (window.confirm('Hapus kanvas ini beserta semua kartu di dalamnya secara permanen?')) {
+      updateActiveWorld((prev) => {
+        const remainingCanvases = (prev.canvases || []).filter((c) => c.id !== canvasId);
+        return {
+          ...prev,
+          canvases: remainingCanvases,
+          cards: prev.cards.filter((c) => (c.canvasId || 'default') !== canvasId),
+          connections: prev.connections.filter((conn) => {
+            const sourceCard = prev.cards.find((c) => c.id === conn.sourceId);
+            const targetCard = prev.cards.find((c) => c.id === conn.targetId);
+            return (
+              sourceCard && (sourceCard.canvasId || 'default') !== canvasId &&
+              targetCard && (targetCard.canvasId || 'default') !== canvasId
+            );
+          }),
+          updatedAt: Date.now(),
+        };
+      });
+      // Switch active canvas
+      const remaining = canvases.filter((c) => c.id !== canvasId);
+      setActiveCanvasId(remaining[0].id);
+    }
+  };
+
   const handleUpdateWorldInfo = (worldId: string, name: string, description: string, author: string) => {
     setWorlds((prev) =>
       prev.map((w) =>
@@ -595,7 +715,7 @@ export const App: React.FC = () => {
         {/* Sidebar Filter (Visible in Canvas view) */}
         {viewMode === 'canvas' && (
           <SidebarFilter
-            cards={activeWorld.cards}
+            cards={activeCanvasCards}
             selectedCategory={selectedCategory}
             onCategorySelect={setSelectedCategory}
             searchQuery={searchQuery}
@@ -606,6 +726,12 @@ export const App: React.FC = () => {
             }}
             isOpen={isSidebarOpen}
             onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+            canvases={activeWorldCanvases}
+            activeCanvasId={activeCanvasId}
+            onCanvasSelect={setActiveCanvasId}
+            onCreateCanvasRequest={handleTriggerCreateCanvas}
+            onCanvasRenameRequest={handleTriggerRenameCanvas}
+            onCanvasDelete={handleDeleteCanvas}
           />
         )}
 
@@ -613,13 +739,13 @@ export const App: React.FC = () => {
         <main className="flex-1 relative overflow-hidden flex flex-col">
           {viewMode === 'canvas' && (
             <Canvas
-              cards={activeWorld.cards.filter(
+              cards={activeCanvasCards.filter(
                 (c) =>
                   c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                   c.summary.toLowerCase().includes(searchQuery.toLowerCase())
               )}
               selectedCategory={selectedCategory}
-              connections={activeWorld.connections}
+              connections={activeCanvasConnections}
               selectedCardId={selectedCardId}
               onSelectCard={(card) => setSelectedCardId(card ? card.id : null)}
               onDoubleClickCard={(card) => setEditingCard(card)}
@@ -633,7 +759,7 @@ export const App: React.FC = () => {
 
           {viewMode === 'library' && (
             <LibraryView
-              cards={activeWorld.cards}
+              cards={activeCanvasCards}
               selectedCategory={selectedCategory}
               searchQuery={searchQuery}
               onCardClick={(card) => setEditingCard(card)}
@@ -643,16 +769,16 @@ export const App: React.FC = () => {
 
           {viewMode === 'timeline' && (
             <TimelineView
-              cards={activeWorld.cards}
-              connections={activeWorld.connections}
+              cards={activeCanvasCards}
+              connections={activeCanvasConnections}
               onCardClick={(card) => setEditingCard(card)}
             />
           )}
 
           {viewMode === 'relations' && (
             <RelationListView
-              connections={activeWorld.connections}
-              cards={activeWorld.cards}
+              connections={activeCanvasConnections}
+              cards={activeCanvasCards}
               onEditConnection={(conn) => setEditingConnection(conn)}
               onDeleteConnection={handleDeleteConnection}
               onNavigateToCard={handleNavigateToCard}
@@ -690,8 +816,8 @@ export const App: React.FC = () => {
       {editingCard && (
         <CardEditorModal
           card={editingCard}
-          allCards={activeWorld.cards}
-          connections={activeWorld.connections}
+          allCards={activeCanvasCards}
+          connections={activeCanvasConnections}
           onSave={handleSaveCard}
           onDelete={handleDeleteCard}
           onClose={() => setEditingCard(null)}
@@ -706,12 +832,12 @@ export const App: React.FC = () => {
         <ConnectionModal
           connection={editingConnection}
           sourceCard={
-            activeWorld.cards.find((c) => c.id === editingConnection.sourceId) ||
-            activeWorld.cards[0]
+            activeCanvasCards.find((c) => c.id === editingConnection.sourceId) ||
+            activeCanvasCards[0]
           }
           targetCard={
-            activeWorld.cards.find((c) => c.id === editingConnection.targetId) ||
-            activeWorld.cards[0]
+            activeCanvasCards.find((c) => c.id === editingConnection.targetId) ||
+            activeCanvasCards[0]
           }
           onSave={handleSaveConnection}
           onDelete={handleDeleteConnection}
@@ -721,6 +847,16 @@ export const App: React.FC = () => {
 
       {/* Help & Packaging Guide Modal */}
       {showHelpModal && <HelpGuideModal onClose={() => setShowHelpModal(false)} />}
+
+      {/* Canvas Creator / Renamer Modal */}
+      <CanvasModal
+        isOpen={canvasModalConfig.isOpen}
+        title={canvasModalConfig.title}
+        submitLabel={canvasModalConfig.submitLabel}
+        initialValue={canvasModalConfig.initialValue}
+        onClose={() => setCanvasModalConfig((prev) => ({ ...prev, isOpen: false }))}
+        onSubmit={handleCanvasModalSubmit}
+      />
     </div>
   );
 };
