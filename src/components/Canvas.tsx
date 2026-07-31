@@ -52,6 +52,21 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [showLayoutMenu, setShowLayoutMenu] = useState<boolean>(false);
   const layoutMenuRef = useRef<HTMLDivElement>(null);
 
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    canvasX: number;
+    canvasY: number;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    canvasX: 0,
+    canvasY: 0,
+  });
+
   // Card Dragging State
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -61,16 +76,54 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
   const [connectionMousePos, setConnectionMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Close layout menu when clicking outside
+  // Close layout menu and context menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (layoutMenuRef.current && !layoutMenuRef.current.contains(e.target as Node)) {
         setShowLayoutMenu(false);
       }
     };
+    
+    const handleCloseContextMenu = () => {
+      if (contextMenu.visible) {
+        setContextMenu((prev) => ({ ...prev, visible: false }));
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('click', handleCloseContextMenu);
+    document.addEventListener('contextmenu', handleCloseContextMenu);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleCloseContextMenu);
+      document.removeEventListener('contextmenu', handleCloseContextMenu);
+    };
+  }, [contextMenu.visible]);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('.world-card-node') || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      return;
+    }
+    
+    e.preventDefault();
+    e.stopPropagation();
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const screenX = e.clientX;
+    const screenY = e.clientY;
+    const canvasX = (screenX - rect.left - pan.x) / zoom;
+    const canvasY = (screenY - rect.top - pan.y) / zoom;
+    
+    setContextMenu({
+      visible: true,
+      x: screenX,
+      y: screenY,
+      canvasX,
+      canvasY,
+    });
+  };
 
   // Spacebar Key Listener
   useEffect(() => {
@@ -604,6 +657,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       onMouseUp={handlePointerUp}
       onTouchEnd={handlePointerUp}
       onDoubleClick={handleDoubleClickBackground}
+      onContextMenu={handleContextMenu}
     >
       {/* Background Dot Grid */}
       <div
@@ -849,6 +903,82 @@ export const Canvas: React.FC<CanvasProps> = ({
           )}
         </div>
       </div>
+
+      {contextMenu.visible && (
+        <div
+          className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-48 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-800"
+          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-1.5 text-[10px] app-text-muted font-semibold uppercase tracking-wider select-none">
+            Aksi Canvas
+          </div>
+          
+          <div className="py-1">
+            <button
+              type="button"
+              onClick={() => {
+                onAddCardAtPosition(contextMenu.canvasX, contextMenu.canvasY);
+                setContextMenu((prev) => ({ ...prev, visible: false }));
+              }}
+              className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
+            >
+              <Icons.Plus size={14} strokeWidth={2.5} />
+              <span>Tambah Kartu Baru</span>
+            </button>
+          </div>
+
+          <div className="py-1">
+            <button
+              type="button"
+              onClick={() => {
+                handleCenterViewport();
+                setContextMenu((prev) => ({ ...prev, visible: false }));
+              }}
+              className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors cursor-pointer"
+            >
+              <Icons.Focus size={14} className="app-text-muted" />
+              <span>Tengahkan Layar</span>
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => {
+                setIsSpacePressed(!isSpacePressed);
+                setContextMenu((prev) => ({ ...prev, visible: false }));
+              }}
+              className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors cursor-pointer"
+            >
+              <Icons.Hand size={14} className="app-text-muted" />
+              <span>{isSpacePressed ? 'Matikan Mode Pan' : 'Aktifkan Mode Pan'}</span>
+            </button>
+          </div>
+
+          <div className="py-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedCardIds.length > 0) {
+                  onDeleteCardsRequest(selectedCardIds);
+                  setSelectedCardIds([]);
+                } else if (selectedCardId) {
+                  onDeleteCardsRequest([selectedCardId]);
+                }
+                setContextMenu((prev) => ({ ...prev, visible: false }));
+              }}
+              className={`w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors ${
+                selectedCardIds.length > 0 || selectedCardId
+                  ? 'text-rose-500 font-medium cursor-pointer'
+                  : 'app-text-muted cursor-not-allowed opacity-50'
+              }`}
+              disabled={selectedCardIds.length === 0 && !selectedCardId}
+            >
+              <Icons.Trash2 size={14} />
+              <span>Hapus Kartu Terpilih</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

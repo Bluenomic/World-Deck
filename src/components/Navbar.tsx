@@ -8,14 +8,11 @@ interface NavbarProps {
   onViewModeChange: (mode: ViewMode) => void;
   currentTheme: AppTheme;
   onThemeChange: (theme: AppTheme) => void;
-  onAddCard: () => void;
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onResetWorld: () => void;
   onOpenHelp: () => void;
   onOpenWorldManager: () => void;
-  totalCards: number;
-  totalConnections: number;
   localDirectoryName: string | null;
   onChangeDirectory: () => void;
   canUndo: boolean;
@@ -32,14 +29,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   onViewModeChange,
   currentTheme,
   onThemeChange,
-  onAddCard,
   onExport,
   onImport,
   onResetWorld,
   onOpenHelp,
   onOpenWorldManager,
-  totalCards,
-  totalConnections,
   localDirectoryName,
   onChangeDirectory,
   canUndo,
@@ -89,19 +83,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>{projectName}</span>
         </button>
 
-        <span className="opacity-40">/</span>
-
-        <div className="flex items-center gap-1.5 font-medium px-2 py-1 app-text-main">
-          <Icons.LayoutGrid size={14} className="app-text-muted" />
-          <span className="text-[10px] px-1.5 py-0.2 rounded app-bg-secondary font-mono border app-border app-text-muted">
-            {totalCards} Kartu • {totalConnections} Relasi
-          </span>
-
-          <span className="hidden sm:inline-flex text-[10px] px-2 py-0.5 rounded-md bg-emerald-950/70 text-emerald-400 border border-emerald-800/60 font-medium items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Tersimpan Otomatis</span>
-          </span>
-        </div>
       </div>
 
       {/* View Mode Switcher (Database Tabs) */}
@@ -192,35 +173,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Workspace Folder Status Pill */}
-        {localDirectoryName && (
-          <div 
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/70 text-emerald-400 border border-emerald-800/60 text-xs font-semibold shadow-sm"
-            title={`Workspace aktif disimpan di folder: ${localDirectoryName}`}
-          >
-            <Icons.FolderClosed size={14} className="text-emerald-400 animate-pulse" />
-            <span className="truncate max-w-[120px]">
-              Workspace: {localDirectoryName}
-            </span>
-          </div>
-        )}
-
-        {/* Primary Action Button */}
-        <button
-          type="button"
-          onClick={onAddCard}
-          className="px-3 py-1.5 rounded-lg app-accent-bg text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-transform active:scale-95"
-        >
-          <Icons.Plus size={14} strokeWidth={2.5} />
-          <span>Tambah Kartu</span>
-        </button>
-
         {/* Consolidated Actions Dropdown Menu */}
         <div className="relative" ref={menuRef}>
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="px-2.5 py-1 rounded-lg app-bg-secondary border app-border app-text-main hover:app-bg-hover text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+            className="px-2.5 py-1 rounded-lg app-bg-secondary border app-border app-text-main hover:app-bg-hover text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
             title="Opsi & Menu Proyek"
           >
             <Icons.SlidersHorizontal size={14} className="app-text-muted" />
@@ -229,8 +187,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {isMenuOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-52 app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 z-50 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 space-y-0.5">
-              
+            <div className="absolute right-0 top-full mt-1.5 w-52 app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 z-50 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 space-y-0.5 overflow-hidden">
+              {localDirectoryName && (
+                <>
+                  <div className="px-3 py-2 bg-emerald-950/30 text-emerald-400 font-semibold border-b app-border flex items-center gap-1.5 select-none" title={`Folder Workspace: ${localDirectoryName}`}>
+                    <Icons.FolderClosed size={13} className="text-emerald-400 min-w-[13px]" />
+                    <span className="truncate">WS: {localDirectoryName}</span>
+                  </div>
+                </>
+              )}
+
               <button
                 type="button"
                 onClick={() => {

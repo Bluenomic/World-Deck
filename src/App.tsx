@@ -574,14 +574,11 @@ export const App: React.FC = () => {
         onViewModeChange={setViewMode}
         currentTheme={currentTheme}
         onThemeChange={setCurrentTheme}
-        onAddCard={() => handleAddCardAtPosition(400, 300)}
         onExport={handleExport}
         onImport={handleImport}
         onResetWorld={handleResetWorld}
         onOpenHelp={() => setShowHelpModal(true)}
         onOpenWorldManager={() => setShowWorldManager(true)}
-        totalCards={activeWorld.cards.length}
-        totalConnections={activeWorld.connections.length}
         localDirectoryName={localDirectoryName}
         onChangeDirectory={handleSelectWorkspaceDirectory}
         canUndo={historyIndex >= 0}
