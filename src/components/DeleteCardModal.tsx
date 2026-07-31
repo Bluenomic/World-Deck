@@ -15,13 +15,35 @@ export const DeleteCardModal: React.FC<DeleteCardModalProps> = ({
   onClose,
   onConfirm,
 }) => {
+  React.useEffect(() => {
+    if (!isOpen || cardsToDelete.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        onConfirm();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, cardsToDelete, onClose, onConfirm]);
+
   if (!isOpen || cardsToDelete.length === 0) return null;
 
   const count = cardsToDelete.length;
 
   return (
     <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 backdrop-animate-appear cursor-pointer"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 backdrop-animate-appear cursor-pointer"
       onClick={onClose}
     >
       <div 
