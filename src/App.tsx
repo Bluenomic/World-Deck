@@ -152,7 +152,7 @@ export const App: React.FC = () => {
     ? activeWorld.canvases
     : [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }];
 
-  const activeCanvasCards = activeWorld.cards.filter((c) => (c.canvasId || 'default') === activeCanvasId);
+  const activeCanvasCards = activeWorld.cards.filter((c) => c.canvasId === activeCanvasId);
   const activeCanvasCardIds = activeCanvasCards.map((c) => c.id);
   const activeCanvasConnections = activeWorld.connections.filter(
     (conn) => activeCanvasCardIds.includes(conn.sourceId) && activeCanvasCardIds.includes(conn.targetId)
@@ -237,54 +237,47 @@ export const App: React.FC = () => {
     }
   };
 
-
-
   // Helper to update active world in worlds array with history recording
   const updateActiveWorld = (updater: (prevWorld: WorldProject) => WorldProject) => {
     setWorlds((prevWorlds) => {
-      const currentActive = prevWorlds.find((w) => w.id === activeWorldId);
-      if (currentActive) {
-        setHistoryStack((prevStack) => {
-          const sliced = prevStack.slice(0, historyIndex + 1);
-          if (sliced.length >= 50) sliced.shift();
-          return [...sliced, currentActive];
-        });
-        setHistoryIndex((prevIdx) => Math.min(49, prevIdx + 1));
-      }
-      return prevWorlds.map((w) => (w.id === activeWorldId ? updater(w) : w));
+      const currentWorld = prevWorlds.find((w) => w.id === activeWorldId);
+      if (!currentWorld) return prevWorlds;
+
+      // Record snapshot to history stack
+      setHistoryStack((prev) => {
+        const sliced = prev.slice(0, historyIndex + 1);
+        return [...sliced, currentWorld];
+      });
+      setHistoryIndex((prev) => prev + 1);
+
+      const updatedWorld = updater(currentWorld);
+      return prevWorlds.map((w) => (w.id === activeWorldId ? updatedWorld : w));
     });
   };
 
+  // Undo / Redo Actions
   const handleUndo = () => {
-    if (historyIndex >= 0 && historyStack[historyIndex]) {
-      const targetState = historyStack[historyIndex];
-      const currentActive = worlds.find((w) => w.id === activeWorldId);
+    if (historyIndex < 0) return;
+    const targetSnapshot = historyStack[historyIndex];
+    setHistoryIndex((prev) => prev - 1);
 
-      if (currentActive && historyIndex === historyStack.length - 1) {
-        setHistoryStack((prev) => [...prev, currentActive]);
-      }
-
-      setWorlds((prevWorlds) =>
-        prevWorlds.map((w) => (w.id === activeWorldId ? targetState : w))
-      );
-      setHistoryIndex((prev) => prev - 1);
-    }
+    setWorlds((prevWorlds) =>
+      prevWorlds.map((w) => (w.id === activeWorldId ? targetSnapshot : w))
+    );
   };
 
   const handleRedo = () => {
-    if (historyIndex < historyStack.length - 1) {
-      const nextIndex = historyIndex + 1;
-      const targetState = historyStack[nextIndex];
-      if (targetState) {
-        setWorlds((prevWorlds) =>
-          prevWorlds.map((w) => (w.id === activeWorldId ? targetState : w))
-        );
-        setHistoryIndex(nextIndex);
-      }
-    }
+    if (historyIndex >= historyStack.length - 1) return;
+    const nextIndex = historyIndex + 1;
+    const targetSnapshot = historyStack[nextIndex];
+    setHistoryIndex(nextIndex);
+
+    setWorlds((prevWorlds) =>
+      prevWorlds.map((w) => (w.id === activeWorldId ? targetSnapshot : w))
+    );
   };
 
-  // Global Keyboard Shortcuts for Undo (Ctrl+Z) & Redo (Ctrl+Y / Ctrl+Shift+Z) and Toggle Sidebar (Ctrl+\ / Ctrl+B)
+  // Hotkey Undo/Redo & Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -311,7 +304,7 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [historyIndex, historyStack, activeWorldId]);
 
-  // Card Position Updates
+  // Card Management Actions
   const handleUpdateCardPosition = (id: string, x: number, y: number) => {
     updateActiveWorld((prev) => ({
       ...prev,
@@ -320,7 +313,7 @@ export const App: React.FC = () => {
     }));
   };
 
-  // Add New Blank Card
+  // Add New Blank Card directly on Canvas
   const handleAddCardAtPosition = (x: number = 300, y: number = 300) => {
     const newCard: WorldCard = {
       id: generateId('card'),
@@ -347,7 +340,7 @@ export const App: React.FC = () => {
     setEditingCard(newCard);
   };
 
-  // Add New Card from Library / Deck
+  // Add New Card from Galeri / Deck (Stored in Galeri, NOT placed on canvas automatically)
   const handleAddCardFromLibrary = (deckId?: string) => {
     const newCard: WorldCard = {
       id: generateId('card'),
@@ -360,7 +353,7 @@ export const App: React.FC = () => {
       attributes: [],
       x: 300,
       y: 300,
-      canvasId: activeCanvasId,
+      canvasId: undefined, // Belongs to Galeri only until manually added to Canvas
       deckId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -373,6 +366,18 @@ export const App: React.FC = () => {
     }));
 
     setEditingCard(newCard);
+  };
+
+  // Remove Cards from Canvas (Keep in Galeri)
+  const handleRemoveCardsFromCanvas = (cardIds: string[]) => {
+    updateActiveWorld((prev) => ({
+      ...prev,
+      updatedAt: Date.now(),
+      cards: prev.cards.map((c) => (cardIds.includes(c.id) ? { ...c, canvasId: undefined } : c)),
+      connections: prev.connections.filter(
+        (conn) => !cardIds.includes(conn.sourceId) && !cardIds.includes(conn.targetId)
+      ),
+    }));
   };
 
   // Add Multiple Cards to Canvas from Gallery at Position
@@ -886,6 +891,7 @@ export const App: React.FC = () => {
               onEditConnection={(conn) => setEditingConnection(conn)}
               onAddCardAtPosition={handleAddCardAtPosition}
               onAddCardsToCanvasAtPosition={handleAddCardsToCanvasAtPosition}
+              onRemoveCardsFromCanvas={handleRemoveCardsFromCanvas}
               onDeleteCardsRequest={handleRequestDeleteCards}
             />
           )}
@@ -937,7 +943,13 @@ export const App: React.FC = () => {
           isOpen={!!cardsToDelete}
           cardsToDelete={cardsToDelete}
           onClose={() => setCardsToDelete(null)}
-          onConfirm={handleConfirmDeleteCards}
+          onRemoveFromCanvas={() => {
+            if (cardsToDelete) {
+              handleRemoveCardsFromCanvas(cardsToDelete.map((c) => c.id));
+              setCardsToDelete(null);
+            }
+          }}
+          onPermanentDelete={handleConfirmDeleteCards}
         />
       )}
 

@@ -21,6 +21,7 @@ interface CanvasProps {
   onEditConnection: (connection: CardConnection) => void;
   onAddCardAtPosition: (x: number, y: number) => void;
   onAddCardsToCanvasAtPosition?: (cardIds: string[], position: { x: number; y: number }) => void;
+  onRemoveCardsFromCanvas?: (cardIds: string[]) => void;
   onDeleteCardsRequest: (cardIds: string[]) => void;
 }
 
@@ -39,6 +40,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onEditConnection,
   onAddCardAtPosition,
   onAddCardsToCanvasAtPosition,
+  onRemoveCardsFromCanvas,
   onDeleteCardsRequest,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1017,6 +1019,27 @@ export const Canvas: React.FC<CanvasProps> = ({
             <button
               type="button"
               onClick={() => {
+                const targetIds = selectedCardIds.length > 0 ? selectedCardIds : selectedCardId ? [selectedCardId] : [];
+                if (targetIds.length > 0 && onRemoveCardsFromCanvas) {
+                  onRemoveCardsFromCanvas(targetIds);
+                  setSelectedCardIds([]);
+                }
+                setContextMenu((prev) => ({ ...prev, visible: false }));
+              }}
+              className={`w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors ${
+                selectedCardIds.length > 0 || selectedCardId
+                  ? 'text-amber-400 font-medium cursor-pointer'
+                  : 'app-text-muted cursor-not-allowed opacity-50'
+              }`}
+              disabled={selectedCardIds.length === 0 && !selectedCardId}
+            >
+              <Icons.MinusCircle size={14} />
+              <span>Lepas dari Kanvas</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
                 if (selectedCardIds.length > 0) {
                   onDeleteCardsRequest(selectedCardIds);
                   setSelectedCardIds([]);
@@ -1033,7 +1056,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               disabled={selectedCardIds.length === 0 && !selectedCardId}
             >
               <Icons.Trash2 size={14} />
-              <span>Hapus Kartu Terpilih</span>
+              <span>Hapus Kartu Permanen</span>
             </button>
           </div>
         </div>

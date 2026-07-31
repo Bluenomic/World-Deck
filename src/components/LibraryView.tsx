@@ -66,7 +66,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold app-text-main flex items-center gap-2">
                 <Icons.Library className="app-accent-text" size={22} />
-                <span>Galeri Database & Deck</span>
+                <span>Galeri</span>
               </h2>
             </div>
             <p className="text-xs app-text-muted mt-1">
@@ -105,7 +105,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 className="px-3 py-1.5 rounded-xl app-bg-main border app-border hover:border-purple-400 text-xs font-bold app-text-main flex items-center gap-1.5 cursor-pointer transition-colors"
               >
                 <Icons.ArrowLeft size={14} />
-                <span>Kembali ke Galeri Utama</span>
+                <span>Kembali ke Galeri</span>
               </button>
               <div className="h-4 w-[1px] bg-slate-700" />
               <div className="flex items-center gap-2">

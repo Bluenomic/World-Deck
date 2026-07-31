@@ -110,7 +110,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           }`}
         >
           <Icons.Library size={13} />
-          <span>Galeri Grid</span>
+          <span>Galeri</span>
         </button>
 
         <button
