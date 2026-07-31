@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import type { WorldProject, WorldCard, CardConnection, ViewMode, CardCategory, AppTheme } from './types';
 import { SAMPLE_WORLD } from './data/sampleWorld';
 import { generateId, downloadProjectJson } from './utils/helpers';
-import { saveAppState, loadAppState } from './utils/storage';
+import { saveLocalFileHandle, loadLocalFileHandle } from './utils/storage';
+import * as Icons from 'lucide-react';
 import {
-  connectLocalFileOnDisk,
-  openLocalFileFromDisk,
-  writeToLocalFileHandle,
+  readAllProjectsFromDirectory,
+  writeProjectToDirectory,
+  deleteProjectFromDirectory,
 } from './utils/localFileStorage';
 import { Navbar } from './components/Navbar';
 import { SidebarFilter } from './components/SidebarFilter';
@@ -43,9 +44,10 @@ export const App: React.FC = () => {
   // Storage Loading Flag
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
-  // Native Local Disk File System Handle State
-  const [localFileHandle, setLocalFileHandle] = useState<any>(null);
-  const [localFileName, setLocalFileName] = useState<string | null>(null);
+  // Native Local Disk Folder Workspace State
+  const [localDirectoryHandle, setLocalDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [localDirectoryName, setLocalDirectoryName] = useState<string | null>(null);
+  const [needDirectoryPermission, setNeedDirectoryPermission] = useState<boolean>(false);
 
   // Worlds & Active World State
   const [worlds, setWorlds] = useState<WorldProject[]>([SAMPLE_WORLD]);
@@ -53,10 +55,40 @@ export const App: React.FC = () => {
 
   // Async Load State on Startup from IndexedDB & LocalStorage
   useEffect(() => {
-    loadAppState().then((savedState) => {
-      if (savedState && savedState.worlds && savedState.worlds.length > 0) {
-        setWorlds(savedState.worlds);
-        setActiveWorldId(savedState.activeWorldId);
+    // Load persisted local directory handle from IndexedDB
+    loadLocalFileHandle().then(async (handle) => {
+      if (handle) {
+        try {
+          const options = { mode: 'readwrite' };
+          const permission = await (handle as any).queryPermission(options);
+          if (permission === 'granted') {
+            setLocalDirectoryHandle(handle);
+            setLocalDirectoryName(handle.name);
+            // Load projects from directory
+            const projects = await readAllProjectsFromDirectory(handle);
+            if (projects.length > 0) {
+              setWorlds(projects);
+              const savedActiveId = localStorage.getItem('worldarchive_active_id_v2');
+              if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
+                setActiveWorldId(savedActiveId);
+              } else {
+                setActiveWorldId(projects[0].id);
+              }
+            } else {
+              // Write default sample world if directory is empty
+              await writeProjectToDirectory(handle, SAMPLE_WORLD);
+              setWorlds([SAMPLE_WORLD]);
+              setActiveWorldId(SAMPLE_WORLD.id);
+            }
+          } else {
+            // Need user interaction to restore access permission
+            setLocalDirectoryHandle(handle);
+            setLocalDirectoryName(handle.name);
+            setNeedDirectoryPermission(true);
+          }
+        } catch (e) {
+          console.warn('Gagal memuat izin directory handle:', e);
+        }
       }
       setIsLoaded(true);
     });
@@ -65,53 +97,82 @@ export const App: React.FC = () => {
   // Derived Active World
   const activeWorld = worlds.find((w) => w.id === activeWorldId) || worlds[0] || SAMPLE_WORLD;
 
-  // Auto save Worlds to IndexedDB & LocalStorage
+  // Auto save activeWorldId to LocalStorage
   useEffect(() => {
     if (!isLoaded) return;
-    saveAppState(worlds, activeWorldId);
-  }, [worlds, activeWorldId, isLoaded]);
+    localStorage.setItem('worldarchive_active_id_v2', activeWorldId);
+  }, [activeWorldId, isLoaded]);
 
-  // Auto save directly to linked physical Disk File on Hard Drive (.json)
+  // Auto save active world directly to linked local directory
   useEffect(() => {
-    if (!isLoaded || !localFileHandle) return;
-    writeToLocalFileHandle(localFileHandle, activeWorld);
-  }, [activeWorld, localFileHandle, isLoaded]);
+    if (!isLoaded || !localDirectoryHandle || needDirectoryPermission) return;
+    writeProjectToDirectory(localDirectoryHandle, activeWorld);
+  }, [activeWorld, localDirectoryHandle, isLoaded, needDirectoryPermission]);
 
-  // Disk File System Action Handlers
-  const handleConnectLocalFile = async () => {
+  // Folder Directory Actions
+  const handleSelectWorkspaceDirectory = async () => {
     try {
-      const result = await connectLocalFileOnDisk(activeWorld);
-      if (result) {
-        setLocalFileHandle(result.fileHandle);
-        setLocalFileName(result.fileName);
-        confetti({ particleCount: 80, spread: 60 });
-        alert(`Berhasil terhubung ke berkas disk fisik: ${result.fileName}\n\nProyek ini tersimpan ke hard drive Anda.`);
+      if (!('showDirectoryPicker' in window)) {
+        alert('Browser Anda tidak mendukung File System Access API. Silakan gunakan Chrome, Edge, atau Opera.');
+        return;
       }
-    } catch (err) {
-      alert('Gagal menghubungkan berkas disk lokal.');
+      const handle = await (window as any).showDirectoryPicker({
+        mode: 'readwrite'
+      });
+      if (handle) {
+        setLocalDirectoryHandle(handle);
+        setLocalDirectoryName(handle.name);
+        setNeedDirectoryPermission(false);
+        await saveLocalFileHandle(handle);
+
+        const projects = await readAllProjectsFromDirectory(handle);
+        if (projects.length > 0) {
+          setWorlds(projects);
+          const savedActiveId = localStorage.getItem('worldarchive_active_id_v2');
+          if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
+            setActiveWorldId(savedActiveId);
+          } else {
+            setActiveWorldId(projects[0].id);
+          }
+        } else {
+          await writeProjectToDirectory(handle, SAMPLE_WORLD);
+          setWorlds([SAMPLE_WORLD]);
+          setActiveWorldId(SAMPLE_WORLD.id);
+        }
+        confetti({ particleCount: 100, spread: 70 });
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        alert('Gagal membuka direktori folder.');
+      }
     }
   };
 
-  const handleOpenLocalFile = async () => {
+  const handleRequestDirectoryPermission = async () => {
+    if (!localDirectoryHandle) return;
     try {
-      const result = await openLocalFileFromDisk();
-      if (result) {
-        const imported = result.project;
-        setWorlds((prev) => {
-          const exists = prev.some((w) => w.id === imported.id);
-          if (exists) {
-            return prev.map((w) => (w.id === imported.id ? imported : w));
+      const options = { mode: 'readwrite' };
+      const permission = await (localDirectoryHandle as any).requestPermission(options);
+      if (permission === 'granted') {
+        setNeedDirectoryPermission(false);
+        const projects = await readAllProjectsFromDirectory(localDirectoryHandle);
+        if (projects.length > 0) {
+          setWorlds(projects);
+          const savedActiveId = localStorage.getItem('worldarchive_active_id_v2');
+          if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
+            setActiveWorldId(savedActiveId);
+          } else {
+            setActiveWorldId(projects[0].id);
           }
-          return [...prev, imported];
-        });
-        setActiveWorldId(imported.id);
-        setLocalFileHandle(result.fileHandle);
-        setLocalFileName(result.fileName);
+        } else {
+          await writeProjectToDirectory(localDirectoryHandle, SAMPLE_WORLD);
+          setWorlds([SAMPLE_WORLD]);
+          setActiveWorldId(SAMPLE_WORLD.id);
+        }
         confetti({ particleCount: 100, spread: 70 });
-        alert(`Berhasil membuka berkas disk fisik: ${result.fileName}`);
       }
     } catch (err) {
-      alert('Gagal membaca berkas disk lokal.');
+      alert('Gagal mengaktifkan kembali izin akses folder.');
     }
   };
 
@@ -363,6 +424,12 @@ export const App: React.FC = () => {
     if (window.confirm('Hapus dunia ini secara permanen dari daftar dunia Anda?')) {
       const remaining = worlds.filter((w) => w.id !== worldId);
       setWorlds(remaining);
+      
+      // Delete project file from local directory
+      if (localDirectoryHandle) {
+        deleteProjectFromDirectory(localDirectoryHandle, worldId);
+      }
+
       if (activeWorldId === worldId) {
         setActiveWorldId(remaining[0].id);
       }
@@ -450,6 +517,53 @@ export const App: React.FC = () => {
     if (viewMode !== 'canvas') setViewMode('canvas');
   };
 
+  if (isLoaded && (!localDirectoryHandle || needDirectoryPermission)) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center app-bg-main app-text-main font-sans relative overflow-hidden">
+        {/* Background Decorative Gradients */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
+
+        <div className="w-full max-w-md p-8 rounded-2xl app-bg-secondary border app-border shadow-2xl space-y-6 text-center z-10 animate-in zoom-in-95 duration-300">
+          <div className="mx-auto w-16 h-16 rounded-2xl app-accent-bg flex items-center justify-center text-white font-bold shadow-lg">
+            <Icons.Folder size={32} />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-extrabold app-text-main tracking-tight">World Archive Workspace</h2>
+            <p className="text-xs app-text-muted leading-relaxed px-2">
+              {!localDirectoryHandle
+                ? "Pilih folder lokal di komputer Anda untuk menyimpan seluruh proyek dunia Anda. Semua perubahan akan disimpan secara otomatis ke folder tersebut."
+                : `Aplikasi membutuhkan izin untuk mengakses kembali folder: "${localDirectoryName}".`}
+            </p>
+          </div>
+
+          <div className="pt-2">
+            {!localDirectoryHandle ? (
+              <button
+                type="button"
+                onClick={handleSelectWorkspaceDirectory}
+                className="w-full py-3 rounded-xl app-accent-bg hover:opacity-90 text-white text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Icons.FolderOpen size={16} />
+                <span>Pilih Folder Workspace</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleRequestDirectoryPermission}
+                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Icons.Unlock size={16} />
+                <span>Izinkan Akses Folder</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col app-bg-main app-text-main overflow-hidden font-sans">
       
@@ -468,9 +582,8 @@ export const App: React.FC = () => {
         onOpenWorldManager={() => setShowWorldManager(true)}
         totalCards={activeWorld.cards.length}
         totalConnections={activeWorld.connections.length}
-        localFileName={localFileName}
-        onConnectLocalFile={handleConnectLocalFile}
-        onOpenLocalFile={handleOpenLocalFile}
+        localDirectoryName={localDirectoryName}
+        onChangeDirectory={handleSelectWorkspaceDirectory}
         canUndo={historyIndex >= 0}
         canRedo={historyIndex < historyStack.length - 1}
         onUndo={handleUndo}

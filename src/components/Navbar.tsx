@@ -16,9 +16,8 @@ interface NavbarProps {
   onOpenWorldManager: () => void;
   totalCards: number;
   totalConnections: number;
-  localFileName: string | null;
-  onConnectLocalFile: () => void;
-  onOpenLocalFile: () => void;
+  localDirectoryName: string | null;
+  onChangeDirectory: () => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -41,6 +40,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenWorldManager,
   totalCards,
   totalConnections,
+  localDirectoryName,
+  onChangeDirectory,
   canUndo,
   canRedo,
   onUndo,
@@ -191,6 +192,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
+        {/* Workspace Folder Status Pill */}
+        {localDirectoryName && (
+          <div 
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/70 text-emerald-400 border border-emerald-800/60 text-xs font-semibold shadow-sm"
+            title={`Workspace aktif disimpan di folder: ${localDirectoryName}`}
+          >
+            <Icons.FolderClosed size={14} className="text-emerald-400 animate-pulse" />
+            <span className="truncate max-w-[120px]">
+              Workspace: {localDirectoryName}
+            </span>
+          </div>
+        )}
+
         {/* Primary Action Button */}
         <button
           type="button"
@@ -217,6 +231,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           {isMenuOpen && (
             <div className="absolute right-0 top-full mt-1.5 w-52 app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 z-50 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 space-y-0.5">
               
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onChangeDirectory();
+                }}
+                className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-medium text-amber-500"
+              >
+                <Icons.FolderOpen size={14} />
+                <span>Ganti Folder Workspace</span>
+              </button>
+
+              <div className="my-1 border-t app-border opacity-50" />
+
               <button
                 type="button"
                 onClick={() => {

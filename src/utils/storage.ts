@@ -101,3 +101,39 @@ export const loadAppState = async (): Promise<{ worlds: WorldProject[]; activeWo
 
   return null;
 };
+
+/**
+ * Saves FileSystemFileHandle to IndexedDB
+ */
+export const saveLocalFileHandle = async (handle: any) => {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    if (handle) {
+      await store.put(handle, 'linked_file_handle');
+    } else {
+      await store.delete('linked_file_handle');
+    }
+  } catch (err) {
+    console.warn('IndexedDB save file handle warning:', err);
+  }
+};
+
+/**
+ * Loads FileSystemFileHandle from IndexedDB
+ */
+export const loadLocalFileHandle = async (): Promise<any | null> => {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    return new Promise((resolve) => {
+      const req = store.get('linked_file_handle');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch (err) {
+    return null;
+  }
+};
