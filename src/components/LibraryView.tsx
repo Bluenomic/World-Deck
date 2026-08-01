@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { WorldCard, WorldDeck, CardCategory } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import * as Icons from 'lucide-react';
@@ -42,7 +42,78 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [isHoveredRemoveZone, setIsHoveredRemoveZone] = useState<boolean>(false);
   const [isSuccessRemove, setIsSuccessRemove] = useState<boolean>(false);
 
+  // Dynamic Floating Drag Position & Release Animation States
+  const [justDroppedCardId, setJustDroppedCardId] = useState<string | null>(null);
+  const [draggedCardData, setDraggedCardData] = useState<WorldCard | null>(null);
+  const [dragPhase, setDragPhase] = useState<'idle' | 'lifting' | 'dragging'>('idle');
+
   const draggedCardIdRef = useRef<string | null>(null);
+  const transparentImgRef = useRef<HTMLCanvasElement | null>(null);
+  const floatingPreviewRef = useRef<HTMLDivElement | null>(null);
+  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const dragPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const rafIdRef = useRef<number | null>(null);
+
+  // Create a transparent 1x1 image for hiding native drag preview
+  useEffect(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    canvas.style.position = 'absolute';
+    canvas.style.top = '-9999px';
+    canvas.style.left = '-9999px';
+    document.body.appendChild(canvas);
+    transparentImgRef.current = canvas;
+    return () => {
+      if (document.body.contains(canvas)) {
+        document.body.removeChild(canvas);
+      }
+    };
+  }, []);
+
+  // Track global cursor position during HTML5 drag — direct DOM for zero-lag
+  useEffect(() => {
+    if (!draggedCardId) return;
+
+    const updatePreviewPos = () => {
+      const el = floatingPreviewRef.current;
+      if (el) {
+        const x = dragPosRef.current.x - dragOffsetRef.current.x;
+        const y = dragPosRef.current.y - dragOffsetRef.current.y;
+        el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      }
+      rafIdRef.current = null;
+    };
+
+    const handleGlobalDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.clientX !== 0 || e.clientY !== 0) {
+        dragPosRef.current.x = e.clientX;
+        dragPosRef.current.y = e.clientY;
+        // Batch DOM updates with rAF for smooth 60fps
+        if (rafIdRef.current === null) {
+          rafIdRef.current = requestAnimationFrame(updatePreviewPos);
+        }
+      }
+    };
+
+    window.addEventListener('dragover', handleGlobalDragOver);
+    return () => {
+      window.removeEventListener('dragover', handleGlobalDragOver);
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+    };
+  }, [draggedCardId]);
+
+  // Transition from lifting to dragging phase after pickup animation
+  useEffect(() => {
+    if (dragPhase === 'lifting') {
+      const timer = setTimeout(() => setDragPhase('dragging'), 150);
+      return () => clearTimeout(timer);
+    }
+  }, [dragPhase]);
 
   // Get active deck if user navigated inside a deck
   const activeDeck = decks.find((d) => d.id === activeDeckId) || null;
@@ -305,20 +376,47 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           e.dataTransfer.setData('text/plain', card.id);
           e.dataTransfer.effectAllowed = 'move';
           draggedCardIdRef.current = card.id;
+
+          // Store card data for the floating preview
+          setDraggedCardData(card);
+
+          // Store offset in ref for instant access (no re-render)
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          dragOffsetRef.current = {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          };
+          dragPosRef.current = { x: e.clientX, y: e.clientY };
+
+          // Hide native drag ghost by using a transparent 1x1 canvas
+          if (transparentImgRef.current && e.dataTransfer.setDragImage) {
+            e.dataTransfer.setDragImage(transparentImgRef.current, 0, 0);
+          }
+
+          // Trigger pickup animation then transition to dragging
+          setDragPhase('lifting');
           setDraggedCardId(card.id);
         }}
         onDragEnd={() => {
+          // Trigger drop animation
+          setJustDroppedCardId(draggedCardId);
+          setTimeout(() => setJustDroppedCardId(null), 350);
+
           setDraggedCardId(null);
+          setDraggedCardData(null);
+          setDragPhase('idle');
           setHoveredDeckId(null);
           setIsHoveredRemoveZone(false);
           setIsNearTop(false);
           draggedCardIdRef.current = null;
         }}
         onClick={() => onCardClick(card)}
-        className={`app-bg-secondary border rounded-2xl overflow-hidden shadow-md transition-all cursor-grab active:cursor-grabbing group flex flex-col relative ${
+        className={`app-bg-secondary border rounded-2xl overflow-hidden shadow-md cursor-grab active:cursor-grabbing group flex flex-col relative ${
           isBeingDragged
-            ? 'opacity-40 scale-95 border-purple-500 border-dashed shadow-2xl ring-2 ring-purple-500/50'
-            : 'app-border hover:border-purple-400 hover:-translate-y-0.5'
+            ? 'card-drag-source-glow'
+            : justDroppedCardId === card.id
+            ? 'card-drop-pop app-border'
+            : 'app-border hover:border-purple-400 hover:-translate-y-0.5 transition-all'
         }`}
       >
         {/* Category Header Bar */}
@@ -602,6 +700,112 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             {showCardsInGrid && cardsToDisplay.map(renderCardItem)}
           </div>
         )}
+
+        {/* ======================== */}
+        {/* CUSTOM FLOATING DRAG PREVIEW */}
+        {/* ======================== */}
+        {draggedCardId && draggedCardData && (() => {
+          const dragCard = draggedCardData;
+          const cfg = CATEGORY_CONFIGS[dragCard.category] || CATEGORY_CONFIGS.character;
+          const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle || (() => null);
+          const assignedDeck = decks.find((d) => d.id === dragCard.deckId || (d.cardIds || []).includes(dragCard.id));
+
+          // Initial position from refs
+          const initX = dragPosRef.current.x - dragOffsetRef.current.x;
+          const initY = dragPosRef.current.y - dragOffsetRef.current.y;
+
+          return (
+            <div
+              ref={floatingPreviewRef}
+              className="card-floating-preview"
+              style={{
+                position: 'fixed',
+                left: 0,
+                top: 0,
+                transform: `translate3d(${initX}px, ${initY}px, 0)`,
+                width: '260px',
+                zIndex: 99999,
+                pointerEvents: 'none',
+              }}
+            >
+              <div className={dragPhase === 'lifting' ? 'card-pickup-pop' : 'card-drag-wiggle'}>
+              <div className="app-bg-secondary border border-purple-400 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+                {/* Category Header Bar */}
+                <div className="px-3 py-2 app-bg-main border-b app-border flex items-center justify-between gap-2">
+                  <div
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${cfg.bgGradient} ${cfg.borderColor}`}
+                    style={{ color: cfg.color }}
+                  >
+                    <IconComp size={11} />
+                    <span>{cfg.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Icons.GripHorizontal size={14} className="text-purple-400" />
+                  </div>
+                </div>
+
+                {/* Image */}
+                {dragCard.imageUrl && (
+                  <div className="h-32 w-full overflow-hidden relative">
+                    <img
+                      src={dragCard.imageUrl}
+                      alt={dragCard.title}
+                      className="w-full h-full object-cover opacity-90"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+
+                {/* Content */}
+                <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
+                  <div className="space-y-1">
+                    <h3 className="text-xs font-bold text-purple-300">
+                      {dragCard.title || 'Kartu Tanpa Judul'}
+                    </h3>
+                    {dragCard.subtitle && (
+                      <p className="text-[11px] app-text-muted">{dragCard.subtitle}</p>
+                    )}
+                    <p className="text-[11px] app-text-muted line-clamp-2 leading-relaxed pt-1">
+                      {dragCard.summary || 'Belum ada ringkasan...'}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t app-border flex items-center justify-between">
+                    {assignedDeck ? (
+                      <span
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 shadow-xs"
+                        style={{
+                          borderColor: assignedDeck.color || '#8b5cf6',
+                          color: assignedDeck.color || '#a855f7',
+                          backgroundColor: `${assignedDeck.color || '#8b5cf6'}15`,
+                        }}
+                      >
+                        <Icons.Folder size={10} />
+                        <span className="truncate max-w-[90px]">{assignedDeck.name}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] app-text-muted italic">Mandiri</span>
+                    )}
+
+                    {dragCard.tags && dragCard.tags.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        {dragCard.tags.slice(0, 2).map((tag, i) => (
+                          <span
+                            key={i}
+                            className="text-[9px] px-1.5 py-0.5 rounded app-bg-main app-text-muted border app-border"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
