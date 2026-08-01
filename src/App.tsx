@@ -477,6 +477,29 @@ export const App: React.FC = () => {
     });
   };
 
+  // Reorder cards in gallery
+  const handleReorderCards = (orderedCardIds: string[]) => {
+    updateActiveWorld((prev) => {
+      const cardMap = new Map(prev.cards.map((c) => [c.id, c]));
+      // Start with the ordered cards
+      const reordered: WorldCard[] = [];
+      for (const id of orderedCardIds) {
+        const card = cardMap.get(id);
+        if (card) {
+          reordered.push(card);
+          cardMap.delete(id);
+        }
+      }
+      // Append any remaining cards that weren't in the ordered list
+      const remaining = prev.cards.filter((c) => cardMap.has(c.id));
+      return {
+        ...prev,
+        updatedAt: Date.now(),
+        cards: [...reordered, ...remaining],
+      };
+    });
+  };
+
   // Save Card from Editor
   const handleSaveCard = (updatedCard: WorldCard) => {
     updateActiveWorld((prev) => ({
@@ -926,6 +949,7 @@ export const App: React.FC = () => {
               }}
               onDeleteDeckRequest={handleDeleteDeck}
               onAssignCardToDeck={handleAssignCardToDeck}
+              onReorderCards={handleReorderCards}
             />
           )}
 

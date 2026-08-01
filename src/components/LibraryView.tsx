@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import type { WorldCard, WorldDeck, CardCategory } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import * as Icons from 'lucide-react';
@@ -15,6 +15,7 @@ interface LibraryViewProps {
   onEditDeckRequest: (deck: WorldDeck) => void;
   onDeleteDeckRequest: (deckId: string) => void;
   onAssignCardToDeck: (cardId: string, deckId?: string) => void;
+  onReorderCards: (orderedCardIds: string[]) => void;
 }
 
 export const LibraryView: React.FC<LibraryViewProps> = ({
@@ -28,6 +29,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onEditDeckRequest,
   onDeleteDeckRequest,
   onAssignCardToDeck,
+  onReorderCards,
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'decks' | 'cards'>('all');
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
@@ -45,7 +47,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   // Dynamic Floating Drag Position & Release Animation States
   const [justDroppedCardId, setJustDroppedCardId] = useState<string | null>(null);
   const [draggedCardData, setDraggedCardData] = useState<WorldCard | null>(null);
-  const [dragPhase, setDragPhase] = useState<'idle' | 'lifting' | 'dragging'>('idle');
+
+  // Live Shifting Order for Drag Reordering
+  const [liveOrder, setLiveOrder] = useState<string[] | null>(null);
 
   const draggedCardIdRef = useRef<string | null>(null);
   const transparentImgRef = useRef<HTMLCanvasElement | null>(null);
@@ -53,6 +57,61 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const dragPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const rafIdRef = useRef<number | null>(null);
+
+  // FLIP animation refs for ultra-smooth grid shifting
+  const cardDomRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const prevRectsRef = useRef<Map<string, DOMRect>>(new Map());
+
+  // Execute FLIP layout animation whenever liveOrder shifts
+  useLayoutEffect(() => {
+    if (!liveOrder) {
+      prevRectsRef.current.clear();
+      cardDomRefs.current.forEach((el) => {
+        if (el) {
+          el.style.transition = '';
+          el.style.transform = '';
+        }
+      });
+      return;
+    }
+
+    const prevRects = prevRectsRef.current;
+
+    cardDomRefs.current.forEach((el, id) => {
+      if (!el) return;
+      const oldRect = prevRects.get(id);
+      const newRect = el.getBoundingClientRect();
+
+      if (oldRect && (oldRect.left !== newRect.left || oldRect.top !== newRect.top)) {
+        const dx = oldRect.left - newRect.left;
+        const dy = oldRect.top - newRect.top;
+
+        // Invert: snap instantly to previous position before browser paint
+        el.style.transition = 'none';
+        el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+
+        // Force layout reflow
+        void el.offsetHeight;
+
+        // Play: animate smoothly to new grid location with luxury cubic-bezier curve
+        requestAnimationFrame(() => {
+          el.style.transition = 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)';
+          el.style.transform = 'translate3d(0, 0, 0)';
+        });
+      }
+
+      prevRects.set(id, newRect);
+    });
+  }, [liveOrder]);
+
+  const updateLiveOrderWithFLIP = (nextOrder: string[]) => {
+    cardDomRefs.current.forEach((el, id) => {
+      if (el) {
+        prevRectsRef.current.set(id, el.getBoundingClientRect());
+      }
+    });
+    setLiveOrder(nextOrder);
+  };
 
   // Create a transparent 1x1 image for hiding native drag preview
   useEffect(() => {
@@ -90,30 +149,34 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       if (e.clientX !== 0 || e.clientY !== 0) {
         dragPosRef.current.x = e.clientX;
         dragPosRef.current.y = e.clientY;
-        // Batch DOM updates with rAF for smooth 60fps
         if (rafIdRef.current === null) {
           rafIdRef.current = requestAnimationFrame(updatePreviewPos);
         }
       }
     };
 
+    // Safety cleanup if drag ends outside or dragend event is missed
+    const handleGlobalDragEnd = () => {
+      setDraggedCardId(null);
+      setDraggedCardData(null);
+      setLiveOrder(null);
+      setHoveredDeckId(null);
+      setIsHoveredRemoveZone(false);
+      setIsNearTop(false);
+      draggedCardIdRef.current = null;
+    };
+
     window.addEventListener('dragover', handleGlobalDragOver);
+    window.addEventListener('dragend', handleGlobalDragEnd);
     return () => {
       window.removeEventListener('dragover', handleGlobalDragOver);
+      window.removeEventListener('dragend', handleGlobalDragEnd);
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
     };
   }, [draggedCardId]);
-
-  // Transition from lifting to dragging phase after pickup animation
-  useEffect(() => {
-    if (dragPhase === 'lifting') {
-      const timer = setTimeout(() => setDragPhase('dragging'), 150);
-      return () => clearTimeout(timer);
-    }
-  }, [dragPhase]);
 
   // Get active deck if user navigated inside a deck
   const activeDeck = decks.find((d) => d.id === activeDeckId) || null;
@@ -149,8 +212,24 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     return true;
   });
 
+  // Derived display cards order when live dragging is active
+  const displayCards = (() => {
+    if (!liveOrder) return cardsToDisplay;
+    const cardMap = new Map(cardsToDisplay.map((c) => [c.id, c]));
+    const result: WorldCard[] = [];
+    for (const id of liveOrder) {
+      const card = cardMap.get(id);
+      if (card) {
+        result.push(card);
+        cardMap.delete(id);
+      }
+    }
+    cardMap.forEach((card) => result.push(card));
+    return result;
+  })();
+
   const totalItemsCount =
-    (showDecksInGrid ? filteredDecks.length : 0) + (showCardsInGrid ? cardsToDisplay.length : 0);
+    (showDecksInGrid ? filteredDecks.length : 0) + (showCardsInGrid ? displayCards.length : 0);
 
   // Determine if remove zone should be visible (only inside deck + dragging + near top/hovered/success)
   const shouldShowRemoveZone =
@@ -362,6 +441,25 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     );
   };
 
+  const handleCardDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (liveOrder && draggedCardId) {
+      onReorderCards(liveOrder);
+    }
+    const droppedId = draggedCardId;
+    if (droppedId) {
+      setJustDroppedCardId(droppedId);
+      setTimeout(() => setJustDroppedCardId(null), 300);
+    }
+    setDraggedCardId(null);
+    setDraggedCardData(null);
+    setLiveOrder(null);
+    setHoveredDeckId(null);
+    setIsHoveredRemoveZone(false);
+    setIsNearTop(false);
+    draggedCardIdRef.current = null;
+  };
+
   const renderCardItem = (card: WorldCard) => {
     const cfg = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
     const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle || (() => null);
@@ -371,16 +469,20 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     return (
       <div
         key={`card-${card.id}`}
+        ref={(el) => {
+          if (el) cardDomRefs.current.set(card.id, el);
+          else cardDomRefs.current.delete(card.id);
+        }}
         draggable={true}
         onDragStart={(e) => {
           e.dataTransfer.setData('text/plain', card.id);
           e.dataTransfer.effectAllowed = 'move';
           draggedCardIdRef.current = card.id;
 
-          // Store card data for the floating preview
+          // Store card data for floating preview
           setDraggedCardData(card);
 
-          // Store offset in ref for instant access (no re-render)
+          // Store offset in ref for instant access
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
           dragOffsetRef.current = {
             x: e.clientX - rect.left,
@@ -388,35 +490,47 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           };
           dragPosRef.current = { x: e.clientX, y: e.clientY };
 
-          // Hide native drag ghost by using a transparent 1x1 canvas
+          // Hide native drag ghost
           if (transparentImgRef.current && e.dataTransfer.setDragImage) {
             e.dataTransfer.setDragImage(transparentImgRef.current, 0, 0);
           }
 
-          // Trigger pickup animation then transition to dragging
-          setDragPhase('lifting');
+          // Capture initial rects before setting live order
+          cardDomRefs.current.forEach((el, id) => {
+            if (el) prevRectsRef.current.set(id, el.getBoundingClientRect());
+          });
+
+          // Initialize live shifting order
+          setLiveOrder(cardsToDisplay.map((c) => c.id));
           setDraggedCardId(card.id);
         }}
-        onDragEnd={() => {
-          // Trigger drop animation
-          setJustDroppedCardId(draggedCardId);
-          setTimeout(() => setJustDroppedCardId(null), 350);
+        onDragOver={(e) => {
+          e.preventDefault(); // allow drop
+          if (!draggedCardId || draggedCardId === card.id || !liveOrder) return;
 
-          setDraggedCardId(null);
-          setDraggedCardData(null);
-          setDragPhase('idle');
-          setHoveredDeckId(null);
-          setIsHoveredRemoveZone(false);
-          setIsNearTop(false);
-          draggedCardIdRef.current = null;
+          const fromIdx = liveOrder.indexOf(draggedCardId);
+          const toIdx = liveOrder.indexOf(card.id);
+
+          if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+            const nextOrder = [...liveOrder];
+            nextOrder.splice(fromIdx, 1);
+            nextOrder.splice(toIdx, 0, draggedCardId);
+            updateLiveOrderWithFLIP(nextOrder);
+          }
         }}
-        onClick={() => onCardClick(card)}
-        className={`app-bg-secondary border rounded-2xl overflow-hidden shadow-md cursor-grab active:cursor-grabbing group flex flex-col relative ${
+        onDragEnd={handleCardDrop}
+        onDrop={handleCardDrop}
+        onClick={() => {
+          if (!draggedCardIdRef.current) {
+            onCardClick(card);
+          }
+        }}
+        className={`card-grid-item app-bg-secondary border rounded-2xl overflow-hidden shadow-sm cursor-grab active:cursor-grabbing group flex flex-col relative ${
           isBeingDragged
-            ? 'card-drag-source-glow'
+            ? 'card-drag-placeholder opacity-30 border-2 border-dashed border-purple-500/40 bg-purple-950/20'
             : justDroppedCardId === card.id
-            ? 'card-drop-pop app-border'
-            : 'app-border hover:border-purple-400 hover:-translate-y-0.5 transition-all'
+            ? 'card-drop-settle border-purple-400'
+            : 'app-border hover:border-purple-400/80 hover:-translate-y-0.5'
         }`}
       >
         {/* Category Header Bar */}
@@ -695,14 +809,22 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
+            onDragOver={(e) => {
+              if (draggedCardId) {
+                e.preventDefault();
+              }
+            }}
+            onDrop={handleCardDrop}
+          >
             {showDecksInGrid && filteredDecks.map(renderDeckItem)}
-            {showCardsInGrid && cardsToDisplay.map(renderCardItem)}
+            {showCardsInGrid && displayCards.map((card) => renderCardItem(card))}
           </div>
         )}
 
         {/* ======================== */}
-        {/* CUSTOM FLOATING DRAG PREVIEW */}
+        {/* MINIMALIST FLOATING DRAG PREVIEW */}
         {/* ======================== */}
         {draggedCardId && draggedCardData && (() => {
           const dragCard = draggedCardData;
@@ -728,8 +850,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 pointerEvents: 'none',
               }}
             >
-              <div className={dragPhase === 'lifting' ? 'card-pickup-pop' : 'card-drag-wiggle'}>
-              <div className="app-bg-secondary border border-purple-400 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+              <div className="card-floating-inner app-bg-secondary border border-purple-500/40 rounded-2xl overflow-hidden flex flex-col">
                 {/* Category Header Bar */}
                 <div className="px-3 py-2 app-bg-main border-b app-border flex items-center justify-between gap-2">
                   <div
@@ -801,7 +922,6 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     )}
                   </div>
                 </div>
-              </div>
               </div>
             </div>
           );

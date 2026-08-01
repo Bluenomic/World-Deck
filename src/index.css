@@ -243,118 +243,54 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ============================================= */
-/* Dynamic Card Drag & Drop Animations           */
+/* Minimalist Card Drag & Drop Styling           */
 /* ============================================= */
 
-/* --- Floating Preview: Continuous Wiggle --- */
-@keyframes card-drag-wiggle {
-  0% {
-    transform: rotate(-2deg) translateY(-1px);
-    filter: drop-shadow(0 14px 28px rgba(168, 85, 247, 0.45))
-            drop-shadow(0 0 16px rgba(168, 85, 247, 0.25));
-  }
-  25% {
-    transform: rotate(1.5deg) translateY(-4px);
-    filter: drop-shadow(0 18px 36px rgba(168, 85, 247, 0.5))
-            drop-shadow(0 0 22px rgba(168, 85, 247, 0.3));
-  }
-  50% {
-    transform: rotate(-1deg) translateY(-5px);
-    filter: drop-shadow(0 20px 40px rgba(168, 85, 247, 0.5))
-            drop-shadow(0 0 24px rgba(168, 85, 247, 0.3));
-  }
-  75% {
-    transform: rotate(1.8deg) translateY(-3px);
-    filter: drop-shadow(0 16px 32px rgba(168, 85, 247, 0.5))
-            drop-shadow(0 0 20px rgba(168, 85, 247, 0.3));
-  }
-  100% {
-    transform: rotate(-2deg) translateY(-1px);
-    filter: drop-shadow(0 14px 28px rgba(168, 85, 247, 0.45))
-            drop-shadow(0 0 16px rgba(168, 85, 247, 0.25));
-  }
-}
-
-.card-drag-wiggle {
-  animation: card-drag-wiggle 0.55s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite !important;
-  opacity: 1 !important;
-  backface-visibility: hidden;
-}
-
-/* --- Floating Preview Container (GPU-accelerated, zero-lag) --- */
+/* --- Floating Preview Container (Smooth spring cursor following) --- */
 .card-floating-preview {
   opacity: 1;
   backface-visibility: hidden;
   will-change: transform;
   contain: layout style;
+  transition: transform 0.08s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-/* --- Pickup Pop: Instant snap-lift on floating preview --- */
-@keyframes card-pickup-pop {
+/* --- Floating Preview Inner Card (Minimalist tilt & clean shadow) --- */
+.card-floating-inner {
+  transform: scale(1.025) rotate(1.8deg);
+  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(168, 85, 247, 0.35);
+  backface-visibility: hidden;
+  transition: transform 0.3s ease;
+}
+
+/* --- Grid Shifting Card Item (Smooth FLIP Gliding Layout) --- */
+.card-grid-item {
+  will-change: transform;
+}
+
+/* --- Grid Placeholder Slot (Minimalist subtle dashed outline) --- */
+.card-drag-placeholder {
+  border: 2px dashed rgba(168, 85, 247, 0.35);
+  background-color: rgba(168, 85, 247, 0.05);
+  border-radius: 1rem;
+  transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease;
+}
+
+/* --- Settle animation after card release --- */
+@keyframes card-drop-settle {
   0% {
-    transform: scale(0.92) rotate(0deg);
-    opacity: 0.5;
-    filter: drop-shadow(0 4px 8px rgba(168, 85, 247, 0.2));
-  }
-  60% {
-    transform: scale(1.06) rotate(-2.5deg);
-    opacity: 1;
-    filter: drop-shadow(0 16px 32px rgba(168, 85, 247, 0.5))
-            drop-shadow(0 0 16px rgba(168, 85, 247, 0.3));
-  }
-  100% {
-    transform: scale(1) rotate(-2deg);
-    opacity: 1;
-    filter: drop-shadow(0 14px 28px rgba(168, 85, 247, 0.45))
-            drop-shadow(0 0 14px rgba(168, 85, 247, 0.25));
-  }
-}
-
-.card-pickup-pop {
-  animation: card-pickup-pop 0.18s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
-}
-
-/* --- Source Card Glow: Pulsing glow on the original card while being dragged --- */
-@keyframes source-card-glow-pulse {
-  0%, 100% {
-    box-shadow: 0 0 10px 2px rgba(168, 85, 247, 0.25),
-                inset 0 0 6px rgba(168, 85, 247, 0.06);
-    border-color: rgba(168, 85, 247, 0.45);
+    transform: scale(0.96);
   }
   50% {
-    box-shadow: 0 0 20px 5px rgba(168, 85, 247, 0.45),
-                inset 0 0 10px rgba(168, 85, 247, 0.1);
-    border-color: rgba(192, 132, 252, 0.65);
-  }
-}
-
-.card-drag-source-glow {
-  animation: source-card-glow-pulse 0.9s ease-in-out infinite !important;
-  opacity: 0.5 !important;
-  transform: scale(0.97) !important;
-  border-color: rgba(168, 85, 247, 0.45) !important;
-}
-
-/* --- Drop Pop: Snappy elastic bounce when card is released --- */
-@keyframes card-drop-pop {
-  0% {
-    transform: scale(1.06) rotate(-1deg);
-    box-shadow: 0 12px 24px rgba(168, 85, 247, 0.4), 0 0 16px rgba(168, 85, 247, 0.25);
-  }
-  35% {
-    transform: scale(0.95) rotate(0.5deg);
-    box-shadow: 0 4px 8px rgba(168, 85, 247, 0.15);
-  }
-  65% {
-    transform: scale(1.02) rotate(-0.2deg);
+    transform: scale(1.02);
   }
   100% {
-    transform: scale(1) rotate(0deg);
-    box-shadow: none;
+    transform: scale(1);
   }
 }
 
-.card-drop-pop {
-  animation: card-drop-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
+.card-drop-settle {
+  animation: card-drop-settle 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
 
