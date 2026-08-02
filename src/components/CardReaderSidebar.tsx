@@ -157,14 +157,14 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
         </div>
       )}
 
-      {/* Section 3: Catatan & Penjelasan Lengkap (Full Article Text) */}
-      <div className={`space-y-2.5 pt-2 border-t app-border ${getStaggerClass(4)}`}>
-        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
-          <Icons.BookOpen size={14} />
-          <span>Catatan Lengkap & Detail Lore</span>
-        </div>
+      {/* Section 3: Catatan & Penjelasan Lengkap (Only rendered if activeCard.content is non-empty) */}
+      {activeCard.content && activeCard.content.trim() !== '' && (
+        <div className={`space-y-2.5 pt-2 border-t app-border ${getStaggerClass(4)}`}>
+          <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
+            <Icons.BookOpen size={14} />
+            <span>Catatan Lengkap & Detail Lore</span>
+          </div>
 
-        {activeCard.content ? (
           <div className="text-xs app-text-main leading-relaxed whitespace-pre-wrap font-sans space-y-2 py-1">
             {parseMentions(activeCard.content, allCards).map((seg, idx) =>
               seg.isMention && seg.cardId ? (
@@ -182,12 +182,8 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
               )
             )}
           </div>
-        ) : (
-          <p className="text-xs app-text-muted italic py-1">
-            Belum ada catatan detail. Klik "Edit Kartu" di atas untuk menambahkan penjelasan lengkap.
-          </p>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Section 4: Tags */}
       {activeCard.tags && activeCard.tags.length > 0 && (
