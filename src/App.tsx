@@ -22,6 +22,7 @@ import { WorldManagerModal } from './components/WorldManagerModal';
 import { DeleteCardModal } from './components/DeleteCardModal';
 import { CanvasModal } from './components/CanvasModal';
 import { DeckModal } from './components/DeckModal';
+import { CardReaderSidebar } from './components/CardReaderSidebar';
 
 
 const STORAGE_THEME_KEY = 'worlddeck_theme_v1';
@@ -76,8 +77,10 @@ export const App: React.FC = () => {
     saveWorkspacePreferences({ viewMode: mode });
   };
 
-  // Modals
+  // Modals & Reader Sidebars
   const [editingCard, setEditingCard] = useState<WorldCard | null>(null);
+  const [readerCardId, setReaderCardId] = useState<string | null>(null);
+  const [isReaderFullPage, setIsReaderFullPage] = useState<boolean>(false);
   const [editingDeck, setEditingDeck] = useState<WorldDeck | null>(null);
   const [showDeckModal, setShowDeckModal] = useState<boolean>(false);
   const [editingConnection, setEditingConnection] = useState<CardConnection | null>(null);
@@ -932,7 +935,15 @@ export const App: React.FC = () => {
               connections={activeCanvasConnections}
               selectedCardId={selectedCardId}
               onSelectCard={(card) => setSelectedCardId(card ? card.id : null)}
-              onDoubleClickCard={(card) => setEditingCard(card)}
+              onDoubleClickCard={(card) => {
+                setReaderCardId(card.id);
+                setIsReaderFullPage(false);
+              }}
+              onEditCardRequest={(card) => setEditingCard(card)}
+              onOpenCardFullPageRequest={(card) => {
+                setReaderCardId(card.id);
+                setIsReaderFullPage(true);
+              }}
               onUpdateCardPosition={handleUpdateCardPosition}
               onAddConnection={(src, tgt) => handleAddConnection(src, tgt, 'Terhubung')}
               onEditConnection={(conn) => setEditingConnection(conn)}
@@ -1017,6 +1028,25 @@ export const App: React.FC = () => {
           onImportWorld={handleImport}
         />
       )}
+
+      {/* Wiki Card Reader Sidebar & Full-Page Modal */}
+      <CardReaderSidebar
+        isOpen={!!readerCardId}
+        onClose={() => setReaderCardId(null)}
+        card={activeWorld.cards.find((c) => c.id === readerCardId) || null}
+        allCards={activeWorld.cards}
+        connections={activeWorld.connections}
+        decks={activeWorld.decks || []}
+        initialFullPage={isReaderFullPage}
+        onEditCard={(cardToEdit) => {
+          setEditingCard(cardToEdit);
+          setReaderCardId(null);
+        }}
+        onSelectCard={(targetCardId) => {
+          setReaderCardId(targetCardId);
+          setSelectedCardId(targetCardId);
+        }}
+      />
 
       {/* Card Editor Modal */}
       {editingCard && (

@@ -16,6 +16,8 @@ interface CanvasProps {
   activeCanvasId?: string;
   onSelectCard: (card: WorldCard | null) => void;
   onDoubleClickCard: (card: WorldCard) => void;
+  onEditCardRequest?: (card: WorldCard) => void;
+  onOpenCardFullPageRequest?: (card: WorldCard) => void;
   onUpdateCardPosition: (id: string, x: number, y: number) => void;
   onAddConnection: (sourceId: string, targetId: string) => void;
   onEditConnection: (connection: CardConnection) => void;
@@ -37,6 +39,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   activeCanvasId,
   onSelectCard,
   onDoubleClickCard,
+  onEditCardRequest,
+  onOpenCardFullPageRequest,
   onUpdateCardPosition,
   onAddConnection,
   onEditConnection,
@@ -85,12 +89,14 @@ export const Canvas: React.FC<CanvasProps> = ({
     y: number;
     canvasX: number;
     canvasY: number;
+    targetCardId?: string | null;
   }>({
     visible: false,
     x: 0,
     y: 0,
     canvasX: 0,
     canvasY: 0,
+    targetCardId: null,
   });
 
   // Add Card From Gallery Modal State
@@ -136,7 +142,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const handleContextMenu = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('.world-card-node') || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
       return;
     }
     
@@ -149,12 +155,23 @@ export const Canvas: React.FC<CanvasProps> = ({
     const canvasX = (screenX - rect.left - pan.x) / zoom;
     const canvasY = (screenY - rect.top - pan.y) / zoom;
     
+    const cardElem = target.closest('[data-card-id]');
+    const targetCardId = cardElem?.getAttribute('data-card-id') || null;
+
+    if (targetCardId) {
+      const card = cards.find((c) => c.id === targetCardId);
+      if (card) {
+        onSelectCard(card);
+      }
+    }
+
     setContextMenu({
       visible: true,
       x: screenX,
       y: screenY,
       canvasX,
       canvasY,
+      targetCardId,
     });
   };
 
@@ -1068,115 +1085,182 @@ export const Canvas: React.FC<CanvasProps> = ({
         </div>
       </div>
 
-      {contextMenu.visible && (
-        <div
-          className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-48 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-800"
-          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="px-3 py-1.5 text-[10px] app-text-muted font-semibold uppercase tracking-wider select-none">
-            Aksi Canvas
-          </div>
-          
-          <div className="py-1">
-            <button
-              type="button"
-              onClick={() => {
-                onAddCardAtPosition(contextMenu.canvasX, contextMenu.canvasY);
-                setContextMenu((prev) => ({ ...prev, visible: false }));
-              }}
-              className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
-            >
-              <Icons.Plus size={14} strokeWidth={2.5} />
-              <span>Tambah Kartu Baru</span>
-            </button>
+      {contextMenu.visible && (() => {
+        const clickedCard = contextMenu.targetCardId ? cards.find((c) => c.id === contextMenu.targetCardId) : null;
+        return (
+          <div
+            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-52 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-800"
+            style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {clickedCard ? (
+              <>
+                <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
+                  📄 {clickedCard.title || 'Kartu'}
+                </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setGalleryTargetPos({ x: contextMenu.canvasX, y: contextMenu.canvasY });
-                setShowAddFromGalleryModal(true);
-                setContextMenu((prev) => ({ ...prev, visible: false }));
-              }}
-              className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
-            >
-              <Icons.FolderPlus size={14} strokeWidth={2.5} />
-              <span>Tambah Kartu dari Galeri</span>
-            </button>
-          </div>
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onOpenCardFullPageRequest) {
+                        onOpenCardFullPageRequest(clickedCard);
+                      } else {
+                        onDoubleClickCard(clickedCard);
+                      }
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
+                  >
+                    <Icons.Maximize2 size={14} />
+                    <span>Buka Kartu</span>
+                  </button>
 
-          <div className="py-1">
-            <button
-              type="button"
-              onClick={() => {
-                handleCenterViewport();
-                setContextMenu((prev) => ({ ...prev, visible: false }));
-              }}
-              className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors cursor-pointer"
-            >
-              <Icons.Focus size={14} className="app-text-muted" />
-              <span>Tengahkan Layar</span>
-            </button>
-            
-            <button
-              type="button"
-              onClick={() => {
-                setIsSpacePressed(!isSpacePressed);
-                setContextMenu((prev) => ({ ...prev, visible: false }));
-              }}
-              className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors cursor-pointer"
-            >
-              <Icons.Hand size={14} className="app-text-muted" />
-              <span>{isSpacePressed ? 'Matikan Mode Pan' : 'Aktifkan Mode Pan'}</span>
-            </button>
-          </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onEditCardRequest) {
+                        onEditCardRequest(clickedCard);
+                      } else {
+                        onDoubleClickCard(clickedCard);
+                      }
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                  >
+                    <Icons.Edit3 size={14} />
+                    <span>Edit Kartu</span>
+                  </button>
+                </div>
 
-          <div className="py-1">
-            <button
-              type="button"
-              onClick={() => {
-                const targetIds = selectedCardIds.length > 0 ? selectedCardIds : selectedCardId ? [selectedCardId] : [];
-                if (targetIds.length > 0 && onRemoveCardsFromCanvas) {
-                  onRemoveCardsFromCanvas(targetIds);
-                  setSelectedCardIds([]);
-                }
-                setContextMenu((prev) => ({ ...prev, visible: false }));
-              }}
-              className={`w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors ${
-                selectedCardIds.length > 0 || selectedCardId
-                  ? 'text-amber-400 font-medium cursor-pointer'
-                  : 'app-text-muted cursor-not-allowed opacity-50'
-              }`}
-              disabled={selectedCardIds.length === 0 && !selectedCardId}
-            >
-              <Icons.MinusCircle size={14} />
-              <span>Lepas dari Kanvas</span>
-            </button>
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onRemoveCardsFromCanvas) {
+                        onRemoveCardsFromCanvas([clickedCard.id]);
+                      }
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-amber-400 font-medium cursor-pointer"
+                  >
+                    <Icons.MinusCircle size={14} />
+                    <span>Lepas dari Kanvas</span>
+                  </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedCardIds.length > 0) {
-                  onDeleteCardsRequest(selectedCardIds);
-                  setSelectedCardIds([]);
-                } else if (selectedCardId) {
-                  onDeleteCardsRequest([selectedCardId]);
-                }
-                setContextMenu((prev) => ({ ...prev, visible: false }));
-              }}
-              className={`w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors ${
-                selectedCardIds.length > 0 || selectedCardId
-                  ? 'text-rose-500 font-medium cursor-pointer'
-                  : 'app-text-muted cursor-not-allowed opacity-50'
-              }`}
-              disabled={selectedCardIds.length === 0 && !selectedCardId}
-            >
-              <Icons.Trash2 size={14} />
-              <span>Hapus Kartu Permanen</span>
-            </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDeleteCardsRequest([clickedCard.id]);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
+                  >
+                    <Icons.Trash2 size={14} />
+                    <span>Hapus Kartu Permanen</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="px-3 py-1.5 text-[10px] app-text-muted font-semibold uppercase tracking-wider select-none">
+                  Aksi Canvas
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAddCardAtPosition(contextMenu.canvasX, contextMenu.canvasY);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
+                  >
+                    <Icons.Plus size={14} strokeWidth={2.5} />
+                    <span>Tambah Kartu Baru</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGalleryTargetPos({ x: contextMenu.canvasX, y: contextMenu.canvasY });
+                      setShowAddFromGalleryModal(true);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
+                  >
+                    <Icons.FolderPlus size={14} strokeWidth={2.5} />
+                    <span>Tambah Kartu dari Galeri</span>
+                  </button>
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCenterViewport();
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Icons.Focus size={14} className="app-text-muted" />
+                    <span>Tengahkan Layar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSpacePressed(!isSpacePressed);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Icons.Hand size={14} className="app-text-muted" />
+                    <span>{isSpacePressed ? 'Matikan Mode Pan' : 'Aktifkan Mode Pan'}</span>
+                  </button>
+                </div>
+
+                {(selectedCardIds.length > 0 || selectedCardId) && (
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetIds = selectedCardIds.length > 0 ? selectedCardIds : selectedCardId ? [selectedCardId] : [];
+                        if (targetIds.length > 0 && onRemoveCardsFromCanvas) {
+                          onRemoveCardsFromCanvas(targetIds);
+                          setSelectedCardIds([]);
+                        }
+                        setContextMenu((prev) => ({ ...prev, visible: false }));
+                      }}
+                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-amber-400 font-medium cursor-pointer"
+                    >
+                      <Icons.MinusCircle size={14} />
+                      <span>Lepas Kartu Terpilih</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedCardIds.length > 0) {
+                          onDeleteCardsRequest(selectedCardIds);
+                          setSelectedCardIds([]);
+                        } else if (selectedCardId) {
+                          onDeleteCardsRequest([selectedCardId]);
+                        }
+                        setContextMenu((prev) => ({ ...prev, visible: false }));
+                      }}
+                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
+                    >
+                      <Icons.Trash2 size={14} />
+                      <span>Hapus Kartu Terpilih</span>
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <AddCardFromGalleryModal
         isOpen={showAddFromGalleryModal}

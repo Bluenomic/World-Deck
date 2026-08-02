@@ -412,8 +412,69 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 )}
               </div>
 
+              {/* Atribut Kustom / Wiki Infobox Properties */}
+              <div className="space-y-2 pt-2 border-t app-border">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold app-text-muted flex items-center gap-1.5">
+                    <Icons.Sliders size={13} className="app-accent-text" />
+                    <span>Atribut Kustom / Infobox (Nama & Nilai)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddAttribute}
+                    className="text-xs font-semibold app-accent-text hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Icons.Plus size={13} />
+                    <span>+ Atribut Baru</span>
+                  </button>
+                </div>
+
+                {attributes.length === 0 ? (
+                  <div className="p-3 rounded-xl app-bg-secondary border border-dashed app-border text-xs app-text-muted flex items-center justify-between gap-2">
+                    <span>Belum ada atribut kustom (mis. Spesies: Manusia, Status: Aktif, Elemen: Api).</span>
+                    <button
+                      type="button"
+                      onClick={handleAddAttribute}
+                      className="px-2.5 py-1 rounded-lg app-accent-bg text-white text-[11px] font-bold cursor-pointer shrink-0"
+                    >
+                      + Tambah Atribut
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2">
+                    {attributes.map((attr) => (
+                      <div key={attr.id} className="flex items-center gap-2 app-bg-secondary p-2 rounded-xl border app-border">
+                        <input
+                          type="text"
+                          value={attr.key}
+                          onChange={(e) => handleUpdateAttribute(attr.id, e.target.value, attr.value)}
+                          placeholder="Nama Atribut (mis. Spesies)"
+                          className="w-1/3 app-bg-main border app-border rounded-lg px-2.5 py-1 text-xs app-text-main focus:outline-none focus:border-blue-500 font-medium"
+                        />
+                        <span className="app-text-muted font-bold">:</span>
+                        <input
+                          type="text"
+                          value={attr.value}
+                          onChange={(e) => handleUpdateAttribute(attr.id, attr.key, e.target.value)}
+                          placeholder="Nilai Atribut (mis. Elven)"
+                          className="flex-1 app-bg-main border app-border rounded-lg px-2.5 py-1 text-xs app-text-main focus:outline-none focus:border-blue-500 font-medium"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAttribute(attr.id)}
+                          className="p-1 app-text-muted hover:text-rose-400 rounded-lg hover:app-bg-hover transition-colors cursor-pointer"
+                          title="Hapus Atribut"
+                        >
+                          <Icons.Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Tags */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 pt-2 border-t app-border">
                 <label className="text-xs font-semibold app-text-muted block">Tags Halaman (#tag)</label>
                 <div className="flex gap-2">
                   <input
