@@ -529,12 +529,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
-  // Double click canvas background to create new card
-  const handleDoubleClickBackground = (e: React.MouseEvent) => {
-    if (e.target === containerRef.current || (e.target as HTMLElement).id === 'canvas-svg-bg') {
-      const worldPos = screenToWorld(e.clientX, e.clientY);
-      onAddCardAtPosition(worldPos.x, worldPos.y);
-    }
+  // Double click canvas background disabled
+  const handleDoubleClickBackground = (_e: React.MouseEvent) => {
+    // Empty as requested
   };
 
   // Smart Auto Layout with Mode Selection & Target Box Filtering (Requires > 1 selected cards)
