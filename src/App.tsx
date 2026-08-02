@@ -74,6 +74,7 @@ export const App: React.FC = () => {
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
+    setReaderCardId(null);
     saveWorkspacePreferences({ viewMode: mode });
   };
 
@@ -81,6 +82,11 @@ export const App: React.FC = () => {
   const [editingCard, setEditingCard] = useState<WorldCard | null>(null);
   const [readerCardId, setReaderCardId] = useState<string | null>(null);
   const [isReaderFullPage, setIsReaderFullPage] = useState<boolean>(false);
+
+  // Close reader sidebar automatically when changing views, worlds, or canvases
+  useEffect(() => {
+    setReaderCardId(null);
+  }, [viewMode, activeWorldId, activeCanvasId]);
   const [editingDeck, setEditingDeck] = useState<WorldDeck | null>(null);
   const [showDeckModal, setShowDeckModal] = useState<boolean>(false);
   const [editingConnection, setEditingConnection] = useState<CardConnection | null>(null);
