@@ -41,6 +41,8 @@ export interface WorldCard {
   attributes: CustomAttribute[];
   x: number;
   y: number;
+  width?: number;
+  height?: number;
   pinned?: boolean;
   canvasId?: string;
   deckId?: string;

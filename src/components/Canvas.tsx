@@ -27,6 +27,7 @@ interface CanvasProps {
   onDeleteCardsRequest: (cardIds: string[]) => void;
   onDeleteConnection?: (id: string) => void;
   onDeleteConnections?: (ids: string[]) => void;
+  onUpdateCardDimensions?: (id: string, width: number, height: number) => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -50,6 +51,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onDeleteCardsRequest,
   onDeleteConnection,
   onDeleteConnections,
+  onUpdateCardDimensions,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const targetCanvasId = activeCanvasId || 'default';
@@ -607,13 +609,14 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       if (!sourceCard || !targetCard) return null;
 
-      const cardW = 288;
-      const sourceH = cardHeightsRef.current.get(sourceCard.id) || 180;
-      const targetH = cardHeightsRef.current.get(targetCard.id) || 180;
+      const sourceW = sourceCard.width || 288;
+      const targetW = targetCard.width || 288;
+      const sourceH = cardHeightsRef.current.get(sourceCard.id) || sourceCard.height || 180;
+      const targetH = cardHeightsRef.current.get(targetCard.id) || targetCard.height || 180;
 
-      const sourceCenterX = sourceCard.x + cardW / 2;
+      const sourceCenterX = sourceCard.x + sourceW / 2;
       const sourceCenterY = sourceCard.y + sourceH / 2;
-      const targetCenterX = targetCard.x + cardW / 2;
+      const targetCenterX = targetCard.x + targetW / 2;
       const targetCenterY = targetCard.y + targetH / 2;
 
       const dx = targetCenterX - sourceCenterX;
@@ -633,7 +636,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         dir = 'horizontal';
         if (dx >= 0) {
           // Source -> Target (Left to Right)
-          const sourceEdgeX = sourceCard.x + cardW + 2;
+          const sourceEdgeX = sourceCard.x + sourceW + 2;
           const sourceEdgeY = Math.min(Math.max(targetCenterY, sourceCard.y + 24), sourceCard.y + sourceH - 24);
 
           const targetEdgeX = targetCard.x - 2;
@@ -648,7 +651,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           const sourceEdgeX = sourceCard.x - 2;
           const sourceEdgeY = Math.min(Math.max(targetCenterY, sourceCard.y + 24), sourceCard.y + sourceH - 24);
 
-          const targetEdgeX = targetCard.x + cardW + 2;
+          const targetEdgeX = targetCard.x + targetW + 2;
           const targetEdgeY = Math.min(Math.max(sourceCenterY, targetCard.y + 24), targetCard.y + targetH - 24);
 
           x1 = dirMode === 'bidirectional' ? sourceEdgeX - arrowLen : sourceEdgeX;
@@ -660,10 +663,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         dir = 'vertical';
         if (dy >= 0) {
           // Source -> Target (Top to Bottom)
-          const sourceEdgeX = Math.min(Math.max(targetCenterX, sourceCard.x + 24), sourceCard.x + cardW - 24);
+          const sourceEdgeX = Math.min(Math.max(targetCenterX, sourceCard.x + 24), sourceCard.x + sourceW - 24);
           const sourceEdgeY = sourceCard.y + sourceH + 2;
 
-          const targetEdgeX = Math.min(Math.max(sourceCenterX, targetCard.x + 24), targetCard.x + cardW - 24);
+          const targetEdgeX = Math.min(Math.max(sourceCenterX, targetCard.x + 24), targetCard.x + targetW - 24);
           const targetEdgeY = targetCard.y - 2;
 
           x1 = sourceEdgeX;
@@ -672,10 +675,10 @@ export const Canvas: React.FC<CanvasProps> = ({
           y2 = targetEdgeY - arrowLen;
         } else {
           // Source -> Target (Bottom to Top)
-          const sourceEdgeX = Math.min(Math.max(targetCenterX, sourceCard.x + 24), sourceCard.x + cardW - 24);
+          const sourceEdgeX = Math.min(Math.max(targetCenterX, sourceCard.x + 24), sourceCard.x + sourceW - 24);
           const sourceEdgeY = sourceCard.y - 2;
 
-          const targetEdgeX = Math.min(Math.max(sourceCenterX, targetCard.x + 24), targetCard.x + cardW - 24);
+          const targetEdgeX = Math.min(Math.max(sourceCenterX, targetCard.x + 24), targetCard.x + targetW - 24);
           const targetEdgeY = targetCard.y + targetH + 2;
 
           x1 = sourceEdgeX;
@@ -912,11 +915,13 @@ export const Canvas: React.FC<CanvasProps> = ({
               isConnectingSource={connectingSourceId === card.id}
               isDimmed={isDimmed}
               isCategoryHighlighted={isCategoryHighlighted}
+              zoom={zoom}
               onSelect={handleCardSelect}
               onDoubleClick={onDoubleClickCard}
               onStartConnection={handleStartConnection}
               connectionCount={connCount}
               onMeasureHeight={(id, h) => cardHeightsRef.current.set(id, h)}
+              onUpdateDimensions={onUpdateCardDimensions}
             />
           );
         })}

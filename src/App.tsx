@@ -322,6 +322,14 @@ export const App: React.FC = () => {
     }));
   };
 
+  const handleUpdateCardDimensions = (id: string, width: number, height: number) => {
+    updateActiveWorld((prev) => ({
+      ...prev,
+      updatedAt: Date.now(),
+      cards: prev.cards.map((c) => (c.id === id ? { ...c, width, height } : c)),
+    }));
+  };
+
   // Add New Blank Card directly on Canvas
   const handleAddCardAtPosition = (x: number = 300, y: number = 300) => {
     const newCard: WorldCard = {
@@ -959,6 +967,7 @@ export const App: React.FC = () => {
               onDeleteCardsRequest={handleRequestDeleteCards}
               onDeleteConnection={handleDeleteConnection}
               onDeleteConnections={handleDeleteConnections}
+              onUpdateCardDimensions={handleUpdateCardDimensions}
             />
           )}
 

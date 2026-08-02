@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import type { WorldCard } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import * as Icons from 'lucide-react';
@@ -9,11 +9,13 @@ interface WorldCardNodeProps {
   isConnectingSource: boolean;
   isDimmed?: boolean;
   isCategoryHighlighted?: boolean;
+  zoom?: number;
   onSelect: (card: WorldCard, e: React.MouseEvent | React.TouchEvent) => void;
   onDoubleClick: (card: WorldCard) => void;
   onStartConnection: (cardId: string, e: React.MouseEvent | React.TouchEvent) => void;
   connectionCount: number;
   onMeasureHeight?: (cardId: string, height: number) => void;
+  onUpdateDimensions?: (cardId: string, width: number, height: number) => void;
 }
 
 export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
@@ -22,65 +24,118 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
   isConnectingSource,
   isDimmed = false,
   isCategoryHighlighted = false,
+  zoom = 1,
   onSelect,
   onDoubleClick,
   onStartConnection,
   connectionCount,
   onMeasureHeight,
+  onUpdateDimensions,
 }) => {
+  const nodeRef = useRef<HTMLDivElement>(null);
   const config = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
   const IconComponent = (Icons as any)[config.iconName] || Icons.HelpCircle || (() => null);
+
+  const width = card.width || 288;
+  const height = card.height;
+
+  // Determine Level of Detail (LOD) based on card height & width
+  // Compact LOD: height < 140px or width < 240px
+  // Detailed LOD: height >= 260px or width >= 340px
+  const isCompact = (height && height < 140) || width < 240;
+  const isDetailed = (height && height >= 260) || width >= 340;
+
+  // Drag Resize Handler
+  const handleResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const startW = width;
+    const startH = height || nodeRef.current?.offsetHeight || 180;
+
+    const handlePointerMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const moveX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : (moveEvent as MouseEvent).clientX;
+      const moveY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
+
+      const deltaX = (moveX - clientX) / (zoom || 1);
+      const deltaY = (moveY - clientY) / (zoom || 1);
+
+      const newWidth = Math.round(Math.max(220, Math.min(650, startW + deltaX)));
+      const newHeight = Math.round(Math.max(110, Math.min(800, startH + deltaY)));
+
+      onUpdateDimensions?.(card.id, newWidth, newHeight);
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerMove);
+      window.removeEventListener('touchend', handlePointerUp);
+    };
+
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('touchmove', handlePointerMove);
+    window.addEventListener('touchend', handlePointerUp);
+  };
 
   return (
     <div
       data-card-id={card.id}
       ref={(el) => {
+        (nodeRef as any).current = el;
         if (el) {
           onMeasureHeight?.(card.id, el.offsetHeight);
         }
       }}
       style={{
         transform: `translate(${card.x}px, ${card.y}px)`,
+        width: `${width}px`,
+        height: height ? `${height}px` : undefined,
       }}
-      className={`absolute w-72 rounded-xl app-bg-secondary border transition-all cursor-grab active:cursor-grabbing group select-none ${
+      className={`absolute rounded-xl app-bg-secondary border transition-all cursor-grab active:cursor-grabbing group select-none flex flex-col overflow-hidden ${
         isDimmed ? 'opacity-20 pointer-events-none grayscale-[40%]' : 'opacity-100 pointer-events-auto'
       } ${
         isSelected
-          ? 'border-blue-500 ring-2 ring-blue-500/40 shadow-xl z-30 scale-[1.02]'
+          ? 'border-blue-500 ring-2 ring-blue-500/40 shadow-xl z-30 scale-[1.01]'
           : isConnectingSource
           ? 'border-emerald-400 ring-2 ring-emerald-400/40 shadow-xl z-30'
           : isCategoryHighlighted
-          ? 'border-blue-400/80 ring-2 ring-blue-400/30 shadow-md z-20 scale-[1.01]'
+          ? 'border-blue-400/80 ring-2 ring-blue-400/30 shadow-md z-20'
           : 'app-border hover:border-slate-500/60 z-10'
       }`}
       onMouseDown={(e) => !isDimmed && onSelect(card, e)}
       onTouchStart={(e) => !isDimmed && onSelect(card, e)}
       onDoubleClick={() => !isDimmed && onDoubleClick(card)}
     >
-      {/* Cover Image Preview */}
-      {card.imageUrl ? (
-        <div className="h-28 w-full overflow-hidden relative rounded-t-xl">
-          <img
-            src={card.imageUrl}
-            alt={card.title}
-            className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity pointer-events-none select-none"
-            draggable={false}
-            onDragStart={(e) => e.preventDefault()}
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = 'none';
-            }}
-          />
-        </div>
-      ) : (
-        <div className="h-2.5 w-full rounded-t-xl" style={{ backgroundColor: config.color, opacity: 0.8 }} />
+      {/* Cover Image Preview (Hidden in compact view) */}
+      {!isCompact && (
+        card.imageUrl ? (
+          <div className={`w-full overflow-hidden relative rounded-t-xl shrink-0 ${isDetailed ? 'h-36' : 'h-24'}`}>
+            <img
+              src={card.imageUrl}
+              alt={card.title}
+              className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity pointer-events-none select-none"
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()}
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+          </div>
+        ) : (
+          <div className="h-2 w-full rounded-t-xl shrink-0" style={{ backgroundColor: config.color, opacity: 0.8 }} />
+        )
       )}
 
       {/* Card Content Body */}
-      <div className="p-3.5 space-y-2">
+      <div className="p-3 space-y-2 flex-1 overflow-y-auto custom-scrollbar">
         
         {/* Category Pill & Connection Badge */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 shrink-0">
           <div
             className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium border ${config.bgGradient} ${config.borderColor}`}
             style={{ color: config.color }}
@@ -102,25 +157,59 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
           }`}>
             {card.title || 'Tanpa Judul'}
           </h3>
-          {card.subtitle ? (
-            <p className="text-[11px] app-text-muted line-clamp-1">
+          {card.subtitle && !isCompact && (
+            <p className="text-[11px] app-text-muted line-clamp-1 italic">
               {card.subtitle}
             </p>
-          ) : null}
+          )}
         </div>
 
         {/* Summary Description */}
-        <p className={`text-[11px] line-clamp-2 leading-relaxed ${
+        <p className={`text-[11px] leading-relaxed ${isCompact ? 'line-clamp-1' : isDetailed ? 'line-clamp-4' : 'line-clamp-2'} ${
           card.summary ? 'app-text-muted' : 'app-text-muted opacity-50'
         }`}>
           {card.summary || 'Belum ada ringkasan.'}
         </p>
 
-        {/* Property Rows */}
-        {card.attributes && card.attributes.length > 0 && (
+        {/* Extended Details for Large / Expanded Card Size */}
+        {isDetailed && (
+          <>
+            {/* Custom Attributes Table */}
+            {card.attributes && card.attributes.length > 0 && (
+              <div className="pt-2 border-t app-border space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider app-accent-text block">
+                  Atribut Utama
+                </span>
+                <div className="grid grid-cols-1 gap-1">
+                  {card.attributes.map((attr) => (
+                    <div key={attr.id || attr.key} className="flex items-center justify-between text-[11px] app-bg-main px-2 py-1 rounded border app-border">
+                      <span className="font-semibold app-text-muted truncate">{attr.key}:</span>
+                      <span className="font-bold app-text-main truncate">{attr.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Full Written Lore / Content Preview */}
+            {card.content && (
+              <div className="pt-2 border-t app-border space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider app-accent-text block">
+                  Catatan Lore
+                </span>
+                <div className="text-[11px] app-bg-main p-2 rounded border app-border app-text-main leading-relaxed whitespace-pre-wrap font-sans max-h-40 overflow-y-auto custom-scrollbar">
+                  {card.content}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Property Rows for Standard View */}
+        {!isDetailed && card.attributes && card.attributes.length > 0 && (
           <div className="pt-1.5 border-t app-border space-y-1">
             {card.attributes.slice(0, 2).map((attr) => (
-              <div key={attr.id} className="flex items-center justify-between text-[10px] app-text-muted">
+              <div key={attr.id || attr.key} className="flex items-center justify-between text-[10px] app-text-muted">
                 <span className="truncate max-w-[100px] opacity-70">{attr.key}:</span>
                 <span className="truncate max-w-[130px] font-medium app-text-main app-bg-main px-1.5 py-0.2 rounded border app-border">
                   {attr.value}
@@ -131,9 +220,9 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
         )}
 
         {/* Tags */}
-        {card.tags && card.tags.length > 0 && (
+        {card.tags && card.tags.length > 0 && !isCompact && (
           <div className="pt-1 flex flex-wrap gap-1">
-            {card.tags.slice(0, 3).map((tag, idx) => (
+            {card.tags.slice(0, isDetailed ? 6 : 3).map((tag, idx) => (
               <span
                 key={idx}
                 className="text-[10px] px-1.5 py-0.5 rounded app-bg-main app-text-muted border app-border"
@@ -144,6 +233,18 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
           </div>
         )}
       </div>
+
+      {/* Bottom-Right Drag Resize Handle */}
+      {onUpdateDimensions && (
+        <div
+          className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-center justify-end p-1 text-slate-400 hover:text-blue-400 z-40 group-hover:opacity-100 opacity-40 transition-opacity"
+          onMouseDown={handleResizeStart}
+          onTouchStart={handleResizeStart}
+          title="Tarik untuk mengubah ukuran kartu"
+        >
+          <Icons.GripVertical size={13} className="rotate-45" />
+        </div>
+      )}
 
       {/* 4 Directional Connection Handles */}
       {/* Right */}
