@@ -102,10 +102,16 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
             </p>
           )}
 
-          {/* Paragraf Intro / Summary Callout Box */}
-          <div className="notion-callout app-bg-secondary p-3.5 rounded-xl border app-border text-xs app-text-main leading-relaxed shadow-xs">
-            {activeCard.summary || 'Belum ada ringkasan intro untuk kartu ini...'}
-          </div>
+          {/* Paragraf Intro / Summary Text (No container box) */}
+          {activeCard.summary ? (
+            <p className="text-xs app-text-main leading-relaxed">
+              {activeCard.summary}
+            </p>
+          ) : (
+            <p className="text-xs app-text-muted italic">
+              Belum ada ringkasan intro untuk kartu ini...
+            </p>
+          )}
         </div>
 
         {/* Cover Image / Wiki Infobox Picture */}
@@ -137,11 +143,11 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
             <span>Atribut & Properti Utama</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-3.5 app-bg-secondary rounded-xl border app-border shadow-2xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1.5 py-1">
             {activeCard.attributes.map((attr) => (
               <div
                 key={attr.id || attr.key}
-                className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg app-bg-main border app-border text-xs"
+                className="flex items-center justify-between gap-2 py-1 border-b app-border text-xs"
               >
                 <span className="font-semibold app-text-muted truncate">{attr.key}:</span>
                 <span className="font-bold app-text-main truncate">{attr.value}</span>
@@ -159,14 +165,14 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
         </div>
 
         {activeCard.content ? (
-          <div className="app-bg-secondary p-4 rounded-xl border app-border text-xs app-text-main leading-relaxed whitespace-pre-wrap font-sans space-y-2">
+          <div className="text-xs app-text-main leading-relaxed whitespace-pre-wrap font-sans space-y-2 py-1">
             {parseMentions(activeCard.content, allCards).map((seg, idx) =>
               seg.isMention && seg.cardId ? (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => onSelectCard(seg.cardId!)}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 mx-0.5 rounded-md app-bg-main app-accent-text border app-border font-semibold hover:border-blue-400 cursor-pointer transition-all hover:scale-105"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 mx-0.5 rounded-md app-bg-secondary app-accent-text border app-border font-semibold hover:border-blue-400 cursor-pointer transition-all hover:scale-105"
                 >
                   <Icons.FileText size={11} />
                   <span>{seg.text.substring(1)}</span>
@@ -177,9 +183,9 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
             )}
           </div>
         ) : (
-          <div className="p-4 rounded-xl app-bg-secondary border border-dashed app-border text-xs app-text-muted text-center italic">
+          <p className="text-xs app-text-muted italic py-1">
             Belum ada catatan detail. Klik "Edit Kartu" di atas untuk menambahkan penjelasan lengkap.
-          </div>
+          </p>
         )}
       </div>
 
