@@ -4,6 +4,16 @@ import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import { generateId, parseMentions } from '../utils/helpers';
 import * as Icons from 'lucide-react';
 
+const SUGGESTED_ATTRIBUTES_BY_CATEGORY: Record<string, string[]> = {
+  character: ['Umur', 'Peran', 'Senjata', 'Afiliasi', 'Status', 'Hobi', 'Tinggi Badan', 'Spesies'],
+  faction: ['Pemimpin', 'Markas Besar', 'Jumlah Anggota', 'Ideologi', 'Aliansi', 'Kekuatan Utama'],
+  location: ['Wilayah', 'Iklim', 'Populasi', 'Bahasa Utama', 'Tingkat Bahaya', 'Penguasa'],
+  lore: ['Asal Usul', 'Elemen', 'Periode Era', 'Dampak Utama', 'Tokoh Kunci'],
+  timeline: ['Tanggal / Era', 'Lokasi Kejadian', 'Pihak Terlibat', 'Hasil / Dampak', 'Tingkat Skala'],
+  item: ['Tipe Item', 'Pemilik', 'Kelangkaan', 'Efek / Sihir', 'Bahan Pembuatan'],
+  realm: ['Ibu Kota', 'Bentuk Pemerintahan', 'Mata Uang', 'Agama Mayoritas', 'Penguasa Utama'],
+};
+
 interface CardEditorModalProps {
   card: WorldCard;
   allCards: WorldCard[];
@@ -54,10 +64,10 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     setTags(tags.filter((t) => t !== tagToRemove));
   };
 
-  const handleAddAttribute = () => {
-    setAttributes([
-      ...attributes,
-      { id: generateId('attr'), key: 'Properti Baru', value: 'Nilai' },
+  const handleAddAttribute = (initialKey: string = '', initialValue: string = '') => {
+    setAttributes((prev) => [
+      ...prev,
+      { id: generateId('attr'), key: initialKey, value: initialValue },
     ]);
   };
 
@@ -422,7 +432,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                   </label>
                   <button
                     type="button"
-                    onClick={handleAddAttribute}
+                    onClick={() => handleAddAttribute('', '')}
                     className="text-xs font-semibold app-accent-text hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <Icons.Plus size={13} />
@@ -431,45 +441,117 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 </div>
 
                 {attributes.length === 0 ? (
-                  <div className="p-3 rounded-xl app-bg-secondary border border-dashed app-border text-xs app-text-muted flex items-center justify-between gap-2">
-                    <span>Belum ada atribut kustom (mis. Spesies: Manusia, Status: Aktif, Elemen: Api).</span>
-                    <button
-                      type="button"
-                      onClick={handleAddAttribute}
-                      className="px-2.5 py-1 rounded-lg app-accent-bg text-white text-[11px] font-bold cursor-pointer shrink-0"
-                    >
-                      + Tambah Atribut
-                    </button>
+                  <div className="p-3.5 rounded-xl app-bg-secondary border border-dashed app-border space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs app-text-muted">
+                        Belum ada atribut kustom (mis. Spesies: Manusia, Status: Aktif, Elemen: Api).
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleAddAttribute('', '')}
+                        className="px-2.5 py-1 rounded-lg app-accent-bg text-white text-[11px] font-bold cursor-pointer shrink-0"
+                      >
+                        + Tambah Atribut
+                      </button>
+                    </div>
+
+                    {/* Quick Attribute Suggestions in empty state */}
+                    <div className="pt-1 flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] app-text-muted font-bold uppercase tracking-wider flex items-center gap-1">
+                        <Icons.Sparkles size={11} className="text-amber-400" />
+                        <span>Saran Cepat:</span>
+                      </span>
+                      {(SUGGESTED_ATTRIBUTES_BY_CATEGORY[category] || []).slice(0, 6).map((suggKey) => (
+                        <button
+                          key={suggKey}
+                          type="button"
+                          onClick={() => handleAddAttribute(suggKey, '')}
+                          className="text-[11px] px-2.5 py-1 rounded-lg app-bg-main border app-border app-text-main font-semibold hover:border-blue-400 hover:text-blue-400 hover:scale-105 active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                        >
+                          <Icons.Plus size={11} className="text-blue-400" />
+                          <span>{suggKey}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-2">
-                    {attributes.map((attr) => (
-                      <div key={attr.id} className="flex items-center gap-2 app-bg-secondary p-2 rounded-xl border app-border">
-                        <input
-                          type="text"
-                          value={attr.key}
-                          onChange={(e) => handleUpdateAttribute(attr.id, e.target.value, attr.value)}
-                          placeholder="Nama Atribut (mis. Spesies)"
-                          className="w-1/3 app-bg-main border app-border rounded-lg px-2.5 py-1 text-xs app-text-main focus:outline-none focus:border-blue-500 font-medium"
-                        />
-                        <span className="app-text-muted font-bold">:</span>
-                        <input
-                          type="text"
-                          value={attr.value}
-                          onChange={(e) => handleUpdateAttribute(attr.id, attr.key, e.target.value)}
-                          placeholder="Nilai Atribut (mis. Elven)"
-                          className="flex-1 app-bg-main border app-border rounded-lg px-2.5 py-1 text-xs app-text-main focus:outline-none focus:border-blue-500 font-medium"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAttribute(attr.id)}
-                          className="p-1 app-text-muted hover:text-rose-400 rounded-lg hover:app-bg-hover transition-colors cursor-pointer"
-                          title="Hapus Atribut"
-                        >
-                          <Icons.Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {attributes.map((attr) => {
+                      const usedKeys = attributes.map((a) => a.key.toLowerCase());
+                      const categoryDefaults = SUGGESTED_ATTRIBUTES_BY_CATEGORY[category] || [];
+                      const existingKeys = Array.from(
+                        new Set(allCards.flatMap((c) => (c.attributes || []).map((a) => a.key)))
+                      );
+                      const combined = Array.from(new Set([...categoryDefaults, ...existingKeys]));
+                      const filterTerm = attr.key.trim().toLowerCase();
+
+                      const filteredSuggestions = combined.filter((k) => {
+                        if (!k.trim()) return false;
+                        const countUsed = usedKeys.filter((uk) => uk === k.toLowerCase()).length;
+                        if (countUsed > 1) return false;
+                        if (countUsed === 1 && attr.key.toLowerCase() === k.toLowerCase()) return false;
+                        if (!filterTerm) return true;
+                        return k.toLowerCase().includes(filterTerm) && k.toLowerCase() !== filterTerm;
+                      });
+
+                      return (
+                        <div key={attr.id} className="space-y-1.5 app-bg-secondary p-2.5 rounded-xl border app-border">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={attr.key}
+                              onChange={(e) => handleUpdateAttribute(attr.id, e.target.value, attr.value)}
+                              placeholder="Nama Atribut (mis. Spesies)"
+                              className="w-1/3 app-bg-main border app-border rounded-lg px-2.5 py-1.5 text-xs app-text-main focus:outline-none focus:border-blue-500 font-medium"
+                            />
+                            <span className="app-text-muted font-bold">:</span>
+                            <input
+                              id={`attr-val-${attr.id}`}
+                              type="text"
+                              value={attr.value}
+                              onChange={(e) => handleUpdateAttribute(attr.id, attr.key, e.target.value)}
+                              placeholder="Nilai Atribut (mis. Manusia)"
+                              className="flex-1 app-bg-main border app-border rounded-lg px-2.5 py-1.5 text-xs app-text-main focus:outline-none focus:border-blue-500 font-medium"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAttribute(attr.id)}
+                              className="p-1.5 app-text-muted hover:text-rose-400 rounded-lg hover:app-bg-hover transition-colors cursor-pointer"
+                              title="Hapus Atribut"
+                            >
+                              <Icons.Trash2 size={14} />
+                            </button>
+                          </div>
+
+                          {/* Interactive Suggestion Pills below attribute row */}
+                          {filteredSuggestions.length > 0 && (
+                            <div className="pt-0.5 flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] app-text-muted font-bold uppercase tracking-wider flex items-center gap-1">
+                                <Icons.Sparkles size={10} className="text-amber-400" />
+                                <span>Saran:</span>
+                              </span>
+                              {filteredSuggestions.slice(0, 6).map((suggKey) => (
+                                <button
+                                  key={suggKey}
+                                  type="button"
+                                  onClick={() => {
+                                    handleUpdateAttribute(attr.id, suggKey, attr.value);
+                                    setTimeout(() => {
+                                      const valInput = document.getElementById(`attr-val-${attr.id}`);
+                                      if (valInput) valInput.focus();
+                                    }, 50);
+                                  }}
+                                  className="text-[10px] px-2 py-0.5 rounded-md app-bg-main border app-border app-text-main font-semibold hover:border-blue-400 hover:text-blue-400 hover:scale-105 active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                                >
+                                  <Icons.Plus size={10} className="text-blue-400" />
+                                  <span>{suggKey}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -531,7 +613,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={handleAddAttribute}
+                  onClick={() => handleAddAttribute('', '')}
                   className="px-3 py-1.5 rounded-lg app-accent-bg text-white text-xs font-semibold flex items-center gap-1"
                 >
                   <Icons.Plus size={14} />
