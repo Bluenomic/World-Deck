@@ -10,14 +10,13 @@ interface DeckModalProps {
 }
 
 const COLOR_PRESETS = [
-  { name: 'Purple', hex: '#a855f7' },
   { name: 'Blue', hex: '#3b82f6' },
+  { name: 'Indigo', hex: '#6366f1' },
   { name: 'Emerald', hex: '#10b981' },
   { name: 'Amber', hex: '#f59e0b' },
   { name: 'Rose', hex: '#f43f5e' },
   { name: 'Cyan', hex: '#06b6d4' },
-  { name: 'Pink', hex: '#ec4899' },
-  { name: 'Indigo', hex: '#6366f1' },
+  { name: 'Purple', hex: '#a855f7' },
 ];
 
 export const DeckModal: React.FC<DeckModalProps> = ({
@@ -28,17 +27,17 @@ export const DeckModal: React.FC<DeckModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [color, setColor] = useState('#a855f7');
+  const [color, setColor] = useState('#3b82f6');
 
   useEffect(() => {
     if (deck) {
       setName(deck.name || '');
       setDescription(deck.description || '');
-      setColor(deck.color || '#a855f7');
+      setColor(deck.color || '#3b82f6');
     } else {
       setName('');
       setDescription('');
-      setColor('#a855f7');
+      setColor('#3b82f6');
     }
   }, [deck, isOpen]);
 

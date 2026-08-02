@@ -337,10 +337,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const deckCards = cards.filter(
       (c) => c.deckId === deck.id || (deck.cardIds || []).includes(c.id)
     );
-    const deckColor = deck.color || '#a855f7';
+    const deckColor = deck.color || '#3b82f6';
     const isHovered = hoveredDeckId === deck.id;
     const isSuccess = successDeckId === deck.id;
-    const isDraggingAnyCard = !!draggedCardId;
 
     return (
       <div
@@ -349,40 +348,31 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         onDragOver={(e) => handleDragOver(e, deck.id)}
         onDragLeave={(e) => handleDragLeave(e, deck.id)}
         onDrop={(e) => handleDrop(e, deck.id)}
-        className={`app-bg-secondary border rounded-2xl p-4 shadow-md transition-all duration-300 cursor-pointer group flex flex-col justify-between space-y-3 relative overflow-hidden ${
+        style={{
+          boxShadow: `inset 0 3px 0 0 ${isHovered ? '#60a5fa' : '#3b82f6'}`,
+        }}
+        className={`group relative flex flex-col space-y-2 p-3.5 pt-4 cursor-pointer transition-all duration-300 rounded-2xl select-none app-bg-secondary border border-slate-700/60 hover:border-blue-500/70 ${
           isSuccess
-            ? 'border-emerald-400 ring-4 ring-emerald-500/40 bg-emerald-950/20 scale-105 shadow-2xl'
+            ? 'scale-105 border-emerald-400 ring-4 ring-emerald-500/40'
             : isHovered
-            ? 'border-blue-400 ring-4 ring-blue-500/50 bg-blue-950/40 -translate-y-1.5 scale-105 shadow-2xl shadow-blue-500/30'
-            : isDraggingAnyCard
-            ? 'border-blue-500/40 hover:border-blue-400 shadow-blue-900/20 animate-pulse'
-            : 'app-border hover:border-blue-400'
+            ? '-translate-y-1 scale-105 border-blue-400 shadow-xl'
+            : ''
         }`}
       >
-        {/* Top Accent Line */}
-        <div
-          className={`absolute top-0 left-0 right-0 h-1 transition-all ${
-            isHovered ? 'h-1.5 bg-blue-400' : ''
-          }`}
-          style={{ backgroundColor: isHovered ? '#60a5fa' : deckColor }}
-        />
 
-        {/* Drop Zone Overlay Hint (pointer-events-none prevents flicker) */}
+        {/* Drop Zone Overlay Hint */}
         {isHovered && (
-          <div className="absolute inset-0 bg-blue-950/85 backdrop-blur-xs z-20 flex flex-col items-center justify-center p-3 text-center space-y-1.5 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
-            <Icons.FolderInput size={28} className="text-blue-300 animate-bounce" />
+          <div className="absolute inset-0 bg-blue-950/85 backdrop-blur-xs z-30 rounded-2xl flex flex-col items-center justify-center p-3 text-center space-y-1.5 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+            <Icons.Layers size={32} className="text-blue-300 animate-bounce" />
             <span className="text-xs font-bold text-white drop-shadow">
               Lepaskan Kartu di Sini
-            </span>
-            <span className="text-[10px] text-blue-200">
-              Masukan ke Deck "{deck.name}"
             </span>
           </div>
         )}
 
         {/* Success Overlay Hint */}
         {isSuccess && (
-          <div className="absolute inset-0 bg-emerald-950/90 backdrop-blur-xs z-20 flex flex-col items-center justify-center p-3 text-center space-y-1 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+          <div className="absolute inset-0 bg-emerald-950/90 backdrop-blur-xs z-30 rounded-2xl flex flex-col items-center justify-center p-3 text-center space-y-1 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
             <Icons.CheckCircle2 size={32} className="text-emerald-400 animate-bounce" />
             <span className="text-xs font-bold text-emerald-300 drop-shadow">
               Kartu Berhasil Dimasukkan!
@@ -390,62 +380,85 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
         )}
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform duration-300 ${
-                  isHovered ? 'scale-125 rotate-6' : 'group-hover:scale-110'
-                }`}
-                style={{ backgroundColor: deckColor }}
-              >
-                <Icons.Folder size={18} />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold app-text-main group-hover:text-blue-400 transition-colors line-clamp-1">
-                  {deck.name}
-                </h4>
-                <span className="text-[10px] font-semibold app-text-muted">
-                  {deckCards.length} Kartu
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {deck.description && (
-            <p className="text-[11px] app-text-muted line-clamp-2 leading-relaxed">
-              {deck.description}
-            </p>
-          )}
+        {/* Deck Title Header right below top bent bracket line */}
+        <div className="pt-1 px-0.5">
+          <h4 className="text-xs font-bold app-text-main group-hover:text-blue-400 transition-colors truncate text-center">
+            {deck.name}
+          </h4>
         </div>
 
+        {/* Poker Hand / Fan Spread Cards Thumbnail or Empty Deck Card Stack Silhouette */}
         {deckCards.length > 0 ? (
-          <div className="pt-2 border-t app-border flex items-center justify-between text-[10px] app-text-muted">
-            <div className="flex -space-x-1.5 overflow-hidden">
+          <div className="h-44 w-full my-1 relative flex items-center justify-center overflow-hidden py-1">
+            <div className="flex items-center justify-center relative h-full w-full">
               {deckCards.slice(0, 4).map((c, idx) => {
+                const total = Math.min(deckCards.length, 4);
+                // Calculate rotation tilt angle for fanning out cards like a poker hand
+                const angle = total === 1 ? 0 : -12 + (idx / (total - 1)) * 24;
+                // Calculate horizontal offset
+                const xOffset = total === 1 ? 0 : (idx - (total - 1) / 2) * 28;
+                const yOffset = Math.abs(angle) * 0.4;
+                const zIdx = idx + 1;
                 const cfg = CATEGORY_CONFIGS[c.category] || CATEGORY_CONFIGS.character;
+
                 return (
                   <div
                     key={c.id || idx}
-                    className="w-5 h-5 rounded-full border border-slate-900 flex items-center justify-center text-[9px] font-bold text-white shadow-sm"
-                    style={{ backgroundColor: cfg.color }}
-                    title={c.title}
+                    style={{
+                      transform: `translate3d(${xOffset}px, ${yOffset}px, 0) rotate(${angle}deg)`,
+                      zIndex: zIdx,
+                    }}
+                    className="absolute w-28 h-36 rounded-xl app-bg-main border border-slate-700/80 shadow-lg flex flex-col justify-between overflow-hidden transition-transform duration-200 group-hover:scale-105"
                   >
-                    {c.title ? c.title.charAt(0).toUpperCase() : '?'}
+                    {/* Card Top Category Pill Bar */}
+                    <div className="px-2 py-1 app-bg-secondary border-b app-border flex items-center gap-1.5">
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: cfg.color || '#3b82f6' }}
+                      />
+                      <span className="text-[9px] font-bold app-text-main truncate">
+                        {c.title || 'Kartu'}
+                      </span>
+                    </div>
+
+                    {/* Card Cover Image or Mini Text Summary */}
+                    {c.imageUrl ? (
+                      <div className="flex-1 w-full overflow-hidden relative">
+                        <img
+                          src={c.imageUrl}
+                          alt={c.title}
+                          className="w-full h-full object-cover opacity-90 pointer-events-none select-none"
+                          draggable={false}
+                        />
+                      </div>
+                    ) : (
+                      <div className="p-1.5 flex-1 flex flex-col justify-between app-bg-main">
+                        <p className="text-[8.5px] app-text-muted line-clamp-4 leading-tight">
+                          {c.summary || 'Kartu deck...'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
-            <span className="group-hover:text-blue-400 font-semibold transition-colors flex items-center gap-0.5">
-              Buka Deck ➔
-            </span>
           </div>
         ) : (
-          <div className="pt-2 border-t app-border text-[10px] app-text-muted flex items-center justify-between">
-            <span>Deck Kosong</span>
-            <span className="group-hover:text-blue-400 font-semibold transition-colors">
-              + Tambah Kartu
-            </span>
+          /* Empty Deck Card Stack Silhouette */
+          <div className="h-44 w-full my-1 relative flex items-center justify-center overflow-hidden py-1">
+            <div className="flex items-center justify-center relative h-full w-full">
+              {/* Card Silhouette 1 (Back Layer) */}
+              <div className="absolute w-28 h-36 rounded-xl border border-dashed border-slate-700/30 app-bg-main/20 transform -rotate-12 -translate-x-4 translate-y-1.5" />
+              
+              {/* Card Silhouette 2 (Middle Layer) */}
+              <div className="absolute w-28 h-36 rounded-xl border border-dashed border-slate-700/40 app-bg-main/30 transform rotate-6 translate-x-4 -translate-y-1" />
+              
+              {/* Card Silhouette 3 (Front Layer) */}
+              <div className="absolute w-28 h-36 rounded-xl border-2 border-dashed border-slate-600/50 app-bg-main/60 flex flex-col items-center justify-center p-3 text-center text-slate-500 shadow-xs z-10 transition-transform group-hover:scale-105">
+                <Icons.Layers size={22} className="opacity-40 mb-1.5 app-accent-text" />
+                <span className="text-[10px] font-semibold app-text-muted">Deck Kosong</span>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -626,7 +639,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       backgroundColor: `${assignedDeck.color || '#3b82f6'}15`,
                     }}
                   >
-                    <Icons.Folder size={10} />
+                    <Icons.Layers size={10} />
                     <span className="truncate max-w-[90px]">{assignedDeck.name}</span>
                   </span>
                 ) : (
@@ -670,7 +683,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               </h2>
             </div>
             <p className="text-xs app-text-muted mt-1">
-              Arsip galeri terstruktur. Anda dapat menggeser <span className="text-blue-400 font-semibold">(drag & drop)</span> kartu langsung ke dalam Deck folder.
+              Arsip galeri terstruktur. Anda dapat menggeser <span className="text-blue-400 font-semibold">(drag & drop)</span> kartu langsung ke dalam kumpulan Deck.
             </p>
           </div>
 
@@ -680,7 +693,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               onClick={onCreateDeckRequest}
               className="px-3.5 py-2 app-bg-secondary border app-border hover:border-blue-500 rounded-xl text-xs font-bold app-text-main transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
             >
-              <Icons.FolderPlus size={15} className="text-blue-400" />
+              <Icons.SquareStack size={15} className="text-blue-400" />
               <span>+ Buat Deck Baru</span>
             </button>
 
@@ -713,7 +726,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold"
                   style={{ backgroundColor: activeDeck.color || '#3b82f6' }}
                 >
-                  <Icons.Folder size={14} />
+                  <Icons.Layers size={14} />
                 </div>
                 <div>
                   <h3 className="text-xs font-bold app-text-main flex items-center gap-2">
@@ -775,8 +788,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     : 'app-text-muted hover:app-text-main'
                 }`}
               >
-                <Icons.Folder size={14} />
-                <span>Deck / Folder ({decks.length})</span>
+                <Icons.SquareStack size={14} />
+                <span>Deck ({decks.length})</span>
               </button>
               <button
                 type="button"
