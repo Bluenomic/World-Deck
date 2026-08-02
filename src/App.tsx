@@ -994,7 +994,8 @@ export const App: React.FC = () => {
             <TimelineView
               cards={activeCanvasCards}
               connections={activeCanvasConnections}
-              onCardClick={(card) => setEditingCard(card)}
+              onCardClick={(card) => setReaderCardId(card.id)}
+              activeWorldId={activeWorldId}
             />
           )}
 

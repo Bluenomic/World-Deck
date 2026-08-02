@@ -115,3 +115,32 @@ export interface WorkspacePreferences {
   viewMode?: ViewMode;
   canvasViewports?: Record<string, CanvasViewport>;
 }
+
+export interface TimelineTrack {
+  id: string;
+  name: string;
+  y: number;
+  direction: 'right' | 'left';
+  color: string;
+  isMain?: boolean;
+}
+
+export interface TimelineNode {
+  id: string;
+  trackId: string;
+  x: number;
+  title: string;
+  dateLabel: string;
+  description?: string;
+  cardId?: string;
+  nodeType: 'event' | 'branch' | 'joint' | 'loop' | 'point';
+  color?: string;
+}
+
+export interface TimelineLink {
+  id: string;
+  type: 'flow' | 'branch' | 'joint' | 'loop' | 'reverse';
+  sourceNodeId: string;
+  targetNodeId: string;
+  label?: string;
+}
