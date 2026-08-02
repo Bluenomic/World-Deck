@@ -59,6 +59,22 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
     (c) => c.sourceId === activeCard.id || c.targetId === activeCard.id
   );
 
+  // Helper for staggered animation classes in fullpage mode (opening and closing)
+  const getStaggerClass = (step: number) => {
+    if (!isExpanded) return '';
+    if (isOpen) {
+      if (step === 1) return 'fullpage-animate-stagger-1';
+      if (step === 2) return 'fullpage-animate-stagger-2';
+      if (step === 3) return 'fullpage-animate-stagger-3';
+      return 'fullpage-animate-stagger-4';
+    } else {
+      if (step === 1) return 'fullpage-animate-stagger-exit-1';
+      if (step === 2) return 'fullpage-animate-stagger-exit-2';
+      if (step === 3) return 'fullpage-animate-stagger-exit-3';
+      return 'fullpage-animate-stagger-exit-4';
+    }
+  };
+
   // Format date helper
   const formatDate = (timestamp?: number) => {
     if (!timestamp) return '-';
@@ -74,7 +90,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
   const articleContent = (
     <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
       {/* Section 1: Hero / Wiki Intro (Side-by-side Layout) */}
-      <div className="flex flex-col md:flex-row gap-5 items-start justify-between">
+      <div className={`flex flex-col md:flex-row gap-5 items-start justify-between ${getStaggerClass(2)}`}>
         <div className="flex-1 space-y-2.5">
           <h1 className="text-2xl font-extrabold app-text-main leading-tight tracking-tight">
             {activeCard.title || 'Kartu Tanpa Judul'}
@@ -115,7 +131,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
 
       {/* Section 2: Wiki Infobox Custom Attributes */}
       {activeCard.attributes && activeCard.attributes.length > 0 && (
-        <div className="space-y-2">
+        <div className={`space-y-2 ${getStaggerClass(3)}`}>
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
             <Icons.Sliders size={14} />
             <span>Atribut & Properti Utama</span>
@@ -136,7 +152,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
       )}
 
       {/* Section 3: Catatan & Penjelasan Lengkap (Full Article Text) */}
-      <div className="space-y-2.5 pt-2 border-t app-border">
+      <div className={`space-y-2.5 pt-2 border-t app-border ${getStaggerClass(4)}`}>
         <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
           <Icons.BookOpen size={14} />
           <span>Catatan Lengkap & Detail Lore</span>
@@ -169,7 +185,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
 
       {/* Section 4: Tags */}
       {activeCard.tags && activeCard.tags.length > 0 && (
-        <div className="space-y-2 pt-2 border-t app-border">
+        <div className={`space-y-2 pt-2 border-t app-border ${getStaggerClass(4)}`}>
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
             <Icons.Tag size={14} />
             <span>Tags</span>
@@ -190,7 +206,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
 
       {/* Section 5: Relasi Hubungan (Connections on Canvas) */}
       {relatedConnections.length > 0 && (
-        <div className="space-y-2.5 pt-2 border-t app-border">
+        <div className={`space-y-2.5 pt-2 border-t app-border ${getStaggerClass(4)}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
               <Icons.GitCommit size={14} />
@@ -239,7 +255,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
       )}
 
       {/* Section 6: Metadata & Timestamps */}
-      <div className="pt-4 border-t app-border text-[11px] app-text-muted flex items-center justify-between font-mono">
+      <div className={`pt-4 border-t app-border text-[11px] app-text-muted flex items-center justify-between font-mono ${getStaggerClass(4)}`}>
         <span>Dibuat: {formatDate(activeCard.createdAt)}</span>
         <span>Diperbarui: {formatDate(activeCard.updatedAt)}</span>
       </div>
@@ -247,7 +263,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
   );
 
   const headerBar = (
-    <div className="px-5 py-4 border-b app-border app-bg-secondary flex items-center justify-between gap-3 shrink-0">
+    <div className={`px-5 py-4 border-b app-border app-bg-secondary flex items-center justify-between gap-3 shrink-0 ${getStaggerClass(1)}`}>
       <div className="flex items-center gap-2.5 overflow-hidden">
         <div
           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${cfg.bgGradient} ${cfg.borderColor}`}
@@ -308,12 +324,14 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
       {isExpanded ? (
         <div
           className={`fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 transition-all duration-300 ease-in-out ${
-            isOpen ? 'opacity-100 pointer-events-auto scale-100' : 'opacity-0 pointer-events-none scale-95'
+            isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
           onClick={onClose}
         >
           <div
-            className="w-full max-w-4xl h-full max-h-[90vh] app-bg-main border app-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            className={`w-full max-w-4xl h-full max-h-[90vh] app-bg-main border app-border rounded-2xl shadow-2xl flex flex-col overflow-hidden ${
+              isOpen ? 'fullpage-container-expand' : 'fullpage-container-shrink'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             {headerBar}

@@ -243,4 +243,102 @@ h1, h2, h3, h4, h5, h6 {
   animation: card-drop-settle 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* --- Full-Page Wiki Modal Container Expand Animation --- */
+@keyframes fullpage-container-expand {
+  0% {
+    transform: scale(0.68) translateY(18px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.fullpage-container-expand {
+  animation: fullpage-container-expand 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* --- Full-Page Inner Content Slide Down & Fade In Animation --- */
+@keyframes fullpage-content-slide-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fullpage-animate-stagger-1 {
+  opacity: 0;
+  animation: fullpage-content-slide-down 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.12s forwards;
+}
+
+.fullpage-animate-stagger-2 {
+  opacity: 0;
+  animation: fullpage-content-slide-down 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.22s forwards;
+}
+
+.fullpage-animate-stagger-3 {
+  opacity: 0;
+  animation: fullpage-content-slide-down 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.32s forwards;
+}
+
+.fullpage-animate-stagger-4 {
+  opacity: 0;
+  animation: fullpage-content-slide-down 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.40s forwards;
+}
+
+/* --- Full-Page Wiki Modal Container Shrink (Closing) Animation --- */
+@keyframes fullpage-container-shrink {
+  0% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.68) translateY(18px);
+    opacity: 0;
+  }
+}
+
+.fullpage-container-shrink {
+  animation: fullpage-container-shrink 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* --- Full-Page Inner Content Slide Up & Fade Out (Closing) Animation --- */
+@keyframes fullpage-content-slide-up {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
+.fullpage-animate-stagger-exit-1 {
+  opacity: 1;
+  animation: fullpage-content-slide-up 0.25s cubic-bezier(0.4, 0, 0.2, 1) 0.15s forwards;
+}
+
+.fullpage-animate-stagger-exit-2 {
+  opacity: 1;
+  animation: fullpage-content-slide-up 0.25s cubic-bezier(0.4, 0, 0.2, 1) 0.10s forwards;
+}
+
+.fullpage-animate-stagger-exit-3 {
+  opacity: 1;
+  animation: fullpage-content-slide-up 0.25s cubic-bezier(0.4, 0, 0.2, 1) 0.05s forwards;
+}
+
+.fullpage-animate-stagger-exit-4 {
+  opacity: 1;
+  animation: fullpage-content-slide-up 0.25s cubic-bezier(0.4, 0, 0.2, 1) 0s forwards;
+}
+
 
