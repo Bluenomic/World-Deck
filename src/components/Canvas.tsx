@@ -582,6 +582,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
+  // Track measured DOM heights for precise connection line anchoring
+  const cardHeightsRef = useRef<Map<string, number>>(new Map());
+
   // Render SVG Connections
   const renderConnections = () => {
     return connections.map((conn) => {
@@ -590,13 +593,21 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       if (!sourceCard || !targetCard) return null;
 
-      const sourceCenterX = sourceCard.x + 144;
-      const sourceCenterY = sourceCard.y + 80;
-      const targetCenterX = targetCard.x + 144;
-      const targetCenterY = targetCard.y + 80;
+      const cardW = 288;
+      const sourceH = cardHeightsRef.current.get(sourceCard.id) || 180;
+      const targetH = cardHeightsRef.current.get(targetCard.id) || 180;
+
+      const sourceCenterX = sourceCard.x + cardW / 2;
+      const sourceCenterY = sourceCard.y + sourceH / 2;
+      const targetCenterX = targetCard.x + cardW / 2;
+      const targetCenterY = targetCard.y + targetH / 2;
 
       const dx = targetCenterX - sourceCenterX;
       const dy = targetCenterY - sourceCenterY;
+
+      const arrowLen = 9; // distance of arrowhead
+      const dirMode = conn.direction || 'directed';
+      const isSelectedConn = selectedConnectionIds.includes(conn.id);
 
       let x1 = sourceCenterX;
       let y1 = sourceCenterY;
@@ -607,47 +618,73 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (Math.abs(dx) >= Math.abs(dy)) {
         dir = 'horizontal';
         if (dx >= 0) {
-          x1 = sourceCard.x + 288 + 2;
-          y1 = sourceCenterY;
-          x2 = targetCard.x - 6;
-          y2 = targetCenterY;
+          // Source -> Target (Left to Right)
+          const sourceEdgeX = sourceCard.x + cardW + 2;
+          const sourceEdgeY = Math.min(Math.max(targetCenterY, sourceCard.y + 24), sourceCard.y + sourceH - 24);
+
+          const targetEdgeX = targetCard.x - 2;
+          const targetEdgeY = Math.min(Math.max(sourceCenterY, targetCard.y + 24), targetCard.y + targetH - 24);
+
+          x1 = dirMode === 'bidirectional' ? sourceEdgeX + arrowLen : sourceEdgeX;
+          y1 = sourceEdgeY;
+          x2 = targetEdgeX - arrowLen;
+          y2 = targetEdgeY;
         } else {
-          x1 = sourceCard.x - 2;
-          y1 = sourceCenterY;
-          x2 = targetCard.x + 288 + 6;
-          y2 = targetCenterY;
+          // Source -> Target (Right to Left)
+          const sourceEdgeX = sourceCard.x - 2;
+          const sourceEdgeY = Math.min(Math.max(targetCenterY, sourceCard.y + 24), sourceCard.y + sourceH - 24);
+
+          const targetEdgeX = targetCard.x + cardW + 2;
+          const targetEdgeY = Math.min(Math.max(sourceCenterY, targetCard.y + 24), targetCard.y + targetH - 24);
+
+          x1 = dirMode === 'bidirectional' ? sourceEdgeX - arrowLen : sourceEdgeX;
+          y1 = sourceEdgeY;
+          x2 = targetEdgeX + arrowLen;
+          y2 = targetEdgeY;
         }
       } else {
         dir = 'vertical';
         if (dy >= 0) {
-          x1 = sourceCenterX;
-          y1 = sourceCard.y + 200;
-          x2 = targetCenterX;
-          y2 = targetCard.y - 6;
+          // Source -> Target (Top to Bottom)
+          const sourceEdgeX = Math.min(Math.max(targetCenterX, sourceCard.x + 24), sourceCard.x + cardW - 24);
+          const sourceEdgeY = sourceCard.y + sourceH + 2;
+
+          const targetEdgeX = Math.min(Math.max(sourceCenterX, targetCard.x + 24), targetCard.x + cardW - 24);
+          const targetEdgeY = targetCard.y - 2;
+
+          x1 = sourceEdgeX;
+          y1 = dirMode === 'bidirectional' ? sourceEdgeY + arrowLen : sourceEdgeY;
+          x2 = targetEdgeX;
+          y2 = targetEdgeY - arrowLen;
         } else {
-          x1 = sourceCenterX;
-          y1 = sourceCard.y - 2;
-          x2 = targetCenterX;
-          y2 = targetCard.y + 206;
+          // Source -> Target (Bottom to Top)
+          const sourceEdgeX = Math.min(Math.max(targetCenterX, sourceCard.x + 24), sourceCard.x + cardW - 24);
+          const sourceEdgeY = sourceCard.y - 2;
+
+          const targetEdgeX = Math.min(Math.max(sourceCenterX, targetCard.x + 24), targetCard.x + cardW - 24);
+          const targetEdgeY = targetCard.y + targetH + 2;
+
+          x1 = sourceEdgeX;
+          y1 = dirMode === 'bidirectional' ? sourceEdgeY - arrowLen : sourceEdgeY;
+          x2 = targetEdgeX;
+          y2 = targetEdgeY + arrowLen;
         }
       }
 
       const { path, midX, midY } = getBezierPath(x1, y1, x2, y2, dir);
-      const isSelectedConn = selectedConnectionIds.includes(conn.id);
       const isDimmedConn =
         selectedCategory !== 'all' &&
         sourceCard.category !== selectedCategory &&
         targetCard.category !== selectedCategory;
 
-      const dirMode = conn.direction || 'directed';
       let markerEnd: string | undefined = undefined;
       let markerStart: string | undefined = undefined;
 
       if (dirMode === 'directed') {
-        markerEnd = 'url(#arrowhead-end)';
+        markerEnd = isSelectedConn ? 'url(#arrowhead-end-selected)' : 'url(#arrowhead-end)';
       } else if (dirMode === 'bidirectional') {
-        markerEnd = 'url(#arrowhead-end)';
-        markerStart = 'url(#arrowhead-start)';
+        markerEnd = isSelectedConn ? 'url(#arrowhead-end-selected)' : 'url(#arrowhead-end)';
+        markerStart = isSelectedConn ? 'url(#arrowhead-start-selected)' : 'url(#arrowhead-start)';
       } else if (dirMode === 'undirected') {
         markerEnd = undefined;
         markerStart = undefined;
@@ -723,8 +760,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     const sourceCard = cards.find((c) => c.id === connectingSourceId);
     if (!sourceCard) return null;
 
+    const sourceH = cardHeightsRef.current.get(sourceCard.id) || 180;
     const x1 = sourceCard.x + 144;
-    const y1 = sourceCard.y + 80;
+    const y1 = sourceCard.y + sourceH / 2;
     const x2 = connectionMousePos.x;
     const y2 = connectionMousePos.y;
 
@@ -785,21 +823,41 @@ export const Canvas: React.FC<CanvasProps> = ({
               id="arrowhead-end"
               markerWidth="9"
               markerHeight="9"
-              refX="8"
+              refX="0"
               refY="4.5"
               orient="auto"
             >
-              <path d="M 0 1.5 L 8 4.5 L 0 7.5 z" fill="var(--line-stroke)" />
+              <path d="M 0 1 L 8.5 4.5 L 0 8 z" fill="var(--line-stroke)" />
+            </marker>
+            <marker
+              id="arrowhead-end-selected"
+              markerWidth="9"
+              markerHeight="9"
+              refX="0"
+              refY="4.5"
+              orient="auto"
+            >
+              <path d="M 0 1 L 8.5 4.5 L 0 8 z" fill="var(--line-stroke-highlight)" />
             </marker>
             <marker
               id="arrowhead-start"
               markerWidth="9"
               markerHeight="9"
-              refX="1"
+              refX="0"
               refY="4.5"
               orient="auto-start-reverse"
             >
-              <path d="M 0 1.5 L 8 4.5 L 0 7.5 z" fill="var(--line-stroke)" />
+              <path d="M 0 1 L 8.5 4.5 L 0 8 z" fill="var(--line-stroke)" />
+            </marker>
+            <marker
+              id="arrowhead-start-selected"
+              markerWidth="9"
+              markerHeight="9"
+              refX="0"
+              refY="4.5"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 1 L 8.5 4.5 L 0 8 z" fill="var(--line-stroke-highlight)" />
             </marker>
           </defs>
           {renderConnections()}
@@ -844,6 +902,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               onDoubleClick={onDoubleClickCard}
               onStartConnection={handleStartConnection}
               connectionCount={connCount}
+              onMeasureHeight={(id, h) => cardHeightsRef.current.set(id, h)}
             />
           );
         })}

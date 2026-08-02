@@ -20,13 +20,17 @@ export const getBezierPath = (
   let controlY2 = y2;
 
   if (direction === 'vertical') {
-    const dy = Math.max(Math.abs(y2 - y1) * 0.4, 30);
-    controlY1 = y1 > y2 ? y1 - dy : y1 + dy;
-    controlY2 = y1 > y2 ? y2 + dy : y2 - dy;
+    const dy = Math.max(Math.abs(y2 - y1) * 0.45, 30);
+    controlX1 = x1;
+    controlY1 = y1 < y2 ? y1 + dy : y1 - dy;
+    controlX2 = x2;
+    controlY2 = y1 < y2 ? y2 - dy : y2 + dy;
   } else {
-    const dx = Math.max(Math.abs(x2 - x1) * 0.4, 30);
-    controlX1 = x1 > x2 ? x1 - dx : x1 + dx;
-    controlX2 = x1 > x2 ? x2 + dx : x2 - dx;
+    const dx = Math.max(Math.abs(x2 - x1) * 0.45, 30);
+    controlY1 = y1;
+    controlX1 = x1 < x2 ? x1 + dx : x1 - dx;
+    controlY2 = y2;
+    controlX2 = x1 < x2 ? x2 - dx : x2 + dx;
   }
 
   const path = `M ${x1} ${y1} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${x2} ${y2}`;

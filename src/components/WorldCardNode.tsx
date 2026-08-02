@@ -13,6 +13,7 @@ interface WorldCardNodeProps {
   onDoubleClick: (card: WorldCard) => void;
   onStartConnection: (cardId: string, e: React.MouseEvent | React.TouchEvent) => void;
   connectionCount: number;
+  onMeasureHeight?: (cardId: string, height: number) => void;
 }
 
 export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
@@ -25,6 +26,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
   onDoubleClick,
   onStartConnection,
   connectionCount,
+  onMeasureHeight,
 }) => {
   const config = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
   const IconComponent = (Icons as any)[config.iconName] || Icons.HelpCircle || (() => null);
@@ -32,6 +34,11 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
   return (
     <div
       data-card-id={card.id}
+      ref={(el) => {
+        if (el) {
+          onMeasureHeight?.(card.id, el.offsetHeight);
+        }
+      }}
       style={{
         transform: `translate(${card.x}px, ${card.y}px)`,
       }}
