@@ -304,6 +304,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 <span className="text-xs app-text-muted whitespace-nowrap">Kategori:</span>
                 {(Object.keys(CATEGORY_CONFIGS) as CardCategory[]).map((cat) => {
                   const cfg = CATEGORY_CONFIGS[cat];
+                  const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle;
                   const isSel = category === cat;
                   return (
                     <button
@@ -312,11 +313,11 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                       onClick={() => setCategory(cat)}
                       className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 border transition-all ${
                         isSel
-                          ? `${cfg.bgGradient} ${cfg.borderColor} app-text-main font-semibold`
+                          ? `${cfg.bgGradient} ${cfg.borderColor} app-text-main font-semibold shadow-xs`
                           : 'app-bg-main border app-border app-text-muted hover:app-text-main'
                       }`}
                     >
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cfg.color }} />
+                      <IconComp size={13} style={{ color: cfg.color }} />
                       <span>{cfg.label}</span>
                     </button>
                   );

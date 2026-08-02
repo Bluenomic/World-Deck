@@ -287,35 +287,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const activeDeck = decks.find((d) => d.id === activeDeckId) || null;
 
   // Filter cards based on search, category, and active deck navigation
-  const filteredCards = cards.filter((card) => {
+  const cardsToDisplay = cards.filter((card) => {
     if (activeDeckId) {
-      const isInDeck = card.deckId === activeDeckId || (activeDeck?.cardIds || []).includes(card.id);
-      if (!isInDeck) return false;
+      return card.deckId === activeDeckId || (activeDeck?.cardIds || []).includes(card.id);
     }
-
-    const matchesCategory =
-      selectedCategory === 'all' || card.category === selectedCategory;
-    const matchesSearch =
-      card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      card.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      card.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCategory && matchesSearch;
-  });
-
-  const filteredDecks = decks.filter((deck) =>
-    deck.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (deck.description && deck.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
-  const showDecksInGrid = !activeDeckId && (activeTab === 'all' || activeTab === 'decks');
-  const showCardsInGrid = activeDeckId || activeTab === 'all' || activeTab === 'cards';
-
-  // Cards to display in grid (In 'Semua' tab, only show standalone cards not inside any deck)
-  const cardsToDisplay = filteredCards.filter((card) => {
-    if (activeDeckId) return true;
     if (activeTab === 'all') return !card.deckId;
     return true;
   });
+
+  const filteredDecks = decks;
+  const showDecksInGrid = !activeDeckId && (activeTab === 'all' || activeTab === 'decks');
+  const showCardsInGrid = activeDeckId || activeTab === 'all' || activeTab === 'cards';
 
   // Derived display cards order when live dragging is active
   const displayCards = (() => {
@@ -520,10 +502,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   >
                     {/* Card Top Category Pill Bar */}
                     <div className="px-2 py-1 app-bg-secondary border-b app-border flex items-center gap-1.5">
-                      <div
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: cfg.color || '#3b82f6' }}
-                      />
+                      {(() => {
+                        const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle;
+                        return <IconComp size={10} style={{ color: cfg.color || '#3b82f6' }} />;
+                      })()}
                       <span className="text-[9px] font-bold app-text-main truncate">
                         {c.title || 'Kartu'}
                       </span>
@@ -584,6 +566,18 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const assignedDeck = decks.find((d) => d.id === card.deckId || (d.cardIds || []).includes(card.id));
     const isBeingDragged = draggedCardId === card.id;
     const isDroppingThisCard = droppingCardId === card.id;
+
+    const q = searchQuery.trim().toLowerCase();
+    const matchesCategory = selectedCategory === 'all' || card.category === selectedCategory;
+    const matchesSearch =
+      !q ||
+      card.title.toLowerCase().includes(q) ||
+      (card.summary && card.summary.toLowerCase().includes(q)) ||
+      (card.content && card.content.toLowerCase().includes(q)) ||
+      (card.tags && card.tags.some((t) => t.toLowerCase().includes(q)));
+
+    const isCardDimmed = !matchesCategory || !matchesSearch;
+    const isCardHighlighted = (selectedCategory !== 'all' || !!q) && matchesCategory && matchesSearch;
 
     return (
       <div
@@ -661,18 +655,22 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         onDragEnd={handleCardDrop}
         onDrop={handleCardDrop}
         onClick={() => {
-          if (!draggedCardIdRef.current && !isDroppingRef.current) {
+          if (!draggedCardIdRef.current && !isDroppingRef.current && !isCardDimmed) {
             onCardClick(card);
           }
         }}
-        className={`card-grid-item app-bg-secondary border app-border rounded-2xl overflow-hidden shadow-xs cursor-grab active:cursor-grabbing group flex flex-col relative ${
+        className={`card-grid-item app-bg-secondary border rounded-2xl overflow-hidden shadow-xs cursor-grab active:cursor-grabbing group flex flex-col relative transition-all ${
           isBeingDragged && !isDroppingThisCard
             ? 'opacity-20 border-dashed border-slate-700/40 min-h-[160px]'
             : isDroppingThisCard
             ? 'opacity-0 min-h-[160px]'
             : justDroppedCardId === card.id
             ? 'card-drop-settle'
-            : 'hover:border-slate-500/60 hover:-translate-y-0.5'
+            : isCardDimmed
+            ? 'opacity-25 grayscale-[30%] pointer-events-none border-dashed app-border'
+            : isCardHighlighted
+            ? 'border-blue-400 ring-2 ring-blue-500/50 shadow-md scale-[1.01]'
+            : 'app-border hover:border-slate-500/60 hover:-translate-y-0.5'
         }`}
       >
         {isBeingDragged ? (
@@ -831,7 +829,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   <h3 className="text-xs font-bold app-text-main flex items-center gap-2">
                     <span>Deck: {activeDeck.name}</span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold">
-                      {filteredCards.length} Kartu
+                      {cardsToDisplay.length} Kartu
                     </span>
                   </h3>
                   {activeDeck.description && (

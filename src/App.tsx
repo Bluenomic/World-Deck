@@ -938,14 +938,11 @@ export const App: React.FC = () => {
           {viewMode === 'canvas' && (
             <Canvas
               activeCanvasId={activeCanvasId}
-              cards={activeCanvasCards.filter(
-                (c) =>
-                  c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  c.summary.toLowerCase().includes(searchQuery.toLowerCase())
-              )}
+              cards={activeCanvasCards}
               allWorldCards={activeWorld.cards}
               allWorldDecks={activeWorld.decks || []}
               selectedCategory={selectedCategory}
+              searchQuery={searchQuery}
               connections={activeCanvasConnections}
               selectedCardId={selectedCardId}
               onSelectCard={(card) => setSelectedCardId(card ? card.id : null)}

@@ -13,6 +13,7 @@ interface CanvasProps {
   connections: CardConnection[];
   selectedCardId: string | null;
   selectedCategory: CardCategory | 'all';
+  searchQuery?: string;
   activeCanvasId?: string;
   onSelectCard: (card: WorldCard | null) => void;
   onDoubleClickCard: (card: WorldCard) => void;
@@ -37,6 +38,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   connections,
   selectedCardId,
   selectedCategory,
+  searchQuery = '',
   activeCanvasId,
   onSelectCard,
   onDoubleClickCard,
@@ -903,8 +905,17 @@ export const Canvas: React.FC<CanvasProps> = ({
             (c) => c.sourceId === card.id || c.targetId === card.id
           ).length;
 
-          const isDimmed = selectedCategory !== 'all' && card.category !== selectedCategory;
-          const isCategoryHighlighted = selectedCategory !== 'all' && card.category === selectedCategory;
+          const q = searchQuery.trim().toLowerCase();
+          const matchesCategory = selectedCategory === 'all' || card.category === selectedCategory;
+          const matchesSearch =
+            !q ||
+            card.title.toLowerCase().includes(q) ||
+            (card.summary && card.summary.toLowerCase().includes(q)) ||
+            (card.content && card.content.toLowerCase().includes(q)) ||
+            (card.tags && card.tags.some((t) => t.toLowerCase().includes(q)));
+
+          const isDimmed = !matchesCategory || !matchesSearch;
+          const isCategoryHighlighted = (selectedCategory !== 'all' || !!q) && matchesCategory && matchesSearch;
           const isCardSelected = selectedCardId === card.id || selectedCardIds.includes(card.id);
 
           return (

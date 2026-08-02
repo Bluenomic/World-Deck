@@ -199,16 +199,22 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
                     >
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
-                          <span
-                            className="text-[10px] px-1.5 py-0.5 rounded font-semibold border"
-                            style={{
-                              color: cfg.color,
-                              borderColor: 'currentColor',
-                              backgroundColor: `${cfg.color}15`,
-                            }}
-                          >
-                            {cfg.label}
-                          </span>
+                          {(() => {
+                            const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle;
+                            return (
+                              <span
+                                className="text-[10px] px-1.5 py-0.5 rounded font-semibold border inline-flex items-center gap-1"
+                                style={{
+                                  color: cfg.color,
+                                  borderColor: 'currentColor',
+                                  backgroundColor: `${cfg.color}15`,
+                                }}
+                              >
+                                <IconComp size={10} />
+                                <span>{cfg.label}</span>
+                              </span>
+                            );
+                          })()}
                           {isOnCurrentCanvas && (
                             <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">
                               Di Kanvas

@@ -221,6 +221,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
 
               {(Object.keys(CATEGORY_CONFIGS) as CardCategory[]).map((cat) => {
                 const cfg = CATEGORY_CONFIGS[cat];
+                const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle;
                 const count = cards.filter((c) => c.category === cat).length;
                 const isSelected = selectedCategory === cat;
 
@@ -236,10 +237,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: cfg.color }}
-                      />
+                      <IconComp size={13} style={{ color: cfg.color }} />
                       <span>{cfg.label}</span>
                     </div>
                     <span className="text-[10px] font-mono app-text-muted">{count}</span>
