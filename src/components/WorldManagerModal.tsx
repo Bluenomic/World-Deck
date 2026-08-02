@@ -44,7 +44,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
     const newWorld: WorldProject = {
       id: generateId('world'),
       name: newWorldName.trim(),
-      description: newWorldDesc.trim() || 'Arsip worldbuilding kustom baru.',
+      description: newWorldDesc.trim() || 'Arsip workspace kustom baru.',
       author: newWorldAuthor.trim() || 'Penulis / Worldbuilder',
       version: '1.0.0',
       createdAt: Date.now(),
@@ -92,15 +92,15 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
               <Icons.Globe size={18} />
             </div>
             <div>
-              <h2 className="text-base font-bold app-text-main">Pengelola Workspace Dunia</h2>
-              <p className="text-xs app-text-muted">Kelola dan berpindah antar ruang kerja dunia ciptaan Anda</p>
+              <h2 className="text-base font-bold app-text-main">Pengelola Workspace</h2>
             </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 app-text-muted hover:app-text-main rounded-lg hover:app-bg-hover"
+            className="p-1.5 app-text-muted hover:app-text-main rounded-lg hover:app-bg-hover cursor-pointer"
+            title="Tutup Modal"
           >
             <Icons.X size={18} />
           </button>
@@ -111,44 +111,35 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('list')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'list'
                 ? 'border-blue-500 app-text-main font-semibold'
                 : 'border-transparent hover:app-text-main'
             }`}
           >
             <Icons.FolderGit2 size={14} />
-            <span>Daftar Dunia Saya ({worlds.length})</span>
+            <span>Daftar Workspace ({worlds.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('create')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'create'
                 ? 'border-blue-500 app-text-main font-semibold'
                 : 'border-transparent hover:app-text-main'
             }`}
           >
             <Icons.PlusCircle size={14} />
-            <span>+ Buat Dunia Baru</span>
+            <span>+ Buat Workspace Baru</span>
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           
           {activeTab === 'list' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs app-text-muted">Pilih ruang kerja dunia yang ingin Anda buka:</span>
-                <label className="px-3 py-1 rounded-lg app-bg-main border app-border hover:app-bg-hover app-accent-text text-xs font-medium cursor-pointer flex items-center gap-1">
-                  <Icons.Upload size={13} />
-                  <span>Impor JSON</span>
-                  <input type="file" accept=".json" onChange={onImportWorld} className="hidden" />
-                </label>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {worlds.map((w) => {
                   const isActive = w.id === activeWorldId;
@@ -161,7 +152,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                         onSubmit={saveEditWorld}
                         className="app-bg-main p-4 rounded-xl border border-blue-500 space-y-2.5"
                       >
-                        <h4 className="text-xs font-bold app-accent-text">Edit Informasi Dunia</h4>
+                        <h4 className="text-xs font-bold app-accent-text">Edit Informasi Workspace</h4>
                         <input
                           type="text"
                           required
@@ -185,13 +176,13 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                           <button
                             type="button"
                             onClick={() => setEditingWorldId(null)}
-                            className="px-2.5 py-1 rounded text-xs app-text-muted"
+                            className="px-2.5 py-1 rounded text-xs app-text-muted cursor-pointer"
                           >
                             Batal
                           </button>
                           <button
                             type="submit"
-                            className="px-3 py-1 rounded app-accent-bg text-white text-xs font-medium"
+                            className="px-3 py-1 rounded app-accent-bg text-white text-xs font-medium cursor-pointer"
                           >
                             Simpan
                           </button>
@@ -250,7 +241,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                               e.stopPropagation();
                               startEditWorld(w);
                             }}
-                            className="p-1.5 rounded app-text-muted hover:app-text-main hover:app-bg-hover transition-colors"
+                            className="p-1.5 rounded app-text-muted hover:app-text-main hover:app-bg-hover transition-colors cursor-pointer"
                             title="Edit Info"
                           >
                             <Icons.Edit3 size={14} />
@@ -261,8 +252,8 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                               e.stopPropagation();
                               onDuplicateWorld(w.id);
                             }}
-                            className="p-1.5 rounded app-text-muted hover:app-text-main hover:app-bg-hover transition-colors"
-                            title="Duplikat"
+                            className="p-1.5 rounded app-text-muted hover:app-text-main hover:app-bg-hover transition-colors cursor-pointer"
+                            title="Duplikat Workspace"
                           >
                             <Icons.Copy size={14} />
                           </button>
@@ -272,7 +263,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                               e.stopPropagation();
                               downloadProjectJson(w);
                             }}
-                            className="p-1.5 rounded app-text-muted hover:app-text-main hover:app-bg-hover transition-colors"
+                            className="p-1.5 rounded app-text-muted hover:app-text-main hover:app-bg-hover transition-colors cursor-pointer"
                             title="Ekspor JSON"
                           >
                             <Icons.Download size={14} />
@@ -284,8 +275,8 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                                 e.stopPropagation();
                                 onDeleteWorld(w.id);
                               }}
-                              className="p-1.5 rounded text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 transition-colors"
-                              title="Hapus"
+                              className="p-1.5 rounded text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              title="Hapus Workspace"
                             >
                               <Icons.Trash2 size={14} />
                             </button>
@@ -294,11 +285,11 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
 
                         {!isActive ? (
                           <span className="px-3 py-1 rounded-lg app-accent-bg text-white text-xs font-medium">
-                            Buka Dunia
+                            Buka Workspace
                           </span>
                         ) : (
                           <span className="px-3 py-1 rounded-lg app-bg-main app-text-main border app-border text-xs font-medium">
-                            Buka Workspace
+                            Workspace Aktif
                           </span>
                         )}
                       </div>
@@ -310,59 +301,84 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
           )}
 
           {activeTab === 'create' && (
-            <form onSubmit={handleCreateSubmit} className="space-y-3.5 max-w-lg mx-auto py-2">
-              <h3 className="text-sm font-bold app-text-main">Buat Workspace Dunia Baru</h3>
-              
-              <div>
-                <label className="block text-xs font-semibold app-text-muted mb-1">Nama Dunia *</label>
-                <input
-                  type="text"
-                  required
-                  value={newWorldName}
-                  onChange={(e) => setNewWorldName(e.target.value)}
-                  placeholder="Contoh: Kerajaan Nusantara Sihir"
-                  className="w-full app-bg-main border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-blue-500"
-                />
-              </div>
+            <div className="space-y-5 max-w-lg mx-auto py-2">
+              {/* Option A: Create Blank Workspace Form */}
+              <form onSubmit={handleCreateSubmit} className="space-y-3.5 app-bg-main p-4 rounded-xl border app-border">
+                <h3 className="text-xs font-bold uppercase tracking-wider app-accent-text flex items-center gap-1.5">
+                  <Icons.PlusCircle size={14} />
+                  <span>Buat Workspace Baru dari Awal</span>
+                </h3>
+                
+                <div>
+                  <label className="block text-xs font-semibold app-text-muted mb-1">Nama Workspace *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newWorldName}
+                    onChange={(e) => setNewWorldName(e.target.value)}
+                    placeholder="Contoh: Worldbuilding Nusantara"
+                    className="w-full app-bg-secondary border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-blue-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold app-text-muted mb-1">Deskripsi Singkat</label>
-                <textarea
-                  rows={3}
-                  value={newWorldDesc}
-                  onChange={(e) => setNewWorldDesc(e.target.value)}
-                  placeholder="Konsep umum cerita atau latar belakang..."
-                  className="w-full app-bg-main border app-border rounded-lg p-2.5 text-xs app-text-main focus:outline-none focus:border-blue-500"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-semibold app-text-muted mb-1">Deskripsi Singkat</label>
+                  <textarea
+                    rows={2}
+                    value={newWorldDesc}
+                    onChange={(e) => setNewWorldDesc(e.target.value)}
+                    placeholder="Konsep umum latar belakang workspace..."
+                    className="w-full app-bg-secondary border app-border rounded-lg p-2.5 text-xs app-text-main focus:outline-none focus:border-blue-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-semibold app-text-muted mb-1">Penulis</label>
-                <input
-                  type="text"
-                  value={newWorldAuthor}
-                  onChange={(e) => setNewWorldAuthor(e.target.value)}
-                  placeholder="Nama Penulis..."
-                  className="w-full app-bg-main border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-blue-500"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-semibold app-text-muted mb-1">Penulis</label>
+                  <input
+                    type="text"
+                    value={newWorldAuthor}
+                    onChange={(e) => setNewWorldAuthor(e.target.value)}
+                    placeholder="Nama Penulis..."
+                    className="w-full app-bg-secondary border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-blue-500"
+                  />
+                </div>
 
-              <div className="pt-3 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('list')}
-                  className="px-3.5 py-1.5 rounded-lg border app-border text-xs app-text-muted"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 app-accent-bg text-white rounded-lg text-xs font-semibold"
-                >
-                  Buat & Buka
-                </button>
+                <div className="pt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('list')}
+                    className="px-3.5 py-1.5 rounded-lg border app-border text-xs app-text-muted hover:app-text-main cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 app-accent-bg text-white rounded-lg text-xs font-semibold hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                  >
+                    Buat & Buka
+                  </button>
+                </div>
+              </form>
+
+              {/* Option B: Import Workspace from JSON File */}
+              <div className="app-bg-main p-4 rounded-xl border border-dashed app-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-bold app-text-main flex items-center gap-1.5">
+                    <Icons.Upload size={14} className="text-blue-400" />
+                    <span>Atau Impor Workspace dari File JSON</span>
+                  </h4>
+                  <p className="text-[11px] app-text-muted">
+                    Muat data berkas .json cadangan workspace yang pernah diekspor sebelumnya.
+                  </p>
+                </div>
+
+                <label className="px-3.5 py-2 rounded-xl app-accent-bg text-white text-xs font-bold cursor-pointer flex items-center gap-1.5 shrink-0 hover:brightness-110 active:scale-95 transition-all shadow-sm">
+                  <Icons.Upload size={14} />
+                  <span>Pilih File JSON</span>
+                  <input type="file" accept=".json" onChange={onImportWorld} className="hidden" />
+                </label>
               </div>
-            </form>
+            </div>
           )}
 
         </div>

@@ -77,7 +77,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           type="button"
           onClick={onOpenWorldManager}
           className="flex items-center gap-1.5 px-2 py-1 rounded-md app-text-muted hover:app-text-main app-bg-hover transition-colors font-medium"
-          title="Buka Pengelola Dunia (Menu Utama)"
+          title="Pengelola Workspace"
         >
           <Icons.Globe size={15} className="app-accent-text" />
           <span>{projectName}</span>
