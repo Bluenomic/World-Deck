@@ -353,28 +353,28 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           isSuccess
             ? 'border-emerald-400 ring-4 ring-emerald-500/40 bg-emerald-950/20 scale-105 shadow-2xl'
             : isHovered
-            ? 'border-purple-400 ring-4 ring-purple-500/50 bg-purple-950/40 -translate-y-1.5 scale-105 shadow-2xl shadow-purple-500/30'
+            ? 'border-blue-400 ring-4 ring-blue-500/50 bg-blue-950/40 -translate-y-1.5 scale-105 shadow-2xl shadow-blue-500/30'
             : isDraggingAnyCard
-            ? 'border-purple-500/40 hover:border-purple-400 shadow-purple-900/20 animate-pulse'
-            : 'app-border hover:border-purple-400'
+            ? 'border-blue-500/40 hover:border-blue-400 shadow-blue-900/20 animate-pulse'
+            : 'app-border hover:border-blue-400'
         }`}
       >
         {/* Top Accent Line */}
         <div
           className={`absolute top-0 left-0 right-0 h-1 transition-all ${
-            isHovered ? 'h-1.5 bg-purple-400' : ''
+            isHovered ? 'h-1.5 bg-blue-400' : ''
           }`}
-          style={{ backgroundColor: isHovered ? '#c084fc' : deckColor }}
+          style={{ backgroundColor: isHovered ? '#60a5fa' : deckColor }}
         />
 
         {/* Drop Zone Overlay Hint (pointer-events-none prevents flicker) */}
         {isHovered && (
-          <div className="absolute inset-0 bg-purple-950/85 backdrop-blur-xs z-20 flex flex-col items-center justify-center p-3 text-center space-y-1.5 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
-            <Icons.FolderInput size={28} className="text-purple-300 animate-bounce" />
+          <div className="absolute inset-0 bg-blue-950/85 backdrop-blur-xs z-20 flex flex-col items-center justify-center p-3 text-center space-y-1.5 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+            <Icons.FolderInput size={28} className="text-blue-300 animate-bounce" />
             <span className="text-xs font-bold text-white drop-shadow">
               Lepaskan Kartu di Sini
             </span>
-            <span className="text-[10px] text-purple-200">
+            <span className="text-[10px] text-blue-200">
               Masukan ke Deck "{deck.name}"
             </span>
           </div>
@@ -402,7 +402,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 <Icons.Folder size={18} />
               </div>
               <div>
-                <h4 className="text-xs font-bold app-text-main group-hover:text-purple-400 transition-colors line-clamp-1">
+                <h4 className="text-xs font-bold app-text-main group-hover:text-blue-400 transition-colors line-clamp-1">
                   {deck.name}
                 </h4>
                 <span className="text-[10px] font-semibold app-text-muted">
@@ -436,14 +436,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 );
               })}
             </div>
-            <span className="group-hover:text-purple-400 font-semibold transition-colors flex items-center gap-0.5">
+            <span className="group-hover:text-blue-400 font-semibold transition-colors flex items-center gap-0.5">
               Buka Deck ➔
             </span>
           </div>
         ) : (
           <div className="pt-2 border-t app-border text-[10px] app-text-muted flex items-center justify-between">
             <span>Deck Kosong</span>
-            <span className="group-hover:text-purple-400 font-semibold transition-colors">
+            <span className="group-hover:text-blue-400 font-semibold transition-colors">
               + Tambah Kartu
             </span>
           </div>
@@ -555,12 +555,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             onCardClick(card);
           }
         }}
-        className={`card-grid-item app-bg-secondary rounded-2xl overflow-hidden shadow-xs cursor-grab active:cursor-grabbing group flex flex-col relative ${
+        className={`card-grid-item app-bg-secondary border app-border rounded-2xl overflow-hidden shadow-xs cursor-grab active:cursor-grabbing group flex flex-col relative ${
           isBeingDragged
-            ? 'opacity-20 border border-dashed border-slate-700/40 min-h-[160px]'
+            ? 'opacity-20 border-dashed border-slate-700/40 min-h-[160px]'
             : justDroppedCardId === card.id
-            ? 'card-drop-settle app-border'
-            : 'app-border hover:border-purple-400/70 hover:-translate-y-0.5'
+            ? 'card-drop-settle'
+            : 'hover:border-slate-500/60 hover:-translate-y-0.5'
         }`}
       >
         {isBeingDragged ? (
@@ -602,7 +602,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             {/* Content */}
             <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
               <div className="space-y-1">
-                <h3 className="text-xs font-bold app-text-main group-hover:text-purple-400 transition-colors">
+                <h3 className="text-xs font-bold app-text-main group-hover:text-blue-400 transition-colors">
                   {card.title || 'Kartu Tanpa Judul'}
                 </h3>
                 {card.subtitle && (
@@ -621,9 +621,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   <span
                     className="text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 shadow-xs"
                     style={{
-                      borderColor: assignedDeck.color || '#8b5cf6',
-                      color: assignedDeck.color || '#a855f7',
-                      backgroundColor: `${assignedDeck.color || '#8b5cf6'}15`,
+                      borderColor: assignedDeck.color || '#3b82f6',
+                      color: assignedDeck.color || '#3b82f6',
+                      backgroundColor: `${assignedDeck.color || '#3b82f6'}15`,
                     }}
                   >
                     <Icons.Folder size={10} />
@@ -670,7 +670,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               </h2>
             </div>
             <p className="text-xs app-text-muted mt-1">
-              Arsip galeri terstruktur. Anda dapat menggeser <span className="text-purple-400 font-semibold">(drag & drop)</span> kartu langsung ke dalam Deck folder.
+              Arsip galeri terstruktur. Anda dapat menggeser <span className="text-blue-400 font-semibold">(drag & drop)</span> kartu langsung ke dalam Deck folder.
             </p>
           </div>
 
@@ -678,9 +678,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             <button
               type="button"
               onClick={onCreateDeckRequest}
-              className="px-3.5 py-2 app-bg-secondary border app-border hover:border-purple-500 rounded-xl text-xs font-bold app-text-main transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              className="px-3.5 py-2 app-bg-secondary border app-border hover:border-blue-500 rounded-xl text-xs font-bold app-text-main transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
             >
-              <Icons.FolderPlus size={15} className="text-purple-400" />
+              <Icons.FolderPlus size={15} className="text-blue-400" />
               <span>+ Buat Deck Baru</span>
             </button>
 
@@ -697,12 +697,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
         {/* Deck Navigation Breadcrumb (If inside a Deck) */}
         {activeDeck ? (
-          <div className="flex items-center justify-between p-3.5 rounded-2xl app-bg-secondary border border-purple-500/30 shadow-sm">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl app-bg-secondary border border-blue-500/30 shadow-sm">
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setActiveDeckId(null)}
-                className="px-3 py-1.5 rounded-xl app-bg-main border app-border hover:border-purple-400 text-xs font-bold app-text-main flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="px-3 py-1.5 rounded-xl app-bg-main border app-border hover:border-blue-400 text-xs font-bold app-text-main flex items-center gap-1.5 cursor-pointer transition-colors"
               >
                 <Icons.ArrowLeft size={14} />
                 <span>Kembali ke Galeri</span>
@@ -711,14 +711,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               <div className="flex items-center gap-2">
                 <div
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold"
-                  style={{ backgroundColor: activeDeck.color || '#8b5cf6' }}
+                  style={{ backgroundColor: activeDeck.color || '#3b82f6' }}
                 >
                   <Icons.Folder size={14} />
                 </div>
                 <div>
                   <h3 className="text-xs font-bold app-text-main flex items-center gap-2">
                     <span>Deck: {activeDeck.name}</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-semibold">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold">
                       {filteredCards.length} Kartu
                     </span>
                   </h3>

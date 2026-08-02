@@ -130,7 +130,7 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
             </div>
 
             {selectedCardIds.length > 0 && (
-              <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/30">
+              <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/30">
                 {selectedCardIds.length} Kartu Terpilih
               </span>
             )}
@@ -151,7 +151,7 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl app-bg-secondary border app-border focus:outline-none focus:border-purple-500 app-text-main"
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl app-bg-secondary border app-border focus:outline-none focus:border-blue-500 app-text-main"
               />
             </div>
 
@@ -159,7 +159,7 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value as CardCategory | 'all')}
-                className="px-3 py-2 text-xs rounded-xl app-bg-secondary border app-border text-xs focus:outline-none focus:border-purple-500 app-text-main font-medium cursor-pointer"
+                className="px-3 py-2 text-xs rounded-xl app-bg-secondary border app-border text-xs focus:outline-none focus:border-blue-500 app-text-main font-medium cursor-pointer"
               >
                 <option value="all">Semua Kategori</option>
                 {Object.entries(CATEGORY_CONFIGS).map(([key, cfg]) => (
@@ -193,7 +193,7 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
                       onClick={() => toggleSelectCard(card.id)}
                       className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-3 ${
                         isSelected
-                          ? 'border-purple-500 bg-purple-500/10 shadow-sm'
+                          ? 'border-blue-500 bg-blue-500/10 shadow-sm'
                           : 'app-bg-secondary app-border hover:border-slate-600'
                       }`}
                     >
@@ -228,7 +228,7 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
                       <div
                         className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors shrink-0 mt-0.5 ${
                           isSelected
-                            ? 'bg-purple-600 border-purple-500 text-white'
+                            ? 'bg-blue-600 border-blue-500 text-white'
                             : 'border-slate-700 bg-slate-800'
                         }`}
                       >
@@ -263,9 +263,9 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
                     onClick={() => handleSelectDeck(deck)}
                     className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                       allSelected
-                        ? 'border-purple-500 bg-purple-500/10 shadow-sm'
+                        ? 'border-blue-500 bg-blue-500/10 shadow-sm'
                         : someSelected
-                        ? 'border-purple-500/50 bg-purple-500/5'
+                        ? 'border-blue-500/50 bg-blue-500/5'
                         : 'app-bg-secondary app-border hover:border-slate-600'
                     }`}
                   >
@@ -273,9 +273,9 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
                       <div
                         className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border"
                         style={{
-                          backgroundColor: `${deck.color || '#8b5cf6'}20`,
-                          borderColor: deck.color || '#8b5cf6',
-                          color: deck.color || '#a855f7',
+                          backgroundColor: `${deck.color || '#3b82f6'}20`,
+                          borderColor: deck.color || '#3b82f6',
+                          color: deck.color || '#3b82f6',
                         }}
                       >
                         <Icons.Folder size={18} />
@@ -293,9 +293,9 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
                     <div
                       className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors shrink-0 ${
                         allSelected
-                          ? 'bg-purple-600 border-purple-500 text-white'
+                          ? 'bg-blue-600 border-blue-500 text-white'
                           : someSelected
-                          ? 'bg-purple-600/40 border-purple-500 text-white'
+                          ? 'bg-blue-600/40 border-blue-500 text-white'
                           : 'border-slate-700 bg-slate-800'
                       }`}
                     >

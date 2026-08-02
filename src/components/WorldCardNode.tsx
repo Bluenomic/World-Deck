@@ -39,12 +39,12 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
         isDimmed ? 'opacity-20 pointer-events-none grayscale-[40%]' : 'opacity-100 pointer-events-auto'
       } ${
         isSelected
-          ? 'border-purple-500 ring-2 ring-purple-500/40 shadow-xl z-30 scale-[1.02]'
+          ? 'border-blue-500 ring-2 ring-blue-500/40 shadow-xl z-30 scale-[1.02]'
           : isConnectingSource
           ? 'border-emerald-400 ring-2 ring-emerald-400/40 shadow-xl z-30'
           : isCategoryHighlighted
-          ? 'border-purple-400 ring-2 ring-purple-400/40 shadow-lg z-20 scale-[1.01]'
-          : 'app-border hover:border-purple-400 z-10'
+          ? 'border-blue-400/80 ring-2 ring-blue-400/30 shadow-md z-20 scale-[1.01]'
+          : 'app-border hover:border-slate-500/60 z-10'
       }`}
       onMouseDown={(e) => !isDimmed && onSelect(card, e)}
       onTouchStart={(e) => !isDimmed && onSelect(card, e)}
@@ -91,7 +91,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
         {/* Title */}
         <div className="space-y-0.5">
           <h3 className={`text-sm font-bold leading-snug line-clamp-1 transition-colors ${
-            card.title ? 'app-text-main group-hover:text-purple-400' : 'app-text-muted opacity-60'
+            card.title ? 'app-text-main group-hover:text-blue-400' : 'app-text-muted opacity-60'
           }`}>
             {card.title || 'Tanpa Judul'}
           </h3>

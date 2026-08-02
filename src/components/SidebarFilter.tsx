@@ -144,10 +144,10 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
         {/* Right Edge Resizer Handle for Sidebar Width */}
         <div
           onMouseDown={handleMouseDownWidthResize}
-          className="hidden md:block absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-purple-500/40 transition-colors z-40 group -mr-1"
-          title="Seret untuk mengubah lebar sidebar"
+          className="hidden md:block absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-blue-500/40 transition-colors z-40 group -mr-1"
+          title="Drag untuk mengubah lebar Sidebar"
         >
-          <div className="w-[2px] h-full bg-transparent group-hover:bg-purple-400 mx-auto" />
+          <div className="w-[2px] h-full bg-transparent group-hover:bg-blue-400 mx-auto" />
         </div>
 
         {/* Sidebar Header / Search */}
@@ -360,7 +360,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                       onClick={() => onCardClick(card)}
                       className={`w-full px-2.5 py-1.5 rounded-md text-left transition-colors flex items-center gap-2 text-xs cursor-pointer ${
                         isSelected
-                          ? 'app-bg-main app-text-main font-semibold border-l-2 border-purple-500'
+                          ? 'app-bg-main app-text-main font-semibold border-l-2 border-blue-500'
                           : 'app-text-muted hover:app-text-main app-bg-hover'
                       }`}
                     >

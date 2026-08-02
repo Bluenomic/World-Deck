@@ -589,37 +589,32 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (Math.abs(dx) >= Math.abs(dy)) {
         dir = 'horizontal';
         if (dx >= 0) {
-          x1 = sourceCard.x + 288;
+          x1 = sourceCard.x + 288 + 2;
           y1 = sourceCenterY;
-          x2 = targetCard.x;
+          x2 = targetCard.x - 6;
           y2 = targetCenterY;
         } else {
-          x1 = sourceCard.x;
+          x1 = sourceCard.x - 2;
           y1 = sourceCenterY;
-          x2 = targetCard.x + 288;
+          x2 = targetCard.x + 288 + 6;
           y2 = targetCenterY;
         }
       } else {
         dir = 'vertical';
         if (dy >= 0) {
           x1 = sourceCenterX;
-          y1 = sourceCard.y + 160;
+          y1 = sourceCard.y + 200;
           x2 = targetCenterX;
-          y2 = targetCard.y;
+          y2 = targetCard.y - 6;
         } else {
           x1 = sourceCenterX;
-          y1 = sourceCard.y;
+          y1 = sourceCard.y - 2;
           x2 = targetCenterX;
-          y2 = targetCard.y + 160;
+          y2 = targetCard.y + 206;
         }
       }
 
       const { path, midX, midY } = getBezierPath(x1, y1, x2, y2, dir);
-      const isHighlighted =
-        selectedCardId === sourceCard.id ||
-        selectedCardId === targetCard.id ||
-        selectedCardIds.includes(sourceCard.id) ||
-        selectedCardIds.includes(targetCard.id);
       const isDimmedConn =
         selectedCategory !== 'all' &&
         sourceCard.category !== selectedCategory &&
@@ -637,8 +632,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           <path
             d={path}
             fill="none"
-            stroke={isHighlighted ? 'var(--line-stroke-highlight)' : 'var(--line-stroke)'}
-            strokeWidth={isHighlighted ? 3 : 2}
+            stroke="var(--line-stroke)"
+            strokeWidth={2}
             strokeDasharray={conn.type === 'enemy' ? '5,4' : 'none'}
             className="transition-colors duration-150"
             markerEnd="url(#arrowhead)"
@@ -652,11 +647,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           >
             <div
               onClick={() => onEditConnection(conn)}
-              className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold text-center truncate border transition-transform hover:scale-105 select-none ${
-                isHighlighted
-                  ? 'app-bg-main app-accent-text border-purple-500 shadow-md font-bold'
-                  : 'app-bg-secondary app-text-main border app-border hover:border-purple-400'
-              }`}
+              className="px-2.5 py-0.5 rounded-md text-[10px] font-semibold text-center truncate border transition-transform hover:scale-105 select-none app-bg-secondary app-text-main border app-border hover:border-blue-400"
             >
               {conn.label || 'Terhubung'}
             </div>
@@ -733,13 +724,13 @@ export const Canvas: React.FC<CanvasProps> = ({
           <defs>
             <marker
               id="arrowhead"
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
+              markerWidth="9"
+              markerHeight="9"
+              refX="8"
+              refY="4.5"
               orient="auto"
             >
-              <polygon points="0 0, 10 3.5, 0 7" fill="var(--line-stroke)" />
+              <path d="M 0 1.5 L 8 4.5 L 0 7.5 z" fill="var(--line-stroke)" />
             </marker>
           </defs>
           {renderConnections()}
@@ -793,7 +784,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       {cards.length === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center pointer-events-none z-20">
           <div className="app-bg-secondary border app-border p-6 md:p-8 rounded-2xl max-w-md space-y-3 shadow-2xl pointer-events-auto app-text-main">
-            <div className="w-12 h-12 rounded-xl app-accent-bg/20 border border-purple-500/40 text-purple-400 flex items-center justify-center mx-auto text-lg font-bold">
+            <div className="w-12 h-12 rounded-xl app-accent-bg/20 border border-blue-500/40 text-blue-400 flex items-center justify-center mx-auto text-lg font-bold">
               📄
             </div>
             <h3 className="text-base font-bold app-text-main">Canvas Worldbuilding Masih Kosong</h3>
@@ -853,7 +844,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           onClick={() => setIsSpacePressed(!isSpacePressed)}
           className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-xs font-medium px-2 ${
             isSpacePressed
-              ? 'app-accent-bg text-white shadow-md scale-105 ring-2 ring-purple-400/40 font-semibold'
+              ? 'app-accent-bg text-white shadow-md scale-105 ring-2 ring-blue-400/40 font-semibold'
               : 'app-text-muted hover:app-text-main app-bg-hover'
           }`}
           title="Mode Navigasi Pan (Tahan Spasi + Drag Mouse)"
@@ -884,7 +875,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             <Icons.LayoutGrid size={15} />
             <span className="hidden sm:inline">Rapikan</span>
             {selectedCardIds.length > 1 && (
-              <span className="bg-purple-500/20 text-purple-400 text-[10px] font-mono px-1 rounded font-bold">
+              <span className="bg-blue-500/20 text-blue-400 text-[10px] font-mono px-1 rounded font-bold">
                 {selectedCardIds.length}
               </span>
             )}
@@ -982,7 +973,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                 setShowAddFromGalleryModal(true);
                 setContextMenu((prev) => ({ ...prev, visible: false }));
               }}
-              className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-purple-400 cursor-pointer"
+              className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
             >
               <Icons.FolderPlus size={14} strokeWidth={2.5} />
               <span>Tambah Kartu dari Galeri</span>

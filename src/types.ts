@@ -85,7 +85,7 @@ export interface WorldProject {
 
 export type ViewMode = 'canvas' | 'library' | 'timeline' | 'relations';
 
-export type AppTheme = 'notion-dark' | 'notion-light' | 'cyberpunk' | 'dracula' | 'nordic';
+export type AppTheme = 'dark' | 'light';
 
 export interface CategoryConfig {
   id: CardCategory;

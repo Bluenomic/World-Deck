@@ -173,6 +173,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
+        {/* Dark / Light Theme Toggle Button */}
+        <button
+          type="button"
+          onClick={() => onThemeChange(currentTheme === 'dark' ? 'light' : 'dark')}
+          className="p-1.5 rounded-lg app-bg-secondary border app-border app-text-main hover:app-bg-hover transition-colors cursor-pointer"
+          title={currentTheme === 'dark' ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'}
+        >
+          {currentTheme === 'dark' ? <Icons.Sun size={15} /> : <Icons.Moon size={15} />}
+        </button>
+
         {/* Consolidated Actions Dropdown Menu */}
         <div className="relative" ref={menuRef}>
           <button
@@ -248,24 +258,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="my-1 border-t app-border opacity-50" />
 
               {/* Theme Selector inside Dropdown */}
-              <div className="w-full px-3 py-2 flex items-center justify-between hover:app-bg-hover transition-colors text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => {
+                  onThemeChange(currentTheme === 'dark' ? 'light' : 'dark');
+                  setIsMenuOpen(false);
+                }}
+                className="w-full px-3 py-2 flex items-center justify-between hover:app-bg-hover transition-colors text-xs font-semibold"
+              >
                 <div className="flex items-center gap-2">
-                  <Icons.Palette size={14} className="app-accent-text" />
-                  <span>Tema Warna</span>
+                  <Icons.Palette size={14} className="app-text-muted" />
+                  <span>Tema Aplikasi</span>
                 </div>
-                <select
-                  value={currentTheme}
-                  onChange={(e) => onThemeChange(e.target.value as AppTheme)}
-                  className="bg-transparent app-text-main text-xs focus:outline-none cursor-pointer max-w-[120px] text-right font-medium"
-                  title="Pilih Tema Warna Aplikasi"
-                >
-                  <option value="notion-dark" className="app-bg-secondary app-text-main">Notion Dark</option>
-                  <option value="notion-light" className="app-bg-secondary app-text-main">Notion Light</option>
-                  <option value="cyberpunk" className="app-bg-secondary app-text-main">Cyberpunk</option>
-                  <option value="dracula" className="app-bg-secondary app-text-main">Dracula</option>
-                  <option value="nordic" className="app-bg-secondary app-text-main">Nordic Slate</option>
-                </select>
-              </div>
+                <span className="text-xs font-medium app-text-muted">
+                  {currentTheme === 'dark' ? 'Mode Gelap' : 'Mode Terang'}
+                </span>
+              </button>
 
               <div className="my-1 border-t app-border opacity-50" />
 

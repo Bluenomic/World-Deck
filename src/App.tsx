@@ -30,10 +30,10 @@ export const App: React.FC = () => {
   // Theme State
   const [currentTheme, setCurrentTheme] = useState<AppTheme>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_THEME_KEY) || localStorage.getItem('worldweaver_theme_v1');
-      if (saved) return saved as AppTheme;
+      const saved = localStorage.getItem(STORAGE_THEME_KEY);
+      if (saved === 'light' || saved === 'dark') return saved;
     } catch (e) {}
-    return 'notion-dark';
+    return 'dark';
   });
 
   useEffect(() => {
