@@ -1048,9 +1048,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       <span
                         className="text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 shadow-xs"
                         style={{
-                          borderColor: assignedDeck.color || '#8b5cf6',
-                          color: assignedDeck.color || '#a855f7',
-                          backgroundColor: `${assignedDeck.color || '#8b5cf6'}15`,
+                          borderColor: assignedDeck.color || '#3b82f6',
+                          color: assignedDeck.color || '#60a5fa',
+                          backgroundColor: `${assignedDeck.color || '#3b82f6'}15`,
                         }}
                       >
                         <Icons.Folder size={10} />

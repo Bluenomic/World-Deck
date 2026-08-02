@@ -83,10 +83,10 @@ export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({ onClose }) => {
             <div className="p-3.5 rounded-xl app-bg-main border app-border font-mono text-[11px] space-y-2">
               <p className="text-emerald-400 font-bold"># Perintah Inisialisasi Tauri (Jalankan di Terminal Proyek):</p>
               <div className="bg-black/40 p-2.5 rounded border border-slate-800 text-slate-300 space-y-1">
-                <p><span className="text-purple-400">npx</span> @tauri-apps/cli init</p>
+                <p><span className="text-blue-400">npx</span> @tauri-apps/cli init</p>
                 <p><span className="text-emerald-400"># Untuk Android Package:</span></p>
-                <p><span className="text-purple-400">npx</span> tauri android init</p>
-                <p><span className="text-purple-400">npx</span> tauri android build</p>
+                <p><span className="text-blue-400">npx</span> tauri android init</p>
+                <p><span className="text-blue-400">npx</span> tauri android build</p>
               </div>
             </div>
           </div>

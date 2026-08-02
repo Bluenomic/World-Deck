@@ -65,7 +65,7 @@ export const CanvasModal: React.FC<CanvasModalProps> = ({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={placeholder}
-            className="w-full px-3.5 py-2.5 text-xs app-bg-main border app-border rounded-xl app-text-main placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+            className="w-full px-3.5 py-2.5 text-xs app-bg-main border app-border rounded-xl app-text-main placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
             autoFocus
             required
           />

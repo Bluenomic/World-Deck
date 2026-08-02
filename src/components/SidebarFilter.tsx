@@ -252,10 +252,10 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
           {/* Divider 1 */}
           <div 
             onMouseDown={handleMouseDownResize('first')}
-            className="h-[5px] min-h-[5px] w-full bg-slate-800/60 hover:bg-purple-600 cursor-ns-resize transition-all flex items-center justify-center group relative z-10"
+            className="h-[5px] min-h-[5px] w-full bg-slate-800/60 hover:bg-blue-600 cursor-ns-resize transition-all flex items-center justify-center group relative z-10"
             title="Seret untuk mengubah ukuran panel"
           >
-            <div className="w-8 h-[1px] bg-slate-700 group-hover:bg-purple-400 opacity-50" />
+            <div className="w-8 h-[1px] bg-slate-700 group-hover:bg-blue-400 opacity-50" />
           </div>
 
           {/* Canvases Section */}
@@ -328,10 +328,10 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
           {/* Divider 2 */}
           <div 
             onMouseDown={handleMouseDownResize('second')}
-            className="h-[5px] min-h-[5px] w-full bg-slate-800/60 hover:bg-purple-600 cursor-ns-resize transition-all flex items-center justify-center group relative z-10"
+            className="h-[5px] min-h-[5px] w-full bg-slate-800/60 hover:bg-blue-600 cursor-ns-resize transition-all flex items-center justify-center group relative z-10"
             title="Seret untuk mengubah ukuran panel"
           >
-            <div className="w-8 h-[1px] bg-slate-700 group-hover:bg-purple-400 opacity-50" />
+            <div className="w-8 h-[1px] bg-slate-700 group-hover:bg-blue-400 opacity-50" />
           </div>
 
           {/* Cards Section */}

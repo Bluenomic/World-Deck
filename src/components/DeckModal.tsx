@@ -16,7 +16,7 @@ const COLOR_PRESETS = [
   { name: 'Amber', hex: '#f59e0b' },
   { name: 'Rose', hex: '#f43f5e' },
   { name: 'Cyan', hex: '#06b6d4' },
-  { name: 'Purple', hex: '#a855f7' },
+  { name: 'Sky', hex: '#0284c7' },
 ];
 
 export const DeckModal: React.FC<DeckModalProps> = ({
@@ -94,7 +94,7 @@ export const DeckModal: React.FC<DeckModalProps> = ({
               placeholder="Contoh: faksi-faksi-kegelapan, Karakter Utama, dll."
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3.5 py-2 text-xs rounded-xl app-bg-secondary border app-border focus:outline-none focus:border-purple-500 app-text-main font-medium"
+              className="w-full px-3.5 py-2 text-xs rounded-xl app-bg-secondary border app-border focus:outline-none focus:border-blue-500 app-text-main font-medium"
               autoFocus
             />
           </div>
@@ -106,7 +106,7 @@ export const DeckModal: React.FC<DeckModalProps> = ({
               placeholder="Catatan singkat tentang isi deck ini..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2 text-xs rounded-xl app-bg-secondary border app-border focus:outline-none focus:border-purple-500 app-text-main font-medium resize-none"
+              className="w-full px-3.5 py-2 text-xs rounded-xl app-bg-secondary border app-border focus:outline-none focus:border-blue-500 app-text-main font-medium resize-none"
             />
           </div>
 

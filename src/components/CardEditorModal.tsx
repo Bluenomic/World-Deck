@@ -230,7 +230,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                     value={imageUrl}
                     onChange={(e) => setImageUrl(e.target.value)}
                     placeholder="Tempel URL gambar (https://...)"
-                    className="flex-1 w-full app-bg-secondary border app-border rounded-lg px-3 py-1.5 text-xs app-text-main focus:outline-none focus:border-purple-500 font-mono"
+                    className="flex-1 w-full app-bg-secondary border app-border rounded-lg px-3 py-1.5 text-xs app-text-main focus:outline-none focus:border-blue-500 font-mono"
                   />
                   
                   <span className="text-xs app-text-muted">atau</span>
@@ -258,7 +258,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             onClick={() => setActiveTab('content')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
               activeTab === 'content'
-                ? 'border-purple-500 app-text-main font-semibold'
+                ? 'border-blue-500 app-text-main font-semibold'
                 : 'border-transparent hover:app-text-main'
             }`}
           >
@@ -271,7 +271,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             onClick={() => setActiveTab('properties')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
               activeTab === 'properties'
-                ? 'border-purple-500 app-text-main font-semibold'
+                ? 'border-blue-500 app-text-main font-semibold'
                 : 'border-transparent hover:app-text-main'
             }`}
           >
@@ -284,7 +284,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             onClick={() => setActiveTab('relations')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
               activeTab === 'relations'
-                ? 'border-purple-500 app-text-main font-semibold'
+                ? 'border-blue-500 app-text-main font-semibold'
                 : 'border-transparent hover:app-text-main'
             }`}
           >
@@ -373,7 +373,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                         key={otherCard.id}
                         type="button"
                         onClick={() => handleInsertMention(otherCard)}
-                        className="text-[11px] px-2 py-0.5 rounded app-bg-main border app-border app-accent-text hover:border-purple-400 whitespace-nowrap flex items-center gap-1"
+                        className="text-[11px] px-2 py-0.5 rounded app-bg-main border app-border app-accent-text hover:border-blue-400 whitespace-nowrap flex items-center gap-1"
                       >
                         <span>📄 {otherCard.title}</span>
                       </button>
@@ -385,7 +385,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Tuliskan isi catatan, lore, sejarah, atau mitologi... Gunakan @NamaKartu untuk merujuk kartu lain."
-                  className="w-full app-bg-main border app-border rounded-xl p-3.5 text-xs app-text-main placeholder-slate-500 focus:outline-none focus:border-purple-500 leading-relaxed"
+                  className="w-full app-bg-main border app-border rounded-xl p-3.5 text-xs app-text-main placeholder-slate-500 focus:outline-none focus:border-blue-500 leading-relaxed"
                 />
 
                 {content && (
@@ -427,7 +427,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                       }
                     }}
                     placeholder="Tambah tag..."
-                    className="flex-1 app-bg-main border app-border rounded-lg px-3 py-1.5 text-xs app-text-main focus:outline-none focus:border-purple-500"
+                    className="flex-1 app-bg-main border app-border rounded-lg px-3 py-1.5 text-xs app-text-main focus:outline-none focus:border-blue-500"
                   />
                   <button
                     type="button"

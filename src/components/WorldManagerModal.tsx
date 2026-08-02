@@ -113,7 +113,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
             onClick={() => setActiveTab('list')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
               activeTab === 'list'
-                ? 'border-purple-500 app-text-main font-semibold'
+                ? 'border-blue-500 app-text-main font-semibold'
                 : 'border-transparent hover:app-text-main'
             }`}
           >
@@ -126,7 +126,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
             onClick={() => setActiveTab('create')}
             className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
               activeTab === 'create'
-                ? 'border-purple-500 app-text-main font-semibold'
+                ? 'border-blue-500 app-text-main font-semibold'
                 : 'border-transparent hover:app-text-main'
             }`}
           >
@@ -159,7 +159,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                       <form
                         key={w.id}
                         onSubmit={saveEditWorld}
-                        className="app-bg-main p-4 rounded-xl border border-purple-500 space-y-2.5"
+                        className="app-bg-main p-4 rounded-xl border border-blue-500 space-y-2.5"
                       >
                         <h4 className="text-xs font-bold app-accent-text">Edit Informasi Dunia</h4>
                         <input
@@ -209,15 +209,15 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                       }}
                       className={`p-4 rounded-xl border transition-all flex flex-col justify-between space-y-3 cursor-pointer group hover:scale-[1.01] ${
                         isActive
-                          ? 'app-bg-secondary border-purple-500 shadow-md ring-1 ring-purple-500/30'
-                          : 'app-bg-main border app-border hover:border-purple-400'
+                          ? 'app-bg-secondary border-blue-500 shadow-md ring-1 ring-blue-500/30'
+                          : 'app-bg-main border app-border hover:border-blue-400'
                       }`}
                     >
                       <div className="space-y-1.5">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2">
                             <Icons.Globe size={16} className={isActive ? 'app-accent-text' : 'app-text-muted'} />
-                            <h3 className="text-sm font-bold app-text-main group-hover:text-purple-400 transition-colors">
+                            <h3 className="text-sm font-bold app-text-main group-hover:text-blue-400 transition-colors">
                               {w.name}
                             </h3>
                           </div>
@@ -321,7 +321,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                   value={newWorldName}
                   onChange={(e) => setNewWorldName(e.target.value)}
                   placeholder="Contoh: Kerajaan Nusantara Sihir"
-                  className="w-full app-bg-main border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-purple-500"
+                  className="w-full app-bg-main border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -332,7 +332,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                   value={newWorldDesc}
                   onChange={(e) => setNewWorldDesc(e.target.value)}
                   placeholder="Konsep umum cerita atau latar belakang..."
-                  className="w-full app-bg-main border app-border rounded-lg p-2.5 text-xs app-text-main focus:outline-none focus:border-purple-500"
+                  className="w-full app-bg-main border app-border rounded-lg p-2.5 text-xs app-text-main focus:outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -343,7 +343,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                   value={newWorldAuthor}
                   onChange={(e) => setNewWorldAuthor(e.target.value)}
                   placeholder="Nama Penulis..."
-                  className="w-full app-bg-main border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-purple-500"
+                  className="w-full app-bg-main border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-blue-500"
                 />
               </div>
 
