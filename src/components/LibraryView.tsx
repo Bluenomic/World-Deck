@@ -47,6 +47,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   // Dynamic Floating Drag Position & Release Animation States
   const [justDroppedCardId, setJustDroppedCardId] = useState<string | null>(null);
   const [draggedCardData, setDraggedCardData] = useState<WorldCard | null>(null);
+  const [droppingCardId, setDroppingCardId] = useState<string | null>(null);
+  const isDroppingRef = useRef<boolean>(false);
 
   // Live Shifting Order for Drag Reordering
   const [liveOrder, setLiveOrder] = useState<string[] | null>(null);
@@ -133,11 +135,111 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     };
   }, []);
 
+  const cleanupDragState = () => {
+    setDraggedCardId(null);
+    setDraggedCardData(null);
+    setDroppingCardId(null);
+    setLiveOrder(null);
+    liveOrderRef.current = null;
+    setHoveredDeckId(null);
+    setIsHoveredRemoveZone(false);
+    setIsNearTop(false);
+    draggedCardIdRef.current = null;
+    isDroppingRef.current = false;
+  };
+
+  const finishCardDrop = (targetOptions?: {
+    targetRect?: DOMRect | null;
+    shrinkToPoint?: { x: number; y: number };
+  }) => {
+    if (isDroppingRef.current) return;
+
+    const currentCardId = draggedCardIdRef.current || draggedCardId;
+    const currentLiveOrder = liveOrderRef.current;
+
+    if (!currentCardId) {
+      cleanupDragState();
+      return;
+    }
+
+    isDroppingRef.current = true;
+    setDroppingCardId(currentCardId);
+
+    const previewEl = floatingPreviewRef.current;
+    if (!previewEl) {
+      if (currentLiveOrder) onReorderCards(currentLiveOrder);
+      cleanupDragState();
+      return;
+    }
+
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+
+    const innerEl = previewEl.querySelector('.card-floating-inner') as HTMLElement | null;
+
+    // 1. Instantly lock previewEl to current mouse release position & force layout reflow
+    const currentX = dragPosRef.current.x - dragOffsetRef.current.x;
+    const currentY = dragPosRef.current.y - dragOffsetRef.current.y;
+    previewEl.style.transition = 'none';
+    previewEl.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+    void previewEl.offsetHeight; // Force instant DOM reflow (eliminates 100ms pause)
+
+    const dropDuration = 250; // ms — fast, responsive, zero-delay!
+
+    if (targetOptions?.shrinkToPoint) {
+      const { x, y } = targetOptions.shrinkToPoint;
+      previewEl.style.transition = `transform ${dropDuration}ms cubic-bezier(0.16, 1, 0.3, 1), opacity ${dropDuration}ms ease`;
+      previewEl.style.transform = `translate3d(${x}px, ${y}px, 0) scale(0.15)`;
+      previewEl.style.opacity = '0';
+    } else {
+      let targetRect = targetOptions?.targetRect;
+      if (!targetRect && currentCardId) {
+        const gridEl = cardDomRefs.current.get(currentCardId);
+        if (gridEl) {
+          targetRect = gridEl.getBoundingClientRect();
+        }
+      }
+
+      if (targetRect) {
+        const targetX = targetRect.left;
+        const targetY = targetRect.top;
+        const targetWidth = targetRect.width;
+
+        // 2. Start smooth drop glide instantly without delay
+        previewEl.style.transition = `transform ${dropDuration}ms cubic-bezier(0.16, 1, 0.3, 1), width ${dropDuration}ms cubic-bezier(0.16, 1, 0.3, 1), opacity ${dropDuration}ms ease`;
+        previewEl.style.transform = `translate3d(${targetX}px, ${targetY}px, 0)`;
+        previewEl.style.width = `${targetWidth}px`;
+
+        if (innerEl) {
+          innerEl.style.transition = `transform ${dropDuration}ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow ${dropDuration}ms ease`;
+          innerEl.style.transform = 'scale(1) rotate(0deg)';
+          innerEl.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+        }
+      } else {
+        previewEl.style.transition = 'opacity 0.2s ease';
+        previewEl.style.opacity = '0';
+      }
+    }
+
+    setTimeout(() => {
+      if (currentLiveOrder) {
+        onReorderCards(currentLiveOrder);
+      }
+      setJustDroppedCardId(currentCardId);
+      setTimeout(() => setJustDroppedCardId(null), 300);
+
+      cleanupDragState();
+    }, dropDuration);
+  };
+
   // Track global cursor position during HTML5 drag — direct DOM for zero-lag
   useEffect(() => {
     if (!draggedCardId) return;
 
     const updatePreviewPos = () => {
+      if (isDroppingRef.current) return;
       const el = floatingPreviewRef.current;
       if (el) {
         const x = dragPosRef.current.x - dragOffsetRef.current.x;
@@ -148,6 +250,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     };
 
     const handleGlobalDragOver = (e: DragEvent) => {
+      if (isDroppingRef.current) return;
       e.preventDefault();
       if (e.clientX !== 0 || e.clientY !== 0) {
         dragPosRef.current.x = e.clientX;
@@ -158,19 +261,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       }
     };
 
-    // Safety cleanup if drag ends outside or dragend event is missed
     const handleGlobalDragEnd = () => {
-      if (liveOrderRef.current && draggedCardIdRef.current) {
-        onReorderCards(liveOrderRef.current);
+      if (!isDroppingRef.current && (draggedCardIdRef.current || draggedCardId)) {
+        finishCardDrop();
       }
-      setDraggedCardId(null);
-      setDraggedCardData(null);
-      setLiveOrder(null);
-      liveOrderRef.current = null;
-      setHoveredDeckId(null);
-      setIsHoveredRemoveZone(false);
-      setIsNearTop(false);
-      draggedCardIdRef.current = null;
     };
 
     window.addEventListener('dragover', handleGlobalDragOver);
@@ -290,11 +384,18 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       setSuccessDeckId(deckId);
 
       setTimeout(() => setSuccessDeckId(null), 1200);
+
+      const deckEl = e.currentTarget as HTMLElement;
+      const rect = deckEl.getBoundingClientRect();
+      finishCardDrop({
+        shrinkToPoint: {
+          x: rect.left + rect.width / 2 - 130,
+          y: rect.top + rect.height / 2 - 80,
+        },
+      });
+    } else {
+      finishCardDrop();
     }
-    setHoveredDeckId(null);
-    setDraggedCardId(null);
-    setIsNearTop(false);
-    draggedCardIdRef.current = null;
   };
 
   // Handle Drag & Drop handlers to REMOVE card from Deck back to Galeri
@@ -326,11 +427,18 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       setIsSuccessRemove(true);
 
       setTimeout(() => setIsSuccessRemove(false), 1200);
+
+      const removeEl = e.currentTarget as HTMLElement;
+      const rect = removeEl.getBoundingClientRect();
+      finishCardDrop({
+        shrinkToPoint: {
+          x: rect.left + rect.width / 2 - 130,
+          y: rect.top + 10,
+        },
+      });
+    } else {
+      finishCardDrop();
     }
-    setIsHoveredRemoveZone(false);
-    setIsNearTop(false);
-    setDraggedCardId(null);
-    draggedCardIdRef.current = null;
   };
 
   const renderDeckItem = (deck: WorldDeck) => {
@@ -349,7 +457,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         onDragLeave={(e) => handleDragLeave(e, deck.id)}
         onDrop={(e) => handleDrop(e, deck.id)}
         style={{
-          boxShadow: `inset 0 3px 0 0 ${isHovered ? '#60a5fa' : '#3b82f6'}`,
+          boxShadow: `inset 0 3px 0 0 ${isHovered ? '#60a5fa' : deckColor}`,
         }}
         className={`group relative flex flex-col space-y-2 p-3.5 pt-4 cursor-pointer transition-all duration-300 rounded-2xl select-none app-bg-secondary border border-slate-700/60 hover:border-blue-500/70 ${
           isSuccess
@@ -467,21 +575,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
   const handleCardDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (liveOrder && draggedCardId) {
-      onReorderCards(liveOrder);
-    }
-    const droppedId = draggedCardId;
-    if (droppedId) {
-      setJustDroppedCardId(droppedId);
-      setTimeout(() => setJustDroppedCardId(null), 300);
-    }
-    setDraggedCardId(null);
-    setDraggedCardData(null);
-    setLiveOrder(null);
-    setHoveredDeckId(null);
-    setIsHoveredRemoveZone(false);
-    setIsNearTop(false);
-    draggedCardIdRef.current = null;
+    finishCardDrop();
   };
 
   const renderCardItem = (card: WorldCard) => {
@@ -489,6 +583,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle || (() => null);
     const assignedDeck = decks.find((d) => d.id === card.deckId || (d.cardIds || []).includes(card.id));
     const isBeingDragged = draggedCardId === card.id;
+    const isDroppingThisCard = droppingCardId === card.id;
 
     return (
       <div
@@ -499,6 +594,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         }}
         draggable={true}
         onDragStart={(e) => {
+          if (isDroppingRef.current) return;
           e.dataTransfer.setData('text/plain', card.id);
           e.dataTransfer.effectAllowed = 'move';
           draggedCardIdRef.current = card.id;
@@ -529,10 +625,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           liveOrderRef.current = initOrder;
           setLiveOrder(initOrder);
           setDraggedCardId(card.id);
+          setDroppingCardId(null);
         }}
         onDragOver={(e) => {
           e.preventDefault(); // allow drop
-          if (!draggedCardId || draggedCardId === card.id || !liveOrder) return;
+          if (isDroppingRef.current || !draggedCardId || draggedCardId === card.id || !liveOrder) return;
 
           const now = Date.now();
           if (now - lastSwapTimeRef.current < 160) return;
@@ -564,13 +661,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         onDragEnd={handleCardDrop}
         onDrop={handleCardDrop}
         onClick={() => {
-          if (!draggedCardIdRef.current) {
+          if (!draggedCardIdRef.current && !isDroppingRef.current) {
             onCardClick(card);
           }
         }}
         className={`card-grid-item app-bg-secondary border app-border rounded-2xl overflow-hidden shadow-xs cursor-grab active:cursor-grabbing group flex flex-col relative ${
-          isBeingDragged
+          isBeingDragged && !isDroppingThisCard
             ? 'opacity-20 border-dashed border-slate-700/40 min-h-[160px]'
+            : isDroppingThisCard
+            ? 'opacity-0 min-h-[160px]'
             : justDroppedCardId === card.id
             ? 'card-drop-settle'
             : 'hover:border-slate-500/60 hover:-translate-y-0.5'
