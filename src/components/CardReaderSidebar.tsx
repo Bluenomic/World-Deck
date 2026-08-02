@@ -29,6 +29,13 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(initialFullPage);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [displayedCard, setDisplayedCard] = useState<WorldCard | null>(card);
+
+  useEffect(() => {
+    if (card) {
+      setDisplayedCard(card);
+    }
+  }, [card]);
 
   useEffect(() => {
     if (isOpen) {
@@ -37,18 +44,19 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
     }
   }, [isOpen, initialFullPage, card?.id]);
 
-  if (!isOpen || !card) return null;
+  const activeCard = card || displayedCard;
+  if (!activeCard) return null;
 
-  const cfg = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
+  const cfg = CATEGORY_CONFIGS[activeCard.category] || CATEGORY_CONFIGS.character;
   const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle || (() => null);
 
   const assignedDeck = decks.find(
-    (d) => d.id === card.deckId || (d.cardIds || []).includes(card.id)
+    (d) => d.id === activeCard.deckId || (d.cardIds || []).includes(activeCard.id)
   );
 
   // Find all connections related to this card
   const relatedConnections = connections.filter(
-    (c) => c.sourceId === card.id || c.targetId === card.id
+    (c) => c.sourceId === activeCard.id || c.targetId === activeCard.id
   );
 
   // Format date helper
@@ -69,31 +77,31 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
       <div className="flex flex-col md:flex-row gap-5 items-start justify-between">
         <div className="flex-1 space-y-2.5">
           <h1 className="text-2xl font-extrabold app-text-main leading-tight tracking-tight">
-            {card.title || 'Kartu Tanpa Judul'}
+            {activeCard.title || 'Kartu Tanpa Judul'}
           </h1>
 
-          {card.subtitle && (
+          {activeCard.subtitle && (
             <p className="text-xs font-medium app-text-muted italic">
-              {card.subtitle}
+              {activeCard.subtitle}
             </p>
           )}
 
           {/* Paragraf Intro / Summary Callout Box */}
           <div className="notion-callout app-bg-secondary p-3.5 rounded-xl border app-border text-xs app-text-main leading-relaxed shadow-xs">
-            {card.summary || 'Belum ada ringkasan intro untuk kartu ini...'}
+            {activeCard.summary || 'Belum ada ringkasan intro untuk kartu ini...'}
           </div>
         </div>
 
         {/* Cover Image / Wiki Infobox Picture */}
-        {card.imageUrl && (
+        {activeCard.imageUrl && (
           <div
-            onClick={() => setPreviewImageUrl(card.imageUrl!)}
+            onClick={() => setPreviewImageUrl(activeCard.imageUrl!)}
             className="w-full md:w-36 h-48 rounded-xl overflow-hidden border app-border shadow-lg shrink-0 relative bg-slate-900/40 cursor-zoom-in group/img transition-transform hover:scale-[1.02]"
             title="Klik untuk memperbesar gambar"
           >
             <img
-              src={card.imageUrl}
-              alt={card.title}
+              src={activeCard.imageUrl}
+              alt={activeCard.title}
               className="w-full h-full object-cover group-hover/img:brightness-110 transition-all"
               loading="lazy"
             />
@@ -106,7 +114,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
       </div>
 
       {/* Section 2: Wiki Infobox Custom Attributes */}
-      {card.attributes && card.attributes.length > 0 && (
+      {activeCard.attributes && activeCard.attributes.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
             <Icons.Sliders size={14} />
@@ -114,7 +122,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-3.5 app-bg-secondary rounded-xl border app-border shadow-2xs">
-            {card.attributes.map((attr) => (
+            {activeCard.attributes.map((attr) => (
               <div
                 key={attr.id || attr.key}
                 className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg app-bg-main border app-border text-xs"
@@ -134,9 +142,9 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
           <span>Catatan Lengkap & Detail Lore</span>
         </div>
 
-        {card.content ? (
+        {activeCard.content ? (
           <div className="app-bg-secondary p-4 rounded-xl border app-border text-xs app-text-main leading-relaxed whitespace-pre-wrap font-sans space-y-2">
-            {parseMentions(card.content, allCards).map((seg, idx) =>
+            {parseMentions(activeCard.content, allCards).map((seg, idx) =>
               seg.isMention && seg.cardId ? (
                 <button
                   key={idx}
@@ -160,7 +168,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
       </div>
 
       {/* Section 4: Tags */}
-      {card.tags && card.tags.length > 0 && (
+      {activeCard.tags && activeCard.tags.length > 0 && (
         <div className="space-y-2 pt-2 border-t app-border">
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
             <Icons.Tag size={14} />
@@ -168,7 +176,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            {card.tags.map((tag, i) => (
+            {activeCard.tags.map((tag, i) => (
               <span
                 key={i}
                 className="px-2.5 py-1 rounded-lg app-bg-secondary app-text-muted border app-border text-xs font-medium"
@@ -192,7 +200,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
 
           <div className="space-y-1.5">
             {relatedConnections.map((conn) => {
-              const isSource = conn.sourceId === card.id;
+              const isSource = conn.sourceId === activeCard.id;
               const otherCardId = isSource ? conn.targetId : conn.sourceId;
               const otherCard = allCards.find((c) => c.id === otherCardId);
 
@@ -232,8 +240,8 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
 
       {/* Section 6: Metadata & Timestamps */}
       <div className="pt-4 border-t app-border text-[11px] app-text-muted flex items-center justify-between font-mono">
-        <span>Dibuat: {formatDate(card.createdAt)}</span>
-        <span>Diperbarui: {formatDate(card.updatedAt)}</span>
+        <span>Dibuat: {formatDate(activeCard.createdAt)}</span>
+        <span>Diperbarui: {formatDate(activeCard.updatedAt)}</span>
       </div>
     </div>
   );
@@ -267,7 +275,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
       <div className="flex items-center gap-2 shrink-0">
         <button
           type="button"
-          onClick={() => onEditCard(card)}
+          onClick={() => onEditCard(activeCard)}
           className="px-3 py-1.5 rounded-xl app-accent-bg text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
         >
           <Icons.Edit3 size={13} />
@@ -299,11 +307,13 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
     <>
       {isExpanded ? (
         <div
-          className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 animate-in zoom-in-95 duration-200"
+          className={`fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 transition-all duration-300 ease-in-out ${
+            isOpen ? 'opacity-100 pointer-events-auto scale-100' : 'opacity-0 pointer-events-none scale-95'
+          }`}
           onClick={onClose}
         >
           <div
-            className="w-full max-w-4xl h-full max-h-[90vh] app-bg-main border app-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in duration-200"
+            className="w-full max-w-4xl h-full max-h-[90vh] app-bg-main border app-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {headerBar}
@@ -314,13 +324,21 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
         <>
           {/* Backdrop overlay covering the left side to close sidebar on click */}
           <div
-            className="fixed inset-0 z-[115] bg-black/20 backdrop-blur-[0.5px] transition-opacity animate-in fade-in duration-200 cursor-pointer"
+            className={`fixed inset-0 z-[115] bg-black/20 backdrop-blur-[0.5px] transition-opacity duration-300 ease-in-out cursor-pointer ${
+              isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            }`}
             onClick={onClose}
           />
-          <div className="fixed inset-y-0 right-0 z-[120] w-full max-w-lg app-bg-main border-l app-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+          {/* Sidebar Panel with exact CSS transform transition matching left sidebar */}
+          <aside
+            style={{
+              transform: isOpen ? 'translateX(0%)' : 'translateX(100%)',
+            }}
+            className="sidebar-panel-transition fixed inset-y-0 right-0 z-[120] w-full max-w-lg app-bg-main border-l app-border shadow-2xl flex flex-col"
+          >
             {headerBar}
             {articleContent}
-          </div>
+          </aside>
         </>
       )}
 
