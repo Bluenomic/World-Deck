@@ -390,6 +390,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (!e.shiftKey) {
           onSelectCard(null);
           setSelectedCardIds([]);
+          setSelectedConnectionIds([]);
         }
       }
     }
@@ -402,6 +403,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       setPanStart({ x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y });
       onSelectCard(null);
       setSelectedCardIds([]);
+      setSelectedConnectionIds([]);
     }
   };
 
@@ -420,6 +422,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     onSelectCard(card);
 
     const isShift = 'shiftKey' in e && (e as React.MouseEvent).shiftKey;
+    if (!isShift) {
+      setSelectedConnectionIds([]);
+    }
     let activeIds: string[] = [];
 
     if (isShift) {
