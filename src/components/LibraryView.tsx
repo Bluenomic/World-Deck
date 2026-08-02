@@ -50,6 +50,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
   // Live Shifting Order for Drag Reordering
   const [liveOrder, setLiveOrder] = useState<string[] | null>(null);
+  const liveOrderRef = useRef<string[] | null>(null);
 
   const draggedCardIdRef = useRef<string | null>(null);
   const transparentImgRef = useRef<HTMLCanvasElement | null>(null);
@@ -61,6 +62,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   // FLIP animation refs for ultra-smooth grid shifting
   const cardDomRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const prevRectsRef = useRef<Map<string, DOMRect>>(new Map());
+  const lastSwapTimeRef = useRef<number>(0);
 
   // Execute FLIP layout animation whenever liveOrder shifts
   useLayoutEffect(() => {
@@ -110,6 +112,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         prevRectsRef.current.set(id, el.getBoundingClientRect());
       }
     });
+    liveOrderRef.current = nextOrder;
     setLiveOrder(nextOrder);
   };
 
@@ -157,9 +160,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
     // Safety cleanup if drag ends outside or dragend event is missed
     const handleGlobalDragEnd = () => {
+      if (liveOrderRef.current && draggedCardIdRef.current) {
+        onReorderCards(liveOrderRef.current);
+      }
       setDraggedCardId(null);
       setDraggedCardData(null);
       setLiveOrder(null);
+      liveOrderRef.current = null;
       setHoveredDeckId(null);
       setIsHoveredRemoveZone(false);
       setIsNearTop(false);
@@ -168,15 +175,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
     window.addEventListener('dragover', handleGlobalDragOver);
     window.addEventListener('dragend', handleGlobalDragEnd);
+    window.addEventListener('mouseup', handleGlobalDragEnd);
+    window.addEventListener('pointerup', handleGlobalDragEnd);
     return () => {
       window.removeEventListener('dragover', handleGlobalDragOver);
       window.removeEventListener('dragend', handleGlobalDragEnd);
+      window.removeEventListener('mouseup', handleGlobalDragEnd);
+      window.removeEventListener('pointerup', handleGlobalDragEnd);
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
     };
-  }, [draggedCardId]);
+  }, [draggedCardId, onReorderCards]);
 
   // Get active deck if user navigated inside a deck
   const activeDeck = decks.find((d) => d.id === activeDeckId) || null;
@@ -501,21 +512,40 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           });
 
           // Initialize live shifting order
-          setLiveOrder(cardsToDisplay.map((c) => c.id));
+          const initOrder = cardsToDisplay.map((c) => c.id);
+          liveOrderRef.current = initOrder;
+          setLiveOrder(initOrder);
           setDraggedCardId(card.id);
         }}
         onDragOver={(e) => {
           e.preventDefault(); // allow drop
           if (!draggedCardId || draggedCardId === card.id || !liveOrder) return;
 
+          const now = Date.now();
+          if (now - lastSwapTimeRef.current < 160) return;
+
           const fromIdx = liveOrder.indexOf(draggedCardId);
           const toIdx = liveOrder.indexOf(card.id);
 
           if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
-            const nextOrder = [...liveOrder];
-            nextOrder.splice(fromIdx, 1);
-            nextOrder.splice(toIdx, 0, draggedCardId);
-            updateLiveOrderWithFLIP(nextOrder);
+            const rect = e.currentTarget.getBoundingClientRect();
+            const cursorX = e.clientX;
+            const cursorY = e.clientY;
+            const midX = rect.left + rect.width / 2;
+            const midY = rect.top + rect.height / 2;
+
+            const isForward = fromIdx < toIdx;
+            const crossedMidpoint = isForward
+              ? cursorX > midX || cursorY > midY + 15
+              : cursorX < midX || cursorY < midY - 15;
+
+            if (crossedMidpoint) {
+              lastSwapTimeRef.current = now;
+              const nextOrder = [...liveOrder];
+              nextOrder.splice(fromIdx, 1);
+              nextOrder.splice(toIdx, 0, draggedCardId);
+              updateLiveOrderWithFLIP(nextOrder);
+            }
           }
         }}
         onDragEnd={handleCardDrop}
@@ -525,92 +555,100 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             onCardClick(card);
           }
         }}
-        className={`card-grid-item app-bg-secondary border rounded-2xl overflow-hidden shadow-sm cursor-grab active:cursor-grabbing group flex flex-col relative ${
+        className={`card-grid-item app-bg-secondary rounded-2xl overflow-hidden shadow-xs cursor-grab active:cursor-grabbing group flex flex-col relative ${
           isBeingDragged
-            ? 'card-drag-placeholder opacity-30 border-2 border-dashed border-purple-500/40 bg-purple-950/20'
+            ? 'opacity-20 border border-dashed border-slate-700/40 min-h-[160px]'
             : justDroppedCardId === card.id
-            ? 'card-drop-settle border-purple-400'
-            : 'app-border hover:border-purple-400/80 hover:-translate-y-0.5'
+            ? 'card-drop-settle app-border'
+            : 'app-border hover:border-purple-400/70 hover:-translate-y-0.5'
         }`}
       >
-        {/* Category Header Bar */}
-        <div className="px-3 py-2 app-bg-main border-b app-border flex items-center justify-between gap-2">
-          <div
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${cfg.bgGradient} ${cfg.borderColor}`}
-            style={{ color: cfg.color }}
-          >
-            <IconComp size={11} />
-            <span>{cfg.label}</span>
-          </div>
-
-          <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity" title="Geser kartu">
-            <Icons.GripHorizontal size={14} className="app-text-muted cursor-grab" />
-          </div>
-        </div>
-
-        {/* Image */}
-        {card.imageUrl && (
-          <div className="h-32 w-full overflow-hidden relative">
-            <img
-              src={card.imageUrl}
-              alt={card.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90"
-              loading="lazy"
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none';
-              }}
-            />
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
-          <div className="space-y-1">
-            <h3 className="text-xs font-bold app-text-main group-hover:text-purple-400 transition-colors">
-              {card.title || 'Kartu Tanpa Judul'}
-            </h3>
-            {card.subtitle && (
-              <p className="text-[11px] app-text-muted">
-                {card.subtitle}
-              </p>
-            )}
-            <p className="text-[11px] app-text-muted line-clamp-2 leading-relaxed pt-1">
-              {card.summary || 'Belum ada ringkasan...'}
-            </p>
-          </div>
-
-          {/* Footer Info & Assigned Deck Badge */}
-          <div className="pt-2 border-t app-border flex items-center justify-between">
-            {assignedDeck ? (
-              <span
-                className="text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 shadow-xs"
-                style={{
-                  borderColor: assignedDeck.color || '#8b5cf6',
-                  color: assignedDeck.color || '#a855f7',
-                  backgroundColor: `${assignedDeck.color || '#8b5cf6'}15`,
-                }}
+        {isBeingDragged ? (
+          <div className="flex-1 min-h-[160px]" />
+        ) : (
+          <>
+            {/* Category Header Bar */}
+            <div className="px-3 py-2 app-bg-main border-b app-border flex items-center justify-between gap-2">
+              <div
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${cfg.bgGradient} ${cfg.borderColor}`}
+                style={{ color: cfg.color }}
               >
-                <Icons.Folder size={10} />
-                <span className="truncate max-w-[90px]">{assignedDeck.name}</span>
-              </span>
-            ) : (
-              <span className="text-[10px] app-text-muted italic">Mandiri</span>
-            )}
+                <IconComp size={11} />
+                <span>{cfg.label}</span>
+              </div>
 
-            {card.tags && card.tags.length > 0 && (
-              <div className="flex items-center gap-1">
-                {card.tags.slice(0, 2).map((tag, i) => (
-                  <span
-                    key={i}
-                    className="text-[9px] px-1.5 py-0.5 rounded app-bg-main app-text-muted border app-border"
-                  >
-                    #{tag}
-                  </span>
-                ))}
+              <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity" title="Geser kartu">
+                <Icons.GripHorizontal size={14} className="app-text-muted cursor-grab" />
+              </div>
+            </div>
+
+            {/* Image */}
+            {card.imageUrl && (
+              <div className="h-32 w-full overflow-hidden relative">
+                <img
+                  src={card.imageUrl}
+                  alt={card.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90 pointer-events-none select-none"
+                  draggable={false}
+                  onDragStart={(e) => e.preventDefault()}
+                  loading="lazy"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
               </div>
             )}
-          </div>
-        </div>
+
+            {/* Content */}
+            <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
+              <div className="space-y-1">
+                <h3 className="text-xs font-bold app-text-main group-hover:text-purple-400 transition-colors">
+                  {card.title || 'Kartu Tanpa Judul'}
+                </h3>
+                {card.subtitle && (
+                  <p className="text-[11px] app-text-muted">
+                    {card.subtitle}
+                  </p>
+                )}
+                <p className="text-[11px] app-text-muted line-clamp-2 leading-relaxed pt-1">
+                  {card.summary || 'Belum ada ringkasan...'}
+                </p>
+              </div>
+
+              {/* Footer Info & Assigned Deck Badge */}
+              <div className="pt-2 border-t app-border flex items-center justify-between">
+                {assignedDeck ? (
+                  <span
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 shadow-xs"
+                    style={{
+                      borderColor: assignedDeck.color || '#8b5cf6',
+                      color: assignedDeck.color || '#a855f7',
+                      backgroundColor: `${assignedDeck.color || '#8b5cf6'}15`,
+                    }}
+                  >
+                    <Icons.Folder size={10} />
+                    <span className="truncate max-w-[90px]">{assignedDeck.name}</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] app-text-muted italic">Mandiri</span>
+                )}
+
+                {card.tags && card.tags.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    {card.tags.slice(0, 2).map((tag, i) => (
+                      <span
+                        key={i}
+                        className="text-[9px] px-1.5 py-0.5 rounded app-bg-main app-text-muted border app-border"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
   };
@@ -850,7 +888,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 pointerEvents: 'none',
               }}
             >
-              <div className="card-floating-inner app-bg-secondary border border-purple-500/40 rounded-2xl overflow-hidden flex flex-col">
+              <div className="card-floating-inner app-bg-secondary border app-border rounded-2xl overflow-hidden flex flex-col">
                 {/* Category Header Bar */}
                 <div className="px-3 py-2 app-bg-main border-b app-border flex items-center justify-between gap-2">
                   <div
@@ -861,7 +899,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     <span>{cfg.label}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Icons.GripHorizontal size={14} className="text-purple-400" />
+                    <Icons.GripHorizontal size={14} className="app-text-muted" />
                   </div>
                 </div>
 
@@ -871,7 +909,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     <img
                       src={dragCard.imageUrl}
                       alt={dragCard.title}
-                      className="w-full h-full object-cover opacity-90"
+                      className="w-full h-full object-cover opacity-90 pointer-events-none select-none"
+                      draggable={false}
+                      onDragStart={(e) => e.preventDefault()}
                       loading="lazy"
                     />
                   </div>
@@ -880,7 +920,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 {/* Content */}
                 <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
                   <div className="space-y-1">
-                    <h3 className="text-xs font-bold text-purple-300">
+                    <h3 className="text-xs font-bold app-text-main">
                       {dragCard.title || 'Kartu Tanpa Judul'}
                     </h3>
                     {dragCard.subtitle && (

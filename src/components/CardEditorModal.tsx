@@ -191,7 +191,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
         {/* Cover Photo Bar */}
         {imageUrl ? (
           <div className="h-44 w-full relative overflow-hidden group border-b app-border">
-            <img src={imageUrl} alt="Cover" className="w-full h-full object-cover" />
+            <img src={imageUrl} alt="Cover" className="w-full h-full object-cover pointer-events-none select-none" draggable={false} />
             <button
               type="button"
               onClick={() => setImageUrl('')}

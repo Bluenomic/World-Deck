@@ -56,7 +56,9 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
           <img
             src={card.imageUrl}
             alt={card.title}
-            className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+            className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity pointer-events-none select-none"
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
             loading="lazy"
             onError={(e) => {
               (e.target as HTMLElement).style.display = 'none';
