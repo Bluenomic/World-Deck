@@ -608,6 +608,18 @@ export const App: React.FC = () => {
     if (editingConnection?.id === connId) setEditingConnection(null);
   };
 
+  // Delete Multiple Connections
+  const handleDeleteConnections = (connIds: string[]) => {
+    updateActiveWorld((prev) => ({
+      ...prev,
+      updatedAt: Date.now(),
+      connections: prev.connections.filter((c) => !connIds.includes(c.id)),
+    }));
+    if (editingConnection && connIds.includes(editingConnection.id)) {
+      setEditingConnection(null);
+    }
+  };
+
   // World Manager Actions
   const handleCreateWorld = (newWorld: WorldProject) => {
     setWorlds((prev) => [...prev, newWorld]);
@@ -928,6 +940,8 @@ export const App: React.FC = () => {
               onAddCardsToCanvasAtPosition={handleAddCardsToCanvasAtPosition}
               onRemoveCardsFromCanvas={handleRemoveCardsFromCanvas}
               onDeleteCardsRequest={handleRequestDeleteCards}
+              onDeleteConnection={handleDeleteConnection}
+              onDeleteConnections={handleDeleteConnections}
             />
           )}
 
@@ -1025,12 +1039,13 @@ export const App: React.FC = () => {
           connection={editingConnection}
           sourceCard={
             activeCanvasCards.find((c) => c.id === editingConnection.sourceId) ||
-            activeCanvasCards[0]
+            activeWorld.cards.find((c) => c.id === editingConnection.sourceId)
           }
           targetCard={
             activeCanvasCards.find((c) => c.id === editingConnection.targetId) ||
-            activeCanvasCards[0]
+            activeWorld.cards.find((c) => c.id === editingConnection.targetId)
           }
+          allCards={activeWorld.cards}
           onSave={handleSaveConnection}
           onDelete={handleDeleteConnection}
           onClose={() => setEditingConnection(null)}

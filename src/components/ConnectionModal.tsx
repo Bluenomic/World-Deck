@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import type { CardConnection, WorldCard } from '../types';
+import type { CardConnection, WorldCard, ConnectionDirection } from '../types';
 import * as Icons from 'lucide-react';
 
 interface ConnectionModalProps {
   connection: CardConnection;
   sourceCard?: WorldCard;
   targetCard?: WorldCard;
+  allCards?: WorldCard[];
   onSave: (updatedConnection: CardConnection) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
@@ -15,17 +16,37 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
   connection,
   sourceCard,
   targetCard,
+  allCards = [],
   onSave,
   onDelete,
   onClose,
 }) => {
   const [label, setLabel] = useState(connection.label || '');
   const [description, setDescription] = useState(connection.description || '');
+  const [direction, setDirection] = useState<ConnectionDirection>(connection.direction || 'directed');
+  const [sourceId, setSourceId] = useState(connection.sourceId);
+  const [targetId, setTargetId] = useState(connection.targetId);
+
+  const currentSourceCard = allCards.find((c) => c.id === sourceId) || sourceCard;
+  const currentTargetCard = allCards.find((c) => c.id === targetId) || targetCard;
+
+  const handleToggleDirectionArrow = () => {
+    // Swap source & target card IDs
+    const prevSource = sourceId;
+    setSourceId(targetId);
+    setTargetId(prevSource);
+    if (direction !== 'directed') {
+      setDirection('directed');
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
       ...connection,
+      sourceId,
+      targetId,
+      direction,
       label: label.trim() || 'Terhubung',
       description: description.trim(),
     });
@@ -50,7 +71,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 app-text-muted hover:app-text-main rounded-md hover:app-bg-hover"
+            className="p-1 app-text-muted hover:app-text-main rounded-md hover:app-bg-hover cursor-pointer"
           >
             <Icons.X size={16} />
           </button>
@@ -59,22 +80,85 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
         {/* Content Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           
-          {/* Card Endpoints Summary */}
-          <div className="p-3 rounded-xl app-bg-main border app-border flex items-center justify-between text-xs">
-            <div className="space-y-0.5">
-              <span className="text-[10px] app-text-muted uppercase">Asal</span>
-              <p className="font-bold app-text-main truncate max-w-[120px]">
-                {sourceCard ? sourceCard.title : 'Kartu Asal'}
+          {/* Card Endpoints Summary & Interactive Center Arrow Button */}
+          <div className="p-3.5 rounded-xl app-bg-main border app-border flex items-center justify-between gap-3 text-xs">
+            <div className="space-y-0.5 flex-1 min-w-0">
+              <span className="text-[10px] app-text-muted uppercase tracking-wider font-semibold">Asal</span>
+              <p className="font-bold app-text-main truncate" title={currentSourceCard?.title}>
+                {currentSourceCard ? currentSourceCard.title : 'Kartu Asal'}
               </p>
             </div>
 
-            <Icons.ArrowRight size={14} className="app-accent-text shrink-0" />
+            {/* Clickable Center Arrow Button */}
+            <button
+              type="button"
+              onClick={handleToggleDirectionArrow}
+              className="p-2 rounded-xl app-bg-secondary border app-border hover:border-blue-500/70 hover:app-bg-hover app-text-main shrink-0 transition-all hover:scale-110 active:scale-95 cursor-pointer shadow-xs"
+              title="Klik untuk membalikkan arah panah (Asal ⇄ Tujuan)"
+            >
+              {direction === 'directed' && <Icons.ArrowRight size={18} className="app-accent-text" />}
+              {direction === 'bidirectional' && <Icons.ArrowLeftRight size={18} className="app-accent-text" />}
+              {direction === 'undirected' && <Icons.Minus size={18} className="app-text-muted" />}
+            </button>
 
-            <div className="space-y-0.5 text-right">
-              <span className="text-[10px] app-text-muted uppercase">Tujuan</span>
-              <p className="font-bold app-text-main truncate max-w-[120px]">
-                {targetCard ? targetCard.title : 'Kartu Tujuan'}
+            <div className="space-y-0.5 flex-1 min-w-0 text-right">
+              <span className="text-[10px] app-text-muted uppercase tracking-wider font-semibold">Tujuan</span>
+              <p className="font-bold app-text-main truncate" title={currentTargetCard?.title}>
+                {currentTargetCard ? currentTargetCard.title : 'Kartu Tujuan'}
               </p>
+            </div>
+          </div>
+
+          {/* Connection Direction Selector */}
+          <div>
+            <label className="block text-xs font-semibold app-text-muted mb-1.5">
+              Jenis Arah Relasi
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {/* Satu Arah */}
+              <button
+                type="button"
+                onClick={() => setDirection('directed')}
+                className={`py-2.5 px-2 rounded-xl border text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  direction === 'directed'
+                    ? 'app-accent-bg text-white border-transparent shadow-sm font-semibold'
+                    : 'app-bg-main app-border app-text-muted hover:app-text-main hover:app-bg-hover'
+                }`}
+                title="Pilih Satu Arah"
+              >
+                <Icons.ArrowRight size={14} />
+                <span>Satu Arah</span>
+              </button>
+
+              {/* Dua Arah */}
+              <button
+                type="button"
+                onClick={() => setDirection('bidirectional')}
+                className={`py-2.5 px-2 rounded-xl border text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  direction === 'bidirectional'
+                    ? 'app-accent-bg text-white border-transparent shadow-sm font-semibold'
+                    : 'app-bg-main app-border app-text-muted hover:app-text-main hover:app-bg-hover'
+                }`}
+                title="Pilih Dua Arah"
+              >
+                <Icons.ArrowLeftRight size={14} />
+                <span>Dua Arah</span>
+              </button>
+
+              {/* Tanpa Panah */}
+              <button
+                type="button"
+                onClick={() => setDirection('undirected')}
+                className={`py-2.5 px-2 rounded-xl border text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  direction === 'undirected'
+                    ? 'app-accent-bg text-white border-transparent shadow-sm font-semibold'
+                    : 'app-bg-main app-border app-text-muted hover:app-text-main hover:app-bg-hover'
+                }`}
+                title="Pilih Tanpa Panah"
+              >
+                <Icons.Minus size={14} />
+                <span>Tanpa Panah</span>
+              </button>
             </div>
           </div>
 
@@ -88,7 +172,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Masukkan label..."
-              className="w-full app-bg-main border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-purple-500"
+              className="w-full app-bg-main border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -101,7 +185,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Penjelasan detail sejarah hubungan..."
-              className="w-full app-bg-main border app-border rounded-lg p-2.5 text-xs app-text-main focus:outline-none focus:border-purple-500"
+              className="w-full app-bg-main border app-border rounded-lg p-2.5 text-xs app-text-main focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -124,7 +208,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 rounded-lg app-accent-bg text-white text-xs font-semibold"
+                className="px-4 py-1.5 rounded-lg app-accent-bg text-white text-xs font-semibold cursor-pointer"
               >
                 Simpan
               </button>

@@ -60,12 +60,15 @@ export type RelationType =
   | 'involved_in'
   | 'custom';
 
+export type ConnectionDirection = 'directed' | 'bidirectional' | 'undirected';
+
 export interface CardConnection {
   id: string;
   sourceId: string;
   targetId: string;
   label: string;
   type?: RelationType;
+  direction?: ConnectionDirection;
   description?: string;
 }
 

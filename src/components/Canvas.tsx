@@ -23,6 +23,8 @@ interface CanvasProps {
   onAddCardsToCanvasAtPosition?: (cardIds: string[], position: { x: number; y: number }) => void;
   onRemoveCardsFromCanvas?: (cardIds: string[]) => void;
   onDeleteCardsRequest: (cardIds: string[]) => void;
+  onDeleteConnection?: (id: string) => void;
+  onDeleteConnections?: (ids: string[]) => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -42,6 +44,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   onAddCardsToCanvasAtPosition,
   onRemoveCardsFromCanvas,
   onDeleteCardsRequest,
+  onDeleteConnection,
+  onDeleteConnections,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const targetCanvasId = activeCanvasId || 'default';
@@ -97,6 +101,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [dragCardPositions, setDragCardPositions] = useState<Record<string, { x: number; y: number }>>({});
+
+  // Selected Connection IDs for Multi-Selection & Deletion
+  const [selectedConnectionIds, setSelectedConnectionIds] = useState<string[]>([]);
 
   // Connection Dragging State (creating new link)
   const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
@@ -175,13 +182,24 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
   }, []);
 
-  // Delete/Backspace Key Listener for Selected Cards
+  // Delete/Backspace Key Listener for Selected Cards & Selected Connections
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (['INPUT', 'TEXTAREA'].includes(tag)) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedConnectionIds.length > 0) {
+          e.preventDefault();
+          if (onDeleteConnections) {
+            onDeleteConnections(selectedConnectionIds);
+          } else if (onDeleteConnection) {
+            selectedConnectionIds.forEach((id) => onDeleteConnection(id));
+          }
+          setSelectedConnectionIds([]);
+          return;
+        }
+
         const targetIds = selectedCardIds.length > 0
           ? selectedCardIds
           : (selectedCardId ? [selectedCardId] : []);
@@ -195,7 +213,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCardIds, selectedCardId, onDeleteCardsRequest]);
+  }, [selectedCardIds, selectedCardId, selectedConnectionIds, onDeleteCardsRequest, onDeleteConnection, onDeleteConnections]);
 
   // Mutable refs for zoom & pan to prevent stale closure lag during rapid wheel events
   const zoomRef = useRef<number>(zoom);
@@ -615,10 +633,44 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
 
       const { path, midX, midY } = getBezierPath(x1, y1, x2, y2, dir);
+      const isSelectedConn = selectedConnectionIds.includes(conn.id);
       const isDimmedConn =
         selectedCategory !== 'all' &&
         sourceCard.category !== selectedCategory &&
         targetCard.category !== selectedCategory;
+
+      const dirMode = conn.direction || 'directed';
+      let markerEnd: string | undefined = undefined;
+      let markerStart: string | undefined = undefined;
+
+      if (dirMode === 'directed') {
+        markerEnd = 'url(#arrowhead-end)';
+      } else if (dirMode === 'bidirectional') {
+        markerEnd = 'url(#arrowhead-end)';
+        markerStart = 'url(#arrowhead-start)';
+      } else if (dirMode === 'undirected') {
+        markerEnd = undefined;
+        markerStart = undefined;
+      }
+
+      const handleConnClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (e.shiftKey || e.ctrlKey || e.metaKey) {
+          setSelectedConnectionIds((prev) =>
+            prev.includes(conn.id)
+              ? prev.filter((id) => id !== conn.id)
+              : [...prev, conn.id]
+          );
+        } else {
+          setSelectedConnectionIds([conn.id]);
+          onSelectCard(null);
+        }
+      };
+
+      const handleConnDoubleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onEditConnection(conn);
+      };
 
       return (
         <g key={conn.id} className={`group cursor-pointer transition-opacity duration-200 ${isDimmedConn ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
@@ -627,16 +679,18 @@ export const Canvas: React.FC<CanvasProps> = ({
             fill="none"
             stroke="transparent"
             strokeWidth={20}
-            onClick={() => onEditConnection(conn)}
+            onClick={handleConnClick}
+            onDoubleClick={handleConnDoubleClick}
           />
           <path
             d={path}
             fill="none"
-            stroke="var(--line-stroke)"
-            strokeWidth={2}
+            stroke={isSelectedConn ? 'var(--line-stroke-highlight)' : 'var(--line-stroke)'}
+            strokeWidth={isSelectedConn ? 3 : 2}
             strokeDasharray={conn.type === 'enemy' ? '5,4' : 'none'}
             className="transition-colors duration-150"
-            markerEnd="url(#arrowhead)"
+            markerEnd={markerEnd}
+            markerStart={markerStart}
           />
           <foreignObject
             x={midX - 55}
@@ -646,8 +700,13 @@ export const Canvas: React.FC<CanvasProps> = ({
             className="overflow-visible"
           >
             <div
-              onClick={() => onEditConnection(conn)}
-              className="px-2.5 py-0.5 rounded-md text-[10px] font-semibold text-center truncate border transition-transform hover:scale-105 select-none app-bg-secondary app-text-main border app-border hover:border-blue-400"
+              onClick={handleConnClick}
+              onDoubleClick={handleConnDoubleClick}
+              className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold text-center truncate border transition-all hover:scale-105 select-none cursor-pointer ${
+                isSelectedConn
+                  ? 'app-bg-main app-accent-text border-blue-500 shadow-md font-bold ring-2 ring-blue-500/40 scale-105'
+                  : 'app-bg-secondary app-text-main border app-border hover:border-blue-400'
+              }`}
             >
               {conn.label || 'Terhubung'}
             </div>
@@ -723,12 +782,22 @@ export const Canvas: React.FC<CanvasProps> = ({
         >
           <defs>
             <marker
-              id="arrowhead"
+              id="arrowhead-end"
               markerWidth="9"
               markerHeight="9"
               refX="8"
               refY="4.5"
               orient="auto"
+            >
+              <path d="M 0 1.5 L 8 4.5 L 0 7.5 z" fill="var(--line-stroke)" />
+            </marker>
+            <marker
+              id="arrowhead-start"
+              markerWidth="9"
+              markerHeight="9"
+              refX="1"
+              refY="4.5"
+              orient="auto-start-reverse"
             >
               <path d="M 0 1.5 L 8 4.5 L 0 7.5 z" fill="var(--line-stroke)" />
             </marker>
