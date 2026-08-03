@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { WorldCard, CardConnection } from '../types';
 import { generateId } from '../utils/helpers';
 import * as Icons from 'lucide-react';
+import { TimelineDeleteModal } from './TimelineDeleteModal';
+import type { TimelineDeleteTarget } from './TimelineDeleteModal';
 
 interface TimelineTrack {
   id: string;
@@ -152,6 +154,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const [selectedNode, setSelectedNode] = useState<SimpleTimelineNode | null>(null);
   const [readerNode, setReaderNode] = useState<SimpleTimelineNode | null>(null);
 
+  // Custom Delete Modal Target State
+  const [deleteTarget, setDeleteTarget] = useState<TimelineDeleteTarget | null>(null);
+
   // Dragging Node State
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dragStartX, setDragStartX] = useState<number>(0);
@@ -244,14 +249,41 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     return [...otherEvents, ...sorted];
   };
 
+  // Clamp Horizontal Scroll so user cannot scroll endlessly past content boundaries
+  const getClampedScrollX = (rawScrollX: number, vWidth: number) => {
+    if (nodes.length === 0) {
+      return Math.max(-100, Math.min(300, rawScrollX));
+    }
+
+    const minNodeX = Math.min(...nodes.map((n) => n.x));
+    const maxNodeX = Math.max(...nodes.map((n) => n.x));
+
+    const margin = 350; // Padding to comfortably view the first and last card
+
+    const maxAllowedScrollX = margin - minNodeX;
+    const minAllowedScrollX = vWidth - (maxNodeX + margin);
+
+    if (maxAllowedScrollX < minAllowedScrollX) {
+      // Content fits inside viewport: center the content on screen
+      const contentCenter = (minNodeX + maxNodeX) / 2;
+      return vWidth / 2 - contentCenter;
+    }
+
+    return Math.max(minAllowedScrollX, Math.min(maxAllowedScrollX, rawScrollX));
+  };
+
   // Pointer Movement Handlers
   const handlePointerMove = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const viewportHeight = rect.height;
+    const viewportWidth = rect.width;
 
     if (isPanning) {
-      setScrollX(e.clientX - panStart.x);
+      const rawX = e.clientX - panStart.x;
+      const clampedX = getClampedScrollX(rawX, viewportWidth);
+      setScrollX(clampedX);
+
       const rawY = e.clientY - panStart.y;
       const clampedY = Math.max(
         -maxScrollOffset(viewportHeight),
@@ -306,11 +338,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
   const handleWheel = (e: React.WheelEvent) => {
     if (!containerRef.current) return;
-    const viewportHeight = containerRef.current.getBoundingClientRect().height;
+    const rect = containerRef.current.getBoundingClientRect();
+    const viewportHeight = rect.height;
+    const viewportWidth = rect.width;
 
-    if (e.shiftKey) {
+    if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
       const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      setScrollX((prev) => prev - delta * 0.9);
+      setScrollX((prev) => getClampedScrollX(prev - delta * 0.9, viewportWidth));
     } else {
       setScrollY((prev) => {
         const rawY = prev - e.deltaY * 0.9;
@@ -383,9 +417,15 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   };
 
   const handleDeleteNode = (id: string) => {
-    setNodes((prev) => prev.filter((n) => n.id !== id));
-    if (selectedNode?.id === id) setSelectedNode(null);
-    if (readerNode?.id === id) setReaderNode(null);
+    const nodeToDelete = nodes.find((n) => n.id === id);
+    if (nodeToDelete) {
+      setDeleteTarget({
+        type: 'node',
+        id: nodeToDelete.id,
+        title: nodeToDelete.title,
+        subtitle: nodeToDelete.dateLabel || 'Kejadian Waktu',
+      });
+    }
   };
 
   // Helper to check if a track is the Main Timeline track (protected)
@@ -431,10 +471,15 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       alert('Tidak dapat menghapus garis waktu terakhir.');
       return;
     }
-    if (window.confirm(`Hapus garis waktu "${trackToDelete.name}" beserta semua kejadiannya?`)) {
-      setTracks((prev) => prev.filter((t) => t.id !== trackId));
-      setNodes((prev) => prev.filter((n) => n.trackId !== trackId));
-    }
+
+    const count = nodes.filter((n) => n.trackId === trackId).length;
+    setDeleteTarget({
+      type: 'track',
+      id: trackToDelete.id,
+      title: trackToDelete.name,
+      subtitle: 'Garis Waktu Paralel',
+      itemCount: count,
+    });
   };
 
   // Save Track Name or New Track
@@ -458,11 +503,30 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   };
 
   const handleClearAll = () => {
-    if (window.confirm('Bersihkan semua kejadian di seluruh garis waktu?')) {
+    setDeleteTarget({
+      type: 'clear_all',
+      title: 'Seluruh Kejadian Garis Waktu',
+      subtitle: 'Pembersihan Total',
+      itemCount: nodes.length,
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTarget) return;
+
+    if (deleteTarget.type === 'node' && deleteTarget.id) {
+      setNodes((prev) => prev.filter((n) => n.id !== deleteTarget.id));
+      if (selectedNode?.id === deleteTarget.id) setSelectedNode(null);
+      if (readerNode?.id === deleteTarget.id) setReaderNode(null);
+    } else if (deleteTarget.type === 'track' && deleteTarget.id) {
+      setTracks((prev) => prev.filter((t) => t.id !== deleteTarget.id));
+      setNodes((prev) => prev.filter((n) => n.trackId !== deleteTarget.id));
+    } else if (deleteTarget.type === 'clear_all') {
       setNodes([]);
       setSelectedNode(null);
       setReaderNode(null);
     }
+    setDeleteTarget(null);
   };
 
   const linkedCardForReader = readerNode?.cardId ? cards.find((c) => c.id === readerNode.cardId) : null;
@@ -1042,6 +1106,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Custom Delete Confirmation Modal */}
+      <TimelineDeleteModal
+        isOpen={!!deleteTarget}
+        target={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 };
