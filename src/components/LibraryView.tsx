@@ -34,6 +34,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [activeTab, setActiveTab] = useState<'all' | 'decks' | 'cards'>('all');
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
 
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number }>({
+    visible: false, x: 0, y: 0,
+  });
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
   // Drag and Drop States for Decks
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [hoveredDeckId, setHoveredDeckId] = useState<string | null>(null);
@@ -763,47 +769,41 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     );
   };
 
+  // Context Menu Handlers
+  const handleContextMenu = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+    // Only show on background / empty area, not on card items
+    if (target.closest('.card-grid-item') || target.closest('.deck-grid-item')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+  };
+
+  useEffect(() => {
+    if (!contextMenu.visible) return;
+    const handleClose = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(prev => ({ ...prev, visible: false }));
+      }
+    };
+    document.addEventListener('mousedown', handleClose);
+    document.addEventListener('contextmenu', handleClose);
+    return () => {
+      document.removeEventListener('mousedown', handleClose);
+      document.removeEventListener('contextmenu', handleClose);
+    };
+  }, [contextMenu.visible]);
+
   return (
     <div
       onDragOver={handleContainerDragOver}
+      onContextMenu={handleContextMenu}
       className="flex-1 app-bg-main p-6 overflow-y-auto app-text-main transition-colors"
     >
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Header Banner */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b app-border pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold app-text-main flex items-center gap-2">
-                <Icons.Library className="app-accent-text" size={22} />
-                <span>Galeri</span>
-              </h2>
-            </div>
-            <p className="text-xs app-text-muted mt-1">
-              Arsip galeri terstruktur. Anda dapat menggeser <span className="text-blue-400 font-semibold">(drag & drop)</span> kartu langsung ke dalam kumpulan Deck.
-            </p>
-          </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={onCreateDeckRequest}
-              className="px-3.5 py-2 app-bg-secondary border app-border hover:border-blue-500 rounded-xl text-xs font-bold app-text-main transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-            >
-              <Icons.SquareStack size={15} className="text-blue-400" />
-              <span>+ Buat Deck Baru</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onAddCard(activeDeckId || undefined)}
-              className="px-4 py-2 app-accent-bg text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer hover:brightness-110 active:scale-95"
-            >
-              <Icons.Plus size={15} strokeWidth={2.5} />
-              <span>+ Buat Kartu Baru</span>
-            </button>
-          </div>
-        </div>
 
         {/* Deck Navigation Breadcrumb (If inside a Deck) */}
         {activeDeck ? (
@@ -948,13 +948,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           <div className="text-center py-16 app-bg-secondary rounded-2xl border app-border app-text-muted space-y-3">
             <Icons.FileText size={36} className="mx-auto app-text-muted opacity-50" />
             <p className="text-xs">Tidak ada item atau kartu ditemukan dalam galeri ini.</p>
-            <button
-              type="button"
-              onClick={() => onAddCard(activeDeckId || undefined)}
-              className="px-3.5 py-2 app-accent-bg text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
-            >
-              + Buat Kartu Baru
-            </button>
+            <p className="text-[11px] app-text-muted">Klik kanan di area kosong untuk membuat kartu atau deck baru.</p>
           </div>
         ) : (
           <div
@@ -974,6 +968,46 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         {/* ======================== */}
         {/* MINIMALIST FLOATING DRAG PREVIEW */}
         {/* ======================== */}
+        {/* Right-Click Context Menu */}
+        {contextMenu.visible && (
+          <div
+            ref={contextMenuRef}
+            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-52 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100"
+            style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-3 py-1.5 text-[10px] app-text-muted font-semibold uppercase tracking-wider select-none">
+              Aksi Galeri
+            </div>
+
+            <div className="py-1 space-y-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  onAddCard(activeDeckId || undefined);
+                  setContextMenu(prev => ({ ...prev, visible: false }));
+                }}
+                className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
+              >
+                <Icons.Plus size={14} strokeWidth={2.5} />
+                <span>Buat Kartu Baru</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onCreateDeckRequest();
+                  setContextMenu(prev => ({ ...prev, visible: false }));
+                }}
+                className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
+              >
+                <Icons.SquareStack size={14} />
+                <span>Buat Deck Baru</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {draggedCardId && draggedCardData && (() => {
           const dragCard = draggedCardData;
           const cfg = CATEGORY_CONFIGS[dragCard.category] || CATEGORY_CONFIGS.character;
