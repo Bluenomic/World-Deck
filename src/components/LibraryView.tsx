@@ -16,6 +16,9 @@ interface LibraryViewProps {
   onDeleteDeckRequest: (deckId: string) => void;
   onAssignCardToDeck: (cardId: string, deckId?: string) => void;
   onReorderCards: (orderedCardIds: string[]) => void;
+  onEditCardRequest: (card: WorldCard) => void;
+  onOpenCardFullPage: (card: WorldCard) => void;
+  onDeleteCardsRequest: (cardIds: string[]) => void;
 }
 
 export const LibraryView: React.FC<LibraryViewProps> = ({
@@ -30,15 +33,21 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onDeleteDeckRequest,
   onAssignCardToDeck,
   onReorderCards,
+  onEditCardRequest,
+  onOpenCardFullPage,
+  onDeleteCardsRequest,
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'decks' | 'cards'>('all');
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
 
   // Context Menu State
-  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number }>({
-    visible: false, x: 0, y: 0,
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; targetCard: WorldCard | null }>({
+    visible: false, x: 0, y: 0, targetCard: null,
   });
   const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // Multi-Select State
+  const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
 
   // Drag and Drop States for Decks
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
@@ -660,9 +669,20 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         }}
         onDragEnd={handleCardDrop}
         onDrop={handleCardDrop}
-        onClick={() => {
+        data-card-id={card.id}
+        onClick={(e) => {
           if (!draggedCardIdRef.current && !isDroppingRef.current && !isCardDimmed) {
-            onCardClick(card);
+            if (e.ctrlKey || e.metaKey) {
+              setSelectedCardIds(prev => {
+                const next = new Set(prev);
+                if (next.has(card.id)) next.delete(card.id);
+                else next.add(card.id);
+                return next;
+              });
+            } else {
+              setSelectedCardIds(new Set());
+              onCardClick(card);
+            }
           }
         }}
         className={`card-grid-item app-bg-secondary border rounded-2xl overflow-hidden shadow-xs cursor-grab active:cursor-grabbing group flex flex-col relative transition-all ${
@@ -674,6 +694,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             ? 'card-drop-settle'
             : isCardDimmed
             ? 'opacity-25 grayscale-[30%] pointer-events-none border-dashed app-border'
+            : selectedCardIds.has(card.id)
+            ? 'border-blue-400 ring-2 ring-blue-500/40 shadow-md bg-blue-500/5'
             : isCardHighlighted
             ? 'border-blue-400 ring-2 ring-blue-500/50 shadow-md scale-[1.01]'
             : 'app-border hover:border-slate-500/60 hover:-translate-y-0.5'
@@ -773,11 +795,25 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const handleContextMenu = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-    // Only show on background / empty area, not on card items
-    if (target.closest('.card-grid-item') || target.closest('.deck-grid-item')) return;
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+
+    // Check if right-clicked on a card
+    const cardEl = target.closest('.card-grid-item');
+    if (cardEl) {
+      const cardId = cardEl.getAttribute('data-card-id');
+      const card = cardId ? cards.find(c => c.id === cardId) : null;
+      if (card) {
+        setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: card });
+        return;
+      }
+    }
+
+    // Don't show on deck items
+    if (target.closest('.deck-grid-item')) return;
+
+    // Background click
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: null });
   };
 
   useEffect(() => {
@@ -969,42 +1005,140 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         {/* MINIMALIST FLOATING DRAG PREVIEW */}
         {/* ======================== */}
         {/* Right-Click Context Menu */}
+        {/* Multi-Select Floating Toolbar */}
+        {selectedCardIds.size > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[90] app-bg-secondary border app-border rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <div className="flex items-center gap-2 text-xs font-bold app-text-main">
+              <Icons.CheckSquare size={16} className="text-blue-400" />
+              <span>{selectedCardIds.size} kartu dipilih</span>
+            </div>
+            <div className="h-5 w-px bg-slate-600" />
+            <button
+              type="button"
+              onClick={() => {
+                onDeleteCardsRequest(Array.from(selectedCardIds));
+                setSelectedCardIds(new Set());
+              }}
+              className="px-3 py-1.5 rounded-lg bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Icons.Trash2 size={13} />
+              <span>Hapus Semua</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedCardIds(new Set())}
+              className="px-3 py-1.5 rounded-lg app-bg-main app-text-muted hover:app-text-main text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer border app-border"
+            >
+              <Icons.X size={13} />
+              <span>Batal</span>
+            </button>
+          </div>
+        )}
+
+        {/* Right-Click Context Menu */}
         {contextMenu.visible && (
           <div
             ref={contextMenuRef}
-            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-52 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100"
+            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-52 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-700/50"
             style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-3 py-1.5 text-[10px] app-text-muted font-semibold uppercase tracking-wider select-none">
-              Aksi Galeri
-            </div>
+            {contextMenu.targetCard ? (
+              <>
+                <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
+                  📄 {contextMenu.targetCard.title || 'Kartu'}
+                </div>
 
-            <div className="py-1 space-y-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  onAddCard(activeDeckId || undefined);
-                  setContextMenu(prev => ({ ...prev, visible: false }));
-                }}
-                className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
-              >
-                <Icons.Plus size={14} strokeWidth={2.5} />
-                <span>Buat Kartu Baru</span>
-              </button>
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenCardFullPage(contextMenu.targetCard!);
+                      setContextMenu(prev => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
+                  >
+                    <Icons.Maximize2 size={14} />
+                    <span>Buka Kartu</span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  onCreateDeckRequest();
-                  setContextMenu(prev => ({ ...prev, visible: false }));
-                }}
-                className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
-              >
-                <Icons.SquareStack size={14} />
-                <span>Buat Deck Baru</span>
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onEditCardRequest(contextMenu.targetCard!);
+                      setContextMenu(prev => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                  >
+                    <Icons.Edit3 size={14} />
+                    <span>Edit Kartu</span>
+                  </button>
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDeleteCardsRequest([contextMenu.targetCard!.id]);
+                      setContextMenu(prev => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
+                  >
+                    <Icons.Trash2 size={14} />
+                    <span>Hapus Kartu Permanen</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="px-3 py-1.5 text-[10px] app-text-muted font-semibold uppercase tracking-wider select-none">
+                  Aksi Galeri
+                </div>
+
+                <div className="py-1 space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAddCard(activeDeckId || undefined);
+                      setContextMenu(prev => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
+                  >
+                    <Icons.Plus size={14} strokeWidth={2.5} />
+                    <span>Buat Kartu Baru</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onCreateDeckRequest();
+                      setContextMenu(prev => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
+                  >
+                    <Icons.SquareStack size={14} />
+                    <span>Buat Deck Baru</span>
+                  </button>
+                </div>
+
+                {selectedCardIds.size > 0 && (
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDeleteCardsRequest(Array.from(selectedCardIds));
+                        setSelectedCardIds(new Set());
+                        setContextMenu(prev => ({ ...prev, visible: false }));
+                      }}
+                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
+                    >
+                      <Icons.Trash2 size={14} />
+                      <span>Hapus {selectedCardIds.size} Kartu Terpilih</span>
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

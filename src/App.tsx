@@ -988,6 +988,12 @@ export const App: React.FC = () => {
               onDeleteDeckRequest={handleDeleteDeck}
               onAssignCardToDeck={handleAssignCardToDeck}
               onReorderCards={handleReorderCards}
+              onEditCardRequest={(card) => setEditingCard(card)}
+              onOpenCardFullPage={(card) => {
+                setReaderCardId(card.id);
+                setIsReaderFullPage(true);
+              }}
+              onDeleteCardsRequest={handleRequestDeleteCards}
             />
           )}
 

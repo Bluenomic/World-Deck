@@ -1121,40 +1121,53 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         {contextMenu && (
           <div
             style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
-            className="fixed z-50 app-bg-secondary border app-border rounded-xl p-1.5 shadow-2xl animate-in zoom-in-95 duration-100 text-xs min-w-[220px] app-text-main"
+            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-56 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-700/50"
           >
             {contextMenu.selectedBranch ? (
               <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingBranch(contextMenu.selectedBranch!);
-                    setTempBranchLabel(contextMenu.selectedBranch!.label || 'Percabangan Waktu');
-                    setShowBranchModal(true);
-                    setContextMenu(null);
-                  }}
-                  className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
-                >
-                  <Icons.Edit3 size={14} className="app-text-muted" />
-                  <span>Ubah Nama Percabangan</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleDeleteBranch(contextMenu.selectedBranch!.id);
-                    setContextMenu(null);
-                  }}
-                  className="w-full px-3 py-2 text-left text-rose-500 hover:bg-rose-500/10 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors border-t app-border mt-1 pt-2"
-                >
-                  <Icons.Trash2 size={14} />
-                  <span>Hapus Percabangan Waktu</span>
-                </button>
+                <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
+                  🔀 {contextMenu.selectedBranch.label || 'Percabangan'}
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingBranch(contextMenu.selectedBranch!);
+                      setTempBranchLabel(contextMenu.selectedBranch!.label || 'Percabangan Waktu');
+                      setShowBranchModal(true);
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                  >
+                    <Icons.Edit3 size={14} />
+                    <span>Ubah Nama Percabangan</span>
+                  </button>
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleDeleteBranch(contextMenu.selectedBranch!.id);
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
+                  >
+                    <Icons.Trash2 size={14} />
+                    <span>Hapus Percabangan Waktu</span>
+                  </button>
+                </div>
               </>
             ) : contextMenu.targetTrack ? (
               <>
+                <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
+                  🕒 {contextMenu.targetTrack.name}
+                </div>
+
                 {/* Branching Actions */}
                 {draftBranch ? (
-                  <>
+                  <div className="py-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -1165,112 +1178,128 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                         );
                         setContextMenu(null);
                       }}
-                      className="w-full px-3 py-2 text-left app-text-main app-bg-hover rounded-lg flex items-center gap-2 font-bold cursor-pointer transition-colors border app-border mb-1"
+                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
                     >
-                      <Icons.GitCommit size={14} className="app-accent-text" />
+                      <Icons.GitCommit size={14} />
                       <span>Sambungkan Percabangan Di Sini</span>
                     </button>
+
                     <button
                       type="button"
                       onClick={() => {
                         setDraftBranch(null);
                         setContextMenu(null);
                       }}
-                      className="w-full px-3 py-2 text-left app-text-muted hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors mb-1"
+                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors app-text-muted font-medium cursor-pointer"
                     >
                       <Icons.X size={14} />
                       <span>Batal Buat Percabangan</span>
                     </button>
-                    <div className="my-1 border-t app-border" />
-                  </>
+                  </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDraftBranch({
-                        sourceTrackId: contextMenu.targetTrack!.id,
-                        sourceX: contextMenu.clickWorldX!,
-                        sourceNodeId: contextMenu.clickNodeId,
-                      });
-                      setContextMenu(null);
-                    }}
-                    className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
-                  >
-                    <Icons.GitBranch size={14} className="app-text-muted" />
-                    <span>Buat Percabangan Waktu</span>
-                  </button>
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDraftBranch({
+                          sourceTrackId: contextMenu.targetTrack!.id,
+                          sourceX: contextMenu.clickWorldX!,
+                          sourceNodeId: contextMenu.clickNodeId,
+                        });
+                        setContextMenu(null);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                    >
+                      <Icons.GitBranch size={14} />
+                      <span>Buat Percabangan Waktu</span>
+                    </button>
+                  </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingTrack(contextMenu.targetTrack!);
-                    setTempTrackName(contextMenu.targetTrack!.name);
-                    setShowTrackModal(true);
-                    setContextMenu(null);
-                  }}
-                  className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
-                >
-                  <Icons.Edit3 size={14} className="app-text-muted" />
-                  <span>Ubah Nama ({contextMenu.targetTrack.name})</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newOrder = getNewOrderAbove(contextMenu.targetTrack!);
-                    handleAddParallelTrack(newOrder);
-                    setContextMenu(null);
-                  }}
-                  className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
-                >
-                  <Icons.Plus size={14} className="app-text-muted" />
-                  <span>+ Garis Waktu Paralel di Atas</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newOrder = getNewOrderBelow(contextMenu.targetTrack!);
-                    handleAddParallelTrack(newOrder);
-                    setContextMenu(null);
-                  }}
-                  className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
-                >
-                  <Icons.Plus size={14} className="app-text-muted" />
-                  <span>+ Garis Waktu Paralel di Bawah</span>
-                </button>
-
-                {!isMainTrack(contextMenu.targetTrack!) && (
+                <div className="py-1">
                   <button
                     type="button"
                     onClick={() => {
-                      handleDeleteTrack(contextMenu.targetTrack!.id);
+                      setEditingTrack(contextMenu.targetTrack!);
+                      setTempTrackName(contextMenu.targetTrack!.name);
+                      setShowTrackModal(true);
                       setContextMenu(null);
                     }}
-                    className="w-full px-3 py-2 text-left text-rose-500 hover:bg-rose-500/10 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors border-t app-border mt-1 pt-2"
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
                   >
-                    <Icons.Trash2 size={14} />
-                    <span>Hapus Garis Waktu ({contextMenu.targetTrack.name})</span>
+                    <Icons.Edit3 size={14} />
+                    <span>Ubah Nama ({contextMenu.targetTrack.name})</span>
                   </button>
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newOrder = getNewOrderAbove(contextMenu.targetTrack!);
+                      handleAddParallelTrack(newOrder);
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
+                  >
+                    <Icons.Plus size={14} />
+                    <span>+ Garis Waktu Paralel di Atas</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newOrder = getNewOrderBelow(contextMenu.targetTrack!);
+                      handleAddParallelTrack(newOrder);
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
+                  >
+                    <Icons.Plus size={14} />
+                    <span>+ Garis Waktu Paralel di Bawah</span>
+                  </button>
+                </div>
+
+                {!isMainTrack(contextMenu.targetTrack!) && (
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDeleteTrack(contextMenu.targetTrack!.id);
+                        setContextMenu(null);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
+                    >
+                      <Icons.Trash2 size={14} />
+                      <span>Hapus Garis Waktu ({contextMenu.targetTrack.name})</span>
+                    </button>
+                  </div>
                 )}
               </>
             ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  if (contextMenu.clickOrderPosition !== undefined) {
-                    handleAddParallelTrack(contextMenu.clickOrderPosition);
-                  }
-                  setContextMenu(null);
-                }}
-                className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
-              >
-                <Icons.Plus size={14} className="app-text-muted" />
-                <span>
-                  + Buat Garis Waktu Paralel ({contextMenu.isAbove ? 'di Atas' : 'di Bawah'})
-                </span>
-              </button>
+              <>
+                <div className="px-3 py-1.5 text-[10px] app-text-muted font-semibold uppercase tracking-wider select-none">
+                  Aksi Timeline
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (contextMenu.clickOrderPosition !== undefined) {
+                        handleAddParallelTrack(contextMenu.clickOrderPosition);
+                      }
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
+                  >
+                    <Icons.Plus size={14} />
+                    <span>
+                      + Buat Garis Waktu Paralel ({contextMenu.isAbove ? 'di Atas' : 'di Bawah'})
+                    </span>
+                  </button>
+                </div>
+              </>
             )}
           </div>
         )}
