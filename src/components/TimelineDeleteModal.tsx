@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import * as Icons from 'lucide-react';
 
-export type DeleteTargetType = 'node' | 'track' | 'clear_all';
+export type DeleteTargetType = 'node' | 'track' | 'branch' | 'clear_all';
 
 export interface TimelineDeleteTarget {
   type: DeleteTargetType;
@@ -52,6 +52,14 @@ export const TimelineDeleteModal: React.FC<TimelineDeleteModalProps> = ({
           title: 'Hapus Kejadian Waktu',
           desc: 'Apakah Anda yakin ingin menghapus kejadian ini dari garis waktu?',
           confirmText: 'Hapus Kejadian',
+        };
+      case 'branch':
+        return {
+          icon: <Icons.GitBranch size={20} className="text-cyan-400" />,
+          badgeClass: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+          title: 'Hapus Percabangan Waktu',
+          desc: 'Apakah Anda yakin ingin menghapus hubungan percabangan ini?',
+          confirmText: 'Hapus Percabangan',
         };
       case 'track':
         return {

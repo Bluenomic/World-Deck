@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { WorldCard, CardConnection } from '../types';
+import type { WorldCard, CardConnection, TimelineBranch } from '../types';
 import { generateId } from '../utils/helpers';
 import * as Icons from 'lucide-react';
 import { TimelineDeleteModal } from './TimelineDeleteModal';
@@ -121,6 +121,24 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     return [];
   });
 
+  // Timeline Branches State
+  const [branches, setBranches] = useState<TimelineBranch[]>(() => {
+    try {
+      const saved = localStorage.getItem(`${storageKey}_branches`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
+
+  // Interactive Branch Drafting State
+  const [draftBranch, setDraftBranch] = useState<{
+    sourceTrackId: string;
+    sourceX: number;
+    sourceNodeId?: string;
+  } | null>(null);
+
+  const [mouseWorldPos, setMouseWorldPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
   // 2D Pan Offset (Horizontal & Bounded Vertical)
   const [scrollX, setScrollX] = useState<number>(100);
   const [scrollY, setScrollY] = useState<number>(0);
@@ -136,6 +154,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     x: number;
     y: number;
     targetTrack?: TimelineTrack;
+    clickWorldX?: number;
+    clickNodeId?: string;
+    selectedBranch?: TimelineBranch;
     isAbove?: boolean;
     clickOrderPosition?: number;
   } | null>(null);
@@ -145,6 +166,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const [editingTrack, setEditingTrack] = useState<TimelineTrack | null>(null);
   const [newTrackOrderPosition, setNewTrackOrderPosition] = useState<number | null>(null);
   const [tempTrackName, setTempTrackName] = useState<string>('');
+
+  // Branch Name Modal State
+  const [showBranchModal, setShowBranchModal] = useState<boolean>(false);
+  const [editingBranch, setEditingBranch] = useState<TimelineBranch | null>(null);
+  const [tempBranchLabel, setTempBranchLabel] = useState<string>('');
 
   // Node Modal & Readers
   const [showNodeModal, setShowNodeModal] = useState<boolean>(false);
@@ -197,8 +223,20 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     try {
       localStorage.setItem(`${storageKey}_tracks`, JSON.stringify(tracks));
       localStorage.setItem(`${storageKey}_nodes`, JSON.stringify(nodes));
+      localStorage.setItem(`${storageKey}_branches`, JSON.stringify(branches));
     } catch (e) {}
-  }, [tracks, nodes, storageKey]);
+  }, [tracks, nodes, branches, storageKey]);
+
+  // Cancel draft branch on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && draftBranch) {
+        setDraftBranch(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [draftBranch]);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -305,6 +343,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     const viewportHeight = rect.height;
     const viewportWidth = rect.width;
 
+    const mouseY = e.clientY - rect.top;
+    const worldX = Math.round(e.clientX - rect.left - scrollX);
+
+    // Track mouse world position for interactive branch tethering
+    setMouseWorldPos({ x: worldX, y: mouseY });
+
     if (isPanning) {
       const rawX = e.clientX - panStart.x;
       const clampedX = getClampedScrollX(rawX, viewportWidth);
@@ -320,9 +364,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     }
 
     if (draggingNodeId) return;
-
-    const mouseY = e.clientY - rect.top;
-    const worldX = Math.round(e.clientX - rect.left - scrollX);
 
     // Check hover proximity to any track line
     let foundTrackId: string | null = null;
@@ -351,6 +392,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
   const handleMouseDownBg = (e: React.MouseEvent) => {
     if (e.button === 0 && (e.target === containerRef.current || (e.target as HTMLElement).id === 'timeline-center-bg')) {
+      if (draftBranch && hoverTrackId && hoverWorldX !== null) {
+        handleCompleteBranch(hoverTrackId, hoverWorldX);
+        return;
+      }
       setIsPanning(true);
       setPanStart({ x: e.clientX - scrollX, y: e.clientY - scrollY });
       setReaderNode(null);
@@ -380,7 +425,78 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     }
   };
 
-  // Right Click Context Menu Handler (Only on an existing track line)
+  // Branch Handlers
+  const handleCompleteBranch = (targetTrackId: string, targetX: number, targetNodeId?: string) => {
+    if (!draftBranch) return;
+
+    if (
+      draftBranch.sourceTrackId === targetTrackId &&
+      Math.abs(draftBranch.sourceX - targetX) < 10
+    ) {
+      setDraftBranch(null);
+      return;
+    }
+
+    let label = 'Percabangan Waktu';
+    if (draftBranch.sourceTrackId === targetTrackId) {
+      if (targetX < draftBranch.sourceX) {
+        label = 'Loop Waktu (Masa Lalu)';
+      } else {
+        label = 'Lompatan Masa Depan';
+      }
+    } else {
+      label = 'Garis Waktu Alternatif';
+    }
+
+    const newBranch: TimelineBranch = {
+      id: generateId('branch'),
+      sourceTrackId: draftBranch.sourceTrackId,
+      sourceX: draftBranch.sourceX,
+      sourceNodeId: draftBranch.sourceNodeId,
+      targetTrackId,
+      targetX,
+      targetNodeId,
+      label,
+    };
+
+    setBranches((prev) => [...prev, newBranch]);
+    setDraftBranch(null);
+  };
+
+  const handleDeleteBranch = (branchId: string) => {
+    const branchToDelete = branches.find((b) => b.id === branchId);
+    if (branchToDelete) {
+      setDeleteTarget({
+        type: 'branch',
+        id: branchToDelete.id,
+        title: branchToDelete.label || 'Percabangan Waktu',
+        subtitle: 'Hubungan Waktu',
+      });
+    }
+  };
+
+  const handleRightClickBranch = (branch: TimelineBranch, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      selectedBranch: branch,
+    });
+  };
+
+  const handleSaveBranchModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBranch) return;
+    const cleanLabel = tempBranchLabel.trim() || 'Percabangan Waktu';
+    setBranches((prev) =>
+      prev.map((b) => (b.id === editingBranch.id ? { ...b, label: cleanLabel } : b))
+    );
+    setShowBranchModal(false);
+    setEditingBranch(null);
+  };
+
+  // Right Click Context Menu Handler
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!containerRef.current) return;
@@ -388,8 +504,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     const rect = containerRef.current.getBoundingClientRect();
     const viewportHeight = rect.height;
     const mouseY = e.clientY - rect.top;
+    const worldX = Math.round(e.clientX - rect.left - scrollX);
 
-    // Check if right clicked directly on an existing track line (35px tolerance)
     let targetTrack: TimelineTrack | undefined;
     for (const track of sortedTracks) {
       const trackY = getTrackCenterY(track.id, viewportHeight);
@@ -400,10 +516,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     }
 
     if (targetTrack) {
+      const nearNode = nodes.find((n) => n.trackId === targetTrack!.id && Math.abs(n.x - worldX) <= 24);
+
       setContextMenu({
         x: e.clientX,
         y: e.clientY,
         targetTrack,
+        clickWorldX: worldX,
+        clickNodeId: nearNode?.id,
       });
     } else {
       setContextMenu(null);
@@ -542,13 +662,22 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
     if (deleteTarget.type === 'node' && deleteTarget.id) {
       setNodes((prev) => prev.filter((n) => n.id !== deleteTarget.id));
+      setBranches((prev) =>
+        prev.filter((b) => b.sourceNodeId !== deleteTarget.id && b.targetNodeId !== deleteTarget.id)
+      );
       if (selectedNode?.id === deleteTarget.id) setSelectedNode(null);
       if (readerNode?.id === deleteTarget.id) setReaderNode(null);
+    } else if (deleteTarget.type === 'branch' && deleteTarget.id) {
+      setBranches((prev) => prev.filter((b) => b.id !== deleteTarget.id));
     } else if (deleteTarget.type === 'track' && deleteTarget.id) {
       setTracks((prev) => prev.filter((t) => t.id !== deleteTarget.id));
       setNodes((prev) => prev.filter((n) => n.trackId !== deleteTarget.id));
+      setBranches((prev) =>
+        prev.filter((b) => b.sourceTrackId !== deleteTarget.id && b.targetTrackId !== deleteTarget.id)
+      );
     } else if (deleteTarget.type === 'clear_all') {
       setNodes([]);
+      setBranches([]);
       setSelectedNode(null);
       setReaderNode(null);
     }
@@ -581,6 +710,21 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           onContextMenu={handleContextMenu}
           className="flex-1 w-full h-full relative overflow-hidden bg-black cursor-grab active:cursor-grabbing"
         >
+          {/* Active Branch Helper Banner */}
+          {draftBranch && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-cyan-950/90 border border-cyan-500/60 text-cyan-200 px-4 py-2 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 text-xs font-semibold animate-in zoom-in-95 duration-200 pointer-events-auto">
+              <Icons.GitBranch size={16} className="text-cyan-400 animate-pulse" />
+              <span>Modus Percabangan: Klik titik/garis tujuan untuk menyambungkan (Esc untuk batal)</span>
+              <button
+                type="button"
+                onClick={() => setDraftBranch(null)}
+                className="p-1 hover:bg-cyan-900/60 rounded-lg text-cyan-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <Icons.X size={14} />
+              </button>
+            </div>
+          )}
+
           {/* Transparent Click Target Area */}
           <div id="timeline-center-bg" className="absolute inset-0 w-full h-full bg-black" />
 
@@ -630,8 +774,129 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             );
           })}
 
-          {/* SVG Layer for Directional Arrows & Google Maps Style Repeating Track Names */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none">
+          {/* SVG Layer for Directional Arrows, Track Labels, and Branch Connections */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
+            <defs>
+              <marker
+                id="branch-arrow"
+                viewBox="0 0 10 10"
+                refX="6"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#a1a1aa" />
+              </marker>
+            </defs>
+
+            {/* Render Permanent Branches */}
+            {branches.map((branch) => {
+              const sourceTrackY = getTrackCenterY(branch.sourceTrackId, viewportHeight);
+              const targetTrackY = getTrackCenterY(branch.targetTrackId, viewportHeight);
+
+              const startX = branch.sourceX + scrollX;
+              const startY = sourceTrackY;
+              const endX = branch.targetX + scrollX;
+              const endY = targetTrackY;
+
+              const isSameTrack = branch.sourceTrackId === branch.targetTrackId;
+
+              let pathD = '';
+              if (isSameTrack) {
+                const isLoop = branch.targetX < branch.sourceX;
+                const loopOffset = isLoop ? -110 : 110;
+                const midX = (startX + endX) / 2;
+                const cpY = startY + loopOffset;
+                pathD = `M ${startX} ${startY} Q ${midX} ${cpY} ${endX} ${endY}`;
+              } else {
+                const dx = (endX - startX) * 0.45;
+                pathD = `M ${startX} ${startY} C ${startX + dx} ${startY}, ${endX - dx} ${endY}, ${endX} ${endY}`;
+              }
+
+              const midX = (startX + endX) / 2;
+              const midY =
+                (startY + endY) / 2 + (isSameTrack ? (branch.targetX < branch.sourceX ? -60 : 60) : 0);
+
+              return (
+                <g
+                  key={branch.id}
+                  className="group cursor-pointer pointer-events-auto"
+                  onContextMenu={(e) => handleRightClickBranch(branch, e)}
+                >
+                  {/* Thick Hover Click Target */}
+                  <path
+                    d={pathD}
+                    fill="none"
+                    stroke="#a1a1aa"
+                    strokeWidth={12}
+                    strokeOpacity={0.01}
+                    className="group-hover:stroke-opacity-20 transition-all cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRightClickBranch(branch, e);
+                    }}
+                  />
+                  {/* Visible Thicker Dashed Grey Branch Line */}
+                  <path
+                    d={pathD}
+                    fill="none"
+                    stroke="#a1a1aa"
+                    strokeWidth={3}
+                    strokeDasharray="6 4"
+                    strokeLinecap="round"
+                    markerEnd="url(#branch-arrow)"
+                    className="group-hover:stroke-white transition-all"
+                  />
+                  {/* Floating Branch Badge */}
+                  <g style={{ transform: `translate(${midX}px, ${midY}px)` }}>
+                    <rect
+                      x="-70"
+                      y="-11"
+                      width="140"
+                      height="22"
+                      rx="6"
+                      fill="#18181b"
+                      stroke="#52525b"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x="0"
+                      y="4"
+                      fill="#e4e4e7"
+                      fontSize="9"
+                      fontWeight="800"
+                      textAnchor="middle"
+                      className="select-none font-mono uppercase tracking-tight"
+                    >
+                      {branch.label}
+                    </text>
+                  </g>
+                </g>
+              );
+            })}
+
+            {/* Active Draft Branch Cable Following Cursor */}
+            {draftBranch && (
+              <g className="pointer-events-none">
+                <path
+                  d={`M ${draftBranch.sourceX + scrollX} ${getTrackCenterY(draftBranch.sourceTrackId, viewportHeight)} L ${mouseWorldPos.x + scrollX} ${mouseWorldPos.y}`}
+                  fill="none"
+                  stroke="#d4d4d8"
+                  strokeWidth={3}
+                  strokeDasharray="5 5"
+                  className="animate-pulse"
+                />
+                <circle
+                  cx={mouseWorldPos.x + scrollX}
+                  cy={mouseWorldPos.y}
+                  r={6}
+                  fill="#a1a1aa"
+                  className="animate-ping"
+                />
+              </g>
+            )}
+
             <g transform={`translate(${scrollX}, 0)`}>
               {sortedTracks.map((track) => {
                 const trackY = getTrackCenterY(track.id, viewportHeight);
@@ -854,14 +1119,90 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           </div>
         </div>
 
-        {/* Dynamic Context Menu (Parallel Timelines) */}
+        {/* Dynamic Context Menu (Parallel Timelines & Branches) */}
         {contextMenu && (
           <div
             style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
             className="fixed z-50 bg-zinc-900 border border-zinc-800 rounded-xl p-1.5 shadow-2xl animate-in zoom-in-95 duration-100 text-xs min-w-[220px]"
           >
-            {contextMenu.targetTrack ? (
+            {contextMenu.selectedBranch ? (
               <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingBranch(contextMenu.selectedBranch!);
+                    setTempBranchLabel(contextMenu.selectedBranch!.label || 'Percabangan Waktu');
+                    setShowBranchModal(true);
+                    setContextMenu(null);
+                  }}
+                  className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+                >
+                  <Icons.Edit3 size={14} className="text-zinc-400" />
+                  <span>Ubah Nama Percabangan</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDeleteBranch(contextMenu.selectedBranch!.id);
+                    setContextMenu(null);
+                  }}
+                  className="w-full px-3 py-2 text-left text-rose-400 hover:bg-rose-500/10 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors border-t border-zinc-800/80 mt-1 pt-2"
+                >
+                  <Icons.Trash2 size={14} />
+                  <span>Hapus Percabangan Waktu</span>
+                </button>
+              </>
+            ) : contextMenu.targetTrack ? (
+              <>
+                {/* Branching Actions */}
+                {draftBranch ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleCompleteBranch(
+                          contextMenu.targetTrack!.id,
+                          contextMenu.clickWorldX!,
+                          contextMenu.clickNodeId
+                        );
+                        setContextMenu(null);
+                      }}
+                      className="w-full px-3 py-2 text-left text-zinc-100 bg-zinc-800 hover:bg-zinc-700 rounded-lg flex items-center gap-2 font-bold cursor-pointer transition-colors border border-zinc-700 mb-1"
+                    >
+                      <Icons.GitCommit size={14} className="text-zinc-300" />
+                      <span>Sambungkan Percabangan Di Sini</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDraftBranch(null);
+                        setContextMenu(null);
+                      }}
+                      className="w-full px-3 py-2 text-left text-zinc-400 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors mb-1"
+                    >
+                      <Icons.X size={14} />
+                      <span>Batal Buat Percabangan</span>
+                    </button>
+                    <div className="my-1 border-t border-zinc-800" />
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftBranch({
+                        sourceTrackId: contextMenu.targetTrack!.id,
+                        sourceX: contextMenu.clickWorldX!,
+                        sourceNodeId: contextMenu.clickNodeId,
+                      });
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+                  >
+                    <Icons.GitBranch size={14} className="text-zinc-400" />
+                    <span>Buat Percabangan Waktu</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => {
@@ -1080,6 +1421,65 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     setShowTrackModal(false);
                     setEditingTrack(null);
                     setNewTrackOrderPosition(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-zinc-700 text-white font-bold hover:bg-zinc-600 cursor-pointer"
+                >
+                  Simpan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Branch Name Modal */}
+      {showBranchModal && editingBranch && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl text-white modal-animate-appear">
+            <div className="flex items-center justify-between mb-4 border-b border-zinc-800 pb-3">
+              <h3 className="text-sm font-bold flex items-center gap-2">
+                <Icons.GitBranch size={16} className="text-zinc-400" />
+                <span>Ubah Nama Percabangan Waktu</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBranchModal(false);
+                  setEditingBranch(null);
+                }}
+                className="p-1 rounded-lg text-zinc-400 hover:text-white"
+              >
+                <Icons.X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBranchModal} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1">
+                  Nama / Label Percabangan
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Loop Masa Lalu, Timeline Alternatif Alpha..."
+                  value={tempBranchLabel}
+                  onChange={(e) => setTempBranchLabel(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-zinc-500 font-mono text-xs"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBranchModal(false);
+                    setEditingBranch(null);
                   }}
                   className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700"
                 >

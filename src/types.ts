@@ -88,6 +88,17 @@ export interface WorldProject {
   updatedAt: number;
 }
 
+export interface TimelineBranch {
+  id: string;
+  sourceTrackId: string;
+  sourceX: number;
+  sourceNodeId?: string;
+  targetTrackId: string;
+  targetX: number;
+  targetNodeId?: string;
+  label?: string;
+}
+
 export type ViewMode = 'canvas' | 'library' | 'timeline' | 'relations';
 
 export type AppTheme = 'dark' | 'light';
