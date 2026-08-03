@@ -298,7 +298,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="w-full px-3 py-2 text-left hover:app-bg-hover text-amber-500 flex items-center gap-2 transition-colors"
               >
                 <Icons.RotateCcw size={14} />
-                <span>Bersihkan Canvas</span>
+                <span>Bersihkan</span>
               </button>
             </div>
           )}

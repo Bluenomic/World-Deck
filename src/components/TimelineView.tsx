@@ -529,57 +529,21 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     setDeleteTarget(null);
   };
 
+  // Listen for external clear timeline trigger from Navbar Project Menu
+  useEffect(() => {
+    const handleExternalClear = () => {
+      handleClearAll();
+    };
+    window.addEventListener('worlddeck_clear_timeline', handleExternalClear);
+    return () => window.removeEventListener('worlddeck_clear_timeline', handleExternalClear);
+  }, [nodes]);
+
   const linkedCardForReader = readerNode?.cardId ? cards.find((c) => c.id === readerNode.cardId) : null;
   const viewportHeight = containerRef.current ? containerRef.current.getBoundingClientRect().height : 600;
 
   return (
     <div className="flex-1 bg-black text-white flex flex-col relative overflow-hidden select-none">
       
-      {/* Sleek Top Header Toolbar */}
-      <div className="px-5 py-3 bg-black border-b border-zinc-800 flex items-center justify-between z-30">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 flex items-center justify-center font-bold">
-            <Icons.Clock size={18} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-white leading-none">Timeline Multi-Track</h2>
-              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
-                {tracks.length} Garis Waktu Paralel
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-400 mt-0.5">
-              Jarak vertikal menyesuaikan otomatis agar kartu kejadian tidak pernah bertabrakan. Scroll dibatasi pada area timeline.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              const lastOrder = Math.max(...tracks.map((t) => t.order)) + 1;
-              handleAddParallelTrack(lastOrder);
-            }}
-            className="px-3 py-1.5 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-200 hover:text-white hover:bg-zinc-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Icons.Plus size={14} />
-            <span>+ Garis Waktu Baru</span>
-          </button>
-
-          {nodes.length > 0 && (
-            <button
-              type="button"
-              onClick={handleClearAll}
-              className="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-rose-400 hover:border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Icons.Trash2 size={13} />
-              <span>Bersihkan</span>
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* Main Canvas Viewport (Solid Black Background) */}
       <div className="flex-1 relative overflow-hidden flex">
         <div

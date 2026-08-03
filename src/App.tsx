@@ -816,16 +816,19 @@ export const App: React.FC = () => {
     reader.readAsText(file);
   };
 
-  // Reset active world
+  // Reset active world or timeline
   const handleResetWorld = () => {
-    if (window.confirm('Bersihkan semua kartu pada dunia ini dan mulai canvas kosong?')) {
-      updateActiveWorld((prev) => ({
-        ...prev,
-        cards: [],
-        connections: [],
-        updatedAt: Date.now(),
-      }));
-
+    if (viewMode === 'timeline') {
+      window.dispatchEvent(new CustomEvent('worlddeck_clear_timeline'));
+    } else {
+      if (window.confirm('Bersihkan semua kartu pada dunia ini dan mulai canvas kosong?')) {
+        updateActiveWorld((prev) => ({
+          ...prev,
+          cards: [],
+          connections: [],
+          updatedAt: Date.now(),
+        }));
+      }
     }
   };
 
