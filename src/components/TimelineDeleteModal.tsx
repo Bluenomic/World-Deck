@@ -84,44 +84,44 @@ export const TimelineDeleteModal: React.FC<TimelineDeleteModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/75 backdrop-blur-xs z-[100] flex items-center justify-center p-4 cursor-pointer"
+      className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100] flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl text-white modal-animate-appear cursor-default space-y-4"
+        className="w-full max-w-md app-bg-secondary border app-border rounded-2xl p-5 shadow-2xl app-text-main modal-animate-appear cursor-default space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-zinc-800 pb-3">
+        <div className="flex items-start justify-between gap-3 border-b app-border pb-3">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl border flex items-center justify-center ${info.badgeClass}`}>
               {info.icon}
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white leading-snug">{info.title}</h3>
-              <p className="text-[11px] text-zinc-400 mt-0.5">{info.desc}</p>
+              <h3 className="text-sm font-bold app-text-main leading-snug">{info.title}</h3>
+              <p className="text-[11px] app-text-muted mt-0.5">{info.desc}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="p-1 rounded-lg app-text-muted hover:app-text-main hover:app-bg-hover transition-colors"
           >
             <Icons.X size={16} />
           </button>
         </div>
 
         {/* Item Content Preview */}
-        <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500">
+        <div className="p-3.5 rounded-xl app-bg-main border app-border space-y-1">
+          <div className="text-[10px] font-mono font-bold uppercase tracking-wider app-text-muted">
             {target.subtitle || 'Target Penghapusan'}
           </div>
-          <div className="text-sm font-bold text-white truncate">
+          <div className="text-sm font-bold app-text-main truncate">
             {target.title}
           </div>
           {target.itemCount !== undefined && (
-            <div className="text-[11px] text-zinc-400">
-              Total kejadian terdampak: <span className="font-bold text-zinc-200">{target.itemCount}</span>
+            <div className="text-[11px] app-text-muted">
+              Total kejadian terdampak: <span className="font-bold app-text-main">{target.itemCount}</span>
             </div>
           )}
         </div>
@@ -131,7 +131,7 @@ export const TimelineDeleteModal: React.FC<TimelineDeleteModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl app-bg-main app-text-main border app-border font-semibold hover:app-bg-hover transition-colors cursor-pointer"
           >
             Batal
           </button>

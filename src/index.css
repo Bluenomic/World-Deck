@@ -25,7 +25,7 @@ body.theme-dark {
   --text-muted: #a1a1aa;
   --accent: #3b82f6;
   --grid-dot: rgba(255, 255, 255, 0.22);
-  --line-stroke: #52525b;
+  --line-stroke: #94a3b8;
   --line-stroke-highlight: #3b82f6;
   background-color: #1c1d22;
   color: #f4f4f5;
@@ -41,7 +41,7 @@ body.theme-light {
   --text-muted: #78716c;
   --accent: #f97316;
   --grid-dot: rgba(120, 113, 108, 0.22);
-  --line-stroke: #a8a29e;
+  --line-stroke: #475569;
   --line-stroke-highlight: #f97316;
   background-color: #f7f4ed;
   color: #292524;

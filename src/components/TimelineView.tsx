@@ -697,9 +697,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const viewportHeight = containerBounds.height;
 
   return (
-    <div className="flex-1 bg-black text-white flex flex-col relative overflow-hidden select-none">
+    <div className="flex-1 app-bg-main app-text-main flex flex-col relative overflow-hidden select-none transition-colors duration-200">
       
-      {/* Main Canvas Viewport (Solid Black Background) */}
+      {/* Main Canvas Viewport */}
       <div className="flex-1 relative overflow-hidden flex">
         <div
           ref={containerRef}
@@ -708,17 +708,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           onMouseUp={handleMouseUp}
           onWheel={handleWheel}
           onContextMenu={handleContextMenu}
-          className="flex-1 w-full h-full relative overflow-hidden bg-black cursor-grab active:cursor-grabbing"
+          className="flex-1 w-full h-full relative overflow-hidden cursor-grab active:cursor-grabbing transition-colors duration-200 app-bg-main"
         >
           {/* Active Branch Helper Banner */}
           {draftBranch && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-cyan-950/90 border border-cyan-500/60 text-cyan-200 px-4 py-2 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 text-xs font-semibold animate-in zoom-in-95 duration-200 pointer-events-auto">
-              <Icons.GitBranch size={16} className="text-cyan-400 animate-pulse" />
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-cyan-900/90 border border-cyan-500/60 text-cyan-100 px-4 py-2 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 text-xs font-semibold animate-in zoom-in-95 duration-200 pointer-events-auto">
+              <Icons.GitBranch size={16} className="text-cyan-300 animate-pulse" />
               <span>Modus Percabangan: Klik titik/garis tujuan untuk menyambungkan (Esc untuk batal)</span>
               <button
                 type="button"
                 onClick={() => setDraftBranch(null)}
-                className="p-1 hover:bg-cyan-900/60 rounded-lg text-cyan-400 hover:text-white transition-colors cursor-pointer"
+                className="p-1 hover:bg-cyan-800/60 rounded-lg text-cyan-300 hover:text-white transition-colors cursor-pointer"
               >
                 <Icons.X size={14} />
               </button>
@@ -726,7 +726,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           )}
 
           {/* Transparent Click Target Area */}
-          <div id="timeline-center-bg" className="absolute inset-0 w-full h-full bg-black" />
+          <div id="timeline-center-bg" className="absolute inset-0 w-full h-full bg-transparent" />
 
           {/* Render Multi-Track Horizontal Lines & Labels */}
           {sortedTracks.map((track) => {
@@ -742,16 +742,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     className="absolute left-0 right-0 -translate-y-1/2 pointer-events-none"
                   >
                     {/* Upper thin parallel accent line */}
-                    <div className="absolute left-0 right-0 -top-1.5 h-0.5 bg-zinc-500/60" />
-                    {/* Main center line */}
-                    <div className="h-2 bg-zinc-300 shadow-[0_0_8px_rgba(255,255,255,0.2)]" />
+                    <div className="absolute left-0 right-0 -top-1.5 h-0.5 bg-[var(--line-stroke)]/40" />
+                    {/* Main center line: Solid Deep Blue */}
+                    <div className="h-2 bg-blue-600" />
                     {/* Lower thin parallel accent line */}
-                    <div className="absolute left-0 right-0 -bottom-1.5 h-0.5 bg-zinc-500/60" />
+                    <div className="absolute left-0 right-0 -bottom-1.5 h-0.5 bg-[var(--line-stroke)]/40" />
                   </div>
                 ) : (
                   <div
                     style={{ top: `${trackCenterY}px` }}
-                    className="absolute left-0 right-0 -translate-y-1/2 h-1.5 bg-zinc-600 pointer-events-none shadow-[0_0_10px_rgba(161,161,170,0.25)]"
+                    className="absolute left-0 right-0 -translate-y-1/2 h-1.5 pointer-events-none bg-[var(--line-stroke)] shadow-sm opacity-90 transition-colors"
                   />
                 )}
 
@@ -761,11 +761,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   className="absolute left-6 -translate-y-1/2 z-20 pointer-events-none"
                 >
                   {isMain ? (
-                    <span className="px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-400 text-[10px] font-mono font-bold text-zinc-100 shadow-md backdrop-blur-xs uppercase tracking-wider">
+                    <span className="px-2.5 py-1 rounded-lg app-bg-secondary border border-[var(--accent)] text-[10px] font-mono font-bold app-accent-text shadow-md backdrop-blur-xs uppercase tracking-wider">
                       [UTAMA] {track.name}
                     </span>
                   ) : (
-                    <span className="px-2.5 py-1 rounded-lg bg-zinc-900/90 border border-zinc-700/80 text-[10px] font-mono font-bold text-zinc-400 shadow-lg backdrop-blur-xs uppercase tracking-wider">
+                    <span className="px-2.5 py-1 rounded-lg app-bg-secondary border app-border text-[10px] font-mono font-bold app-text-main shadow-sm backdrop-blur-xs uppercase tracking-wider">
                       {track.name}
                     </span>
                   )}
@@ -786,7 +786,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 markerHeight="6"
                 orient="auto-start-reverse"
               >
-                <path d="M 0 0 L 10 5 L 0 10 z" fill="#a1a1aa" />
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)" />
               </marker>
             </defs>
 
@@ -828,7 +828,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   <path
                     d={pathD}
                     fill="none"
-                    stroke="#a1a1aa"
+                    stroke="var(--text-muted)"
                     strokeWidth={12}
                     strokeOpacity={0.01}
                     className="group-hover:stroke-opacity-20 transition-all cursor-pointer"
@@ -837,16 +837,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       handleRightClickBranch(branch, e);
                     }}
                   />
-                  {/* Visible Thicker Dashed Grey Branch Line */}
+                  {/* Visible Thicker Dashed Branch Line */}
                   <path
                     d={pathD}
                     fill="none"
-                    stroke="#a1a1aa"
+                    stroke="var(--line-stroke-highlight)"
                     strokeWidth={3}
                     strokeDasharray="6 4"
                     strokeLinecap="round"
                     markerEnd="url(#branch-arrow)"
-                    className="group-hover:stroke-white transition-all"
+                    className="group-hover:stroke-[var(--accent)] transition-all"
                   />
                   {/* Floating Branch Badge */}
                   <g style={{ transform: `translate(${midX}px, ${midY}px)` }}>
@@ -856,14 +856,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       width="140"
                       height="22"
                       rx="6"
-                      fill="#18181b"
-                      stroke="#52525b"
+                      fill="var(--bg-secondary)"
+                      stroke="var(--border)"
                       strokeWidth="1"
                     />
                     <text
                       x="0"
                       y="4"
-                      fill="#e4e4e7"
+                      fill="var(--text-primary)"
                       fontSize="9"
                       fontWeight="800"
                       textAnchor="middle"
@@ -882,7 +882,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 <path
                   d={`M ${draftBranch.sourceX + scrollX} ${getTrackCenterY(draftBranch.sourceTrackId, viewportHeight)} L ${mouseWorldPos.x + scrollX} ${mouseWorldPos.y}`}
                   fill="none"
-                  stroke="#d4d4d8"
+                  stroke="var(--accent)"
                   strokeWidth={3}
                   strokeDasharray="5 5"
                   className="animate-pulse"
@@ -891,7 +891,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   cx={mouseWorldPos.x + scrollX}
                   cy={mouseWorldPos.y}
                   r={6}
-                  fill="#a1a1aa"
+                  fill="var(--accent)"
                   className="animate-ping"
                 />
               </g>
@@ -912,8 +912,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                           key={`arrow-${track.id}-${idx}`}
                           d="M 0 -5 L 8 0 L 0 5"
                           fill="none"
-                          stroke={isMain ? '#d4d4d8' : '#71717a'}
+                          stroke={isMain ? 'var(--accent)' : 'var(--line-stroke)'}
                           strokeWidth={isMain ? 2.5 : 2}
+                          strokeOpacity={isMain ? 0.75 : 0.65}
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           style={{ transform: `translate(${arrowX}px, ${trackY}px)` }}
@@ -921,7 +922,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       );
                     })}
 
-                    {/* Google Maps Style Repeating Track Name Labels along each Track */}
+                    {/* Repeating Track Name Labels along each Track */}
                     {Array.from({ length: 40 }).map((_, idx) => {
                       const labelX = -750 + idx * 400;
                       return (
@@ -929,8 +930,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                           key={`label-${track.id}-${idx}`}
                           x={labelX}
                           y={trackY - 14}
-                          fill={isMain ? '#d4d4d8' : '#a1a1aa'}
-                          fillOpacity={isMain ? 0.45 : 0.25}
+                          fill={isMain ? 'var(--text-primary)' : 'var(--line-stroke)'}
+                          fillOpacity={isMain ? 0.65 : 0.55}
                           fontSize={11}
                           fontWeight="700"
                           letterSpacing="0.25em"
@@ -964,7 +965,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             >
               <button
                 type="button"
-                className="w-8 h-8 rounded-full bg-zinc-700 hover:bg-zinc-500 text-white flex items-center justify-center shadow-lg hover:scale-125 active:scale-95 transition-all ring-4 ring-zinc-500/30 cursor-pointer"
+                className="w-8 h-8 rounded-full app-bg-secondary hover:app-accent-bg app-text-main hover:text-white border app-border flex items-center justify-center shadow-lg hover:scale-125 active:scale-95 transition-all ring-4 ring-[var(--accent)]/20 cursor-pointer"
                 title="Klik untuk menambah kejadian di posisi ini"
               >
                 <Icons.Plus size={18} />
@@ -1000,10 +1001,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   <div
                     className={`absolute left-1/2 -translate-x-1/2 w-0.5 transition-colors ${
                       isSelected
-                        ? 'bg-zinc-300 shadow-[0_0_8px_rgba(255,255,255,0.6)]'
+                        ? 'bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]'
                         : isMain
-                        ? 'bg-zinc-400'
-                        : 'bg-zinc-700'
+                        ? 'bg-[var(--accent)]'
+                        : 'bg-[var(--border-light)]'
                     }`}
                     style={{
                       top: isUpper ? `-${stemHeight}px` : '0px',
@@ -1025,16 +1026,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     }}
                     className={`absolute -left-4 -top-4 w-8 h-8 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing z-30 transition-all ${
                       isSelected
-                        ? 'bg-zinc-200 text-black ring-4 ring-zinc-400/60 scale-125'
+                        ? 'app-accent-bg text-white ring-4 ring-[var(--accent)]/40 scale-125 shadow-lg'
                         : isMain
-                        ? 'bg-zinc-950 border-2 border-zinc-200 ring-2 ring-zinc-500/40 hover:scale-125'
-                        : 'bg-zinc-900 border-2 border-zinc-500 hover:border-white hover:scale-125 hover:ring-4 hover:ring-zinc-500/40'
+                        ? 'app-bg-main border-2 border-[var(--accent)] ring-2 ring-[var(--accent)]/30 hover:scale-125'
+                        : 'app-bg-secondary border-2 border-[var(--border-light)] hover:border-[var(--accent)] hover:scale-125 hover:ring-4 hover:ring-[var(--accent)]/30'
                     }`}
                     title="Klik untuk memilih, double-click untuk membuka detail, drag untuk menggeser"
                   >
                     <div
                       className={`w-3 h-3 rounded-full pointer-events-none ${
-                        isMain ? 'bg-zinc-100 font-bold' : 'bg-zinc-300'
+                        isSelected ? 'bg-white' : isMain ? 'app-accent-bg font-bold' : 'app-bg-hover'
                       }`}
                     />
                   </div>
@@ -1050,12 +1051,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       setSelectedNode(node);
                       setReaderNode(node);
                     }}
-                    className={`absolute left-1/2 -translate-x-1/2 w-64 p-3.5 rounded-2xl bg-zinc-900 border transition-all duration-200 cursor-pointer shadow-xl group ${
+                    className={`absolute left-1/2 -translate-x-1/2 w-64 p-3.5 rounded-2xl app-bg-secondary border transition-all duration-200 cursor-pointer shadow-xl group ${
                       isUpper ? '-translate-y-full' : ''
                     } ${
                       isSelected
-                        ? 'border-zinc-300 ring-2 ring-zinc-400/30 scale-102'
-                        : 'border-zinc-800 hover:border-zinc-500'
+                        ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/30 scale-102 shadow-2xl'
+                        : 'app-border hover:border-[var(--accent)]'
                     }`}
                     style={{
                       top: isUpper ? `-${stemHeight + 10}px` : `${stemHeight + 10}px`,
@@ -1064,28 +1065,25 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   >
                     {/* Header Label */}
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 truncate">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded app-bg-main app-text-muted border app-border truncate">
                         {node.dateLabel || 'Kejadian'}
-                      </span>
-                      <span className="text-[10px] font-mono text-zinc-500">
-                        {node.x}px
                       </span>
                     </div>
 
                     {/* Title */}
-                    <h4 className="text-xs font-bold text-white line-clamp-2 leading-snug group-hover:text-zinc-300 transition-colors">
+                    <h4 className="text-xs font-bold app-text-main line-clamp-2 leading-snug group-hover:app-accent-text transition-colors">
                       {node.title}
                     </h4>
 
                     {/* Description */}
                     {node.description && (
-                      <p className="text-[11px] text-zinc-400 mt-1.5 line-clamp-2 leading-relaxed">
+                      <p className="text-[11px] app-text-muted mt-1.5 line-clamp-2 leading-relaxed">
                         {node.description}
                       </p>
                     )}
 
                     {/* Actions Footer */}
-                    <div className="mt-2.5 pt-2 border-t border-zinc-800 flex items-center justify-end gap-1 text-[11px]">
+                    <div className="mt-2.5 pt-2 border-t app-border flex items-center justify-end gap-1 text-[11px]">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1095,7 +1093,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                           setModalX(node.x);
                           setShowNodeModal(true);
                         }}
-                        className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                        className="p-1 rounded-md app-text-muted hover:app-text-main hover:app-bg-hover transition-colors"
                         title="Edit Kejadian"
                       >
                         <Icons.Edit2 size={12} />
@@ -1106,7 +1104,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                           e.stopPropagation();
                           handleDeleteNode(node.id);
                         }}
-                        className="p-1 rounded-md text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        className="p-1 rounded-md text-rose-500 hover:bg-rose-500/10 transition-colors"
                         title="Hapus Kejadian"
                       >
                         <Icons.Trash2 size={12} />
@@ -1123,7 +1121,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         {contextMenu && (
           <div
             style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
-            className="fixed z-50 bg-zinc-900 border border-zinc-800 rounded-xl p-1.5 shadow-2xl animate-in zoom-in-95 duration-100 text-xs min-w-[220px]"
+            className="fixed z-50 app-bg-secondary border app-border rounded-xl p-1.5 shadow-2xl animate-in zoom-in-95 duration-100 text-xs min-w-[220px] app-text-main"
           >
             {contextMenu.selectedBranch ? (
               <>
@@ -1135,9 +1133,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     setShowBranchModal(true);
                     setContextMenu(null);
                   }}
-                  className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+                  className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
                 >
-                  <Icons.Edit3 size={14} className="text-zinc-400" />
+                  <Icons.Edit3 size={14} className="app-text-muted" />
                   <span>Ubah Nama Percabangan</span>
                 </button>
                 <button
@@ -1146,7 +1144,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     handleDeleteBranch(contextMenu.selectedBranch!.id);
                     setContextMenu(null);
                   }}
-                  className="w-full px-3 py-2 text-left text-rose-400 hover:bg-rose-500/10 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors border-t border-zinc-800/80 mt-1 pt-2"
+                  className="w-full px-3 py-2 text-left text-rose-500 hover:bg-rose-500/10 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors border-t app-border mt-1 pt-2"
                 >
                   <Icons.Trash2 size={14} />
                   <span>Hapus Percabangan Waktu</span>
@@ -1167,9 +1165,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                         );
                         setContextMenu(null);
                       }}
-                      className="w-full px-3 py-2 text-left text-zinc-100 bg-zinc-800 hover:bg-zinc-700 rounded-lg flex items-center gap-2 font-bold cursor-pointer transition-colors border border-zinc-700 mb-1"
+                      className="w-full px-3 py-2 text-left app-text-main app-bg-hover rounded-lg flex items-center gap-2 font-bold cursor-pointer transition-colors border app-border mb-1"
                     >
-                      <Icons.GitCommit size={14} className="text-zinc-300" />
+                      <Icons.GitCommit size={14} className="app-accent-text" />
                       <span>Sambungkan Percabangan Di Sini</span>
                     </button>
                     <button
@@ -1178,12 +1176,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                         setDraftBranch(null);
                         setContextMenu(null);
                       }}
-                      className="w-full px-3 py-2 text-left text-zinc-400 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors mb-1"
+                      className="w-full px-3 py-2 text-left app-text-muted hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors mb-1"
                     >
                       <Icons.X size={14} />
                       <span>Batal Buat Percabangan</span>
                     </button>
-                    <div className="my-1 border-t border-zinc-800" />
+                    <div className="my-1 border-t app-border" />
                   </>
                 ) : (
                   <button
@@ -1196,9 +1194,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       });
                       setContextMenu(null);
                     }}
-                    className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+                    className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
                   >
-                    <Icons.GitBranch size={14} className="text-zinc-400" />
+                    <Icons.GitBranch size={14} className="app-text-muted" />
                     <span>Buat Percabangan Waktu</span>
                   </button>
                 )}
@@ -1211,9 +1209,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     setShowTrackModal(true);
                     setContextMenu(null);
                   }}
-                  className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+                  className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
                 >
-                  <Icons.Edit3 size={14} className="text-zinc-400" />
+                  <Icons.Edit3 size={14} className="app-text-muted" />
                   <span>Ubah Nama ({contextMenu.targetTrack.name})</span>
                 </button>
 
@@ -1224,9 +1222,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     handleAddParallelTrack(newOrder);
                     setContextMenu(null);
                   }}
-                  className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+                  className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
                 >
-                  <Icons.Plus size={14} className="text-zinc-400" />
+                  <Icons.Plus size={14} className="app-text-muted" />
                   <span>+ Garis Waktu Paralel di Atas</span>
                 </button>
 
@@ -1237,9 +1235,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     handleAddParallelTrack(newOrder);
                     setContextMenu(null);
                   }}
-                  className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+                  className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
                 >
-                  <Icons.Plus size={14} className="text-zinc-400" />
+                  <Icons.Plus size={14} className="app-text-muted" />
                   <span>+ Garis Waktu Paralel di Bawah</span>
                 </button>
 
@@ -1250,7 +1248,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       handleDeleteTrack(contextMenu.targetTrack!.id);
                       setContextMenu(null);
                     }}
-                    className="w-full px-3 py-2 text-left text-rose-400 hover:bg-rose-500/10 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors border-t border-zinc-800/80 mt-1 pt-2"
+                    className="w-full px-3 py-2 text-left text-rose-500 hover:bg-rose-500/10 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors border-t app-border mt-1 pt-2"
                   >
                     <Icons.Trash2 size={14} />
                     <span>Hapus Garis Waktu ({contextMenu.targetTrack.name})</span>
@@ -1266,9 +1264,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   }
                   setContextMenu(null);
                 }}
-                className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+                className="w-full px-3 py-2 text-left app-text-main hover:app-bg-hover rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
               >
-                <Icons.Plus size={14} className="text-zinc-400" />
+                <Icons.Plus size={14} className="app-text-muted" />
                 <span>
                   + Buat Garis Waktu Paralel ({contextMenu.isAbove ? 'di Atas' : 'di Bawah'})
                 </span>
@@ -1279,16 +1277,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
         {/* Right Drawer Slide-over Panel for Reader Node */}
         {readerNode && (
-          <div className="w-80 sm:w-96 bg-zinc-950 border-l border-zinc-800 flex flex-col z-30 shadow-2xl animate-in slide-in-from-right duration-200 text-white">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+          <div className="w-80 sm:w-96 app-bg-secondary border-l app-border flex flex-col z-30 shadow-2xl animate-in slide-in-from-right duration-200 app-text-main">
+            <div className="p-4 border-b app-border flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Icons.Clock size={16} className="text-zinc-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider">Detail Kejadian</h3>
+                <Icons.Clock size={16} className="app-accent-text" />
+                <h3 className="text-xs font-bold uppercase tracking-wider app-text-main">Detail Kejadian</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setReaderNode(null)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
+                className="p-1 rounded-lg app-text-muted hover:app-text-main hover:app-bg-hover"
               >
                 <Icons.X size={16} />
               </button>
@@ -1296,49 +1294,49 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
+                <span className="text-[10px] font-bold uppercase tracking-wider app-text-muted app-bg-main px-2 py-0.5 rounded border app-border">
                   {readerNode.dateLabel || 'Garis Waktu'}
                 </span>
-                <h2 className="text-base font-bold text-white mt-2 leading-tight">
+                <h2 className="text-base font-bold app-text-main mt-2 leading-tight">
                   {readerNode.title}
                 </h2>
               </div>
 
               {readerNode.description && (
-                <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 leading-relaxed">
+                <div className="p-3 rounded-xl app-bg-main border app-border text-xs app-text-muted leading-relaxed">
                   {readerNode.description}
                 </div>
               )}
 
               {/* Linked Card Information */}
               <div>
-                <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                <h4 className="text-[11px] font-bold app-text-muted uppercase tracking-wider mb-2">
                   Kartu Database Terhubung
                 </h4>
                 {linkedCardForReader ? (
                   <div
                     onClick={() => onCardClick(linkedCardForReader)}
-                    className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-500 cursor-pointer transition-all flex items-center justify-between group"
+                    className="p-3 rounded-xl app-bg-main border app-border hover:border-[var(--accent)] cursor-pointer transition-all flex items-center justify-between group"
                   >
                     <div>
-                      <div className="text-[10px] uppercase font-semibold text-zinc-400">
+                      <div className="text-[10px] uppercase font-semibold app-text-muted">
                         {linkedCardForReader.category}
                       </div>
-                      <div className="font-bold text-white group-hover:text-zinc-300 transition-colors">
+                      <div className="font-bold app-text-main group-hover:app-accent-text transition-colors">
                         {linkedCardForReader.title}
                       </div>
                     </div>
-                    <Icons.ChevronRight size={16} className="text-zinc-500 group-hover:translate-x-1 transition-transform" />
+                    <Icons.ChevronRight size={16} className="app-text-muted group-hover:translate-x-1 transition-transform" />
                   </div>
                 ) : (
-                  <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-center text-zinc-500 text-xs">
+                  <div className="p-3 rounded-xl app-bg-main border app-border text-center app-text-muted text-xs">
                     Belum ada kartu terhubung.
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="p-3 border-t border-zinc-800 flex items-center gap-2">
+            <div className="p-3 border-t app-border flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -1347,7 +1345,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   setModalX(readerNode.x);
                   setShowNodeModal(true);
                 }}
-                className="flex-1 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-500 text-xs font-semibold text-white flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 py-2 rounded-xl app-bg-main border app-border hover:app-bg-hover text-xs font-semibold app-text-main flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
               >
                 <Icons.Edit2 size={13} />
                 <span>Edit Kejadian</span>
@@ -1355,7 +1353,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleDeleteNode(readerNode.id)}
-                className="px-3 py-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+                className="px-3 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
               >
                 <Icons.Trash2 size={13} />
               </button>
@@ -1379,11 +1377,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
       {/* Track Name / New Track Modal */}
       {showTrackModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl text-white modal-animate-appear">
-            <div className="flex items-center justify-between mb-4 border-b border-zinc-800 pb-3">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <Icons.Edit3 size={16} className="text-zinc-400" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-sm app-bg-secondary border app-border rounded-2xl p-5 shadow-2xl app-text-main modal-animate-appear">
+            <div className="flex items-center justify-between mb-4 border-b app-border pb-3">
+              <h3 className="text-sm font-bold flex items-center gap-2 app-text-main">
+                <Icons.Edit3 size={16} className="app-text-muted" />
                 <span>{editingTrack ? 'Ubah Nama Garis Waktu' : 'Garis Waktu Paralel Baru'}</span>
               </h3>
               <button
@@ -1393,7 +1391,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   setEditingTrack(null);
                   setNewTrackOrderPosition(null);
                 }}
-                className="p-1 rounded-lg text-zinc-400 hover:text-white"
+                className="p-1 rounded-lg app-text-muted hover:app-text-main hover:app-bg-hover"
               >
                 <Icons.X size={16} />
               </button>
@@ -1401,7 +1399,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
             <form onSubmit={handleSaveTrackModal} className="space-y-3 text-xs">
               <div>
-                <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1">
+                <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">
                   Nama Garis Waktu
                 </label>
                 <input
@@ -1410,7 +1408,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   placeholder="Contoh: KERAJAAN UTARA, KISAH HERO..."
                   value={tempTrackName}
                   onChange={(e) => setTempTrackName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-zinc-500 font-mono text-xs uppercase"
+                  className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] font-mono text-xs uppercase"
                 />
               </div>
 
@@ -1422,13 +1420,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     setEditingTrack(null);
                     setNewTrackOrderPosition(null);
                   }}
-                  className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700"
+                  className="px-4 py-2 rounded-xl app-bg-main app-text-main border app-border font-semibold hover:app-bg-hover transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-zinc-700 text-white font-bold hover:bg-zinc-600 cursor-pointer"
+                  className="px-4 py-2 rounded-xl app-accent-bg text-white font-bold hover:opacity-90 cursor-pointer transition-all shadow-md"
                 >
                   Simpan
                 </button>
@@ -1440,11 +1438,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
       {/* Branch Name Modal */}
       {showBranchModal && editingBranch && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl text-white modal-animate-appear">
-            <div className="flex items-center justify-between mb-4 border-b border-zinc-800 pb-3">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <Icons.GitBranch size={16} className="text-zinc-400" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-sm app-bg-secondary border app-border rounded-2xl p-5 shadow-2xl app-text-main modal-animate-appear">
+            <div className="flex items-center justify-between mb-4 border-b app-border pb-3">
+              <h3 className="text-sm font-bold flex items-center gap-2 app-text-main">
+                <Icons.GitBranch size={16} className="app-text-muted" />
                 <span>Ubah Nama Percabangan Waktu</span>
               </h3>
               <button
@@ -1453,7 +1451,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   setShowBranchModal(false);
                   setEditingBranch(null);
                 }}
-                className="p-1 rounded-lg text-zinc-400 hover:text-white"
+                className="p-1 rounded-lg app-text-muted hover:app-text-main hover:app-bg-hover"
               >
                 <Icons.X size={16} />
               </button>
@@ -1461,7 +1459,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
             <form onSubmit={handleSaveBranchModal} className="space-y-3 text-xs">
               <div>
-                <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1">
+                <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">
                   Nama / Label Percabangan
                 </label>
                 <input
@@ -1470,7 +1468,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   placeholder="Contoh: Loop Masa Lalu, Timeline Alternatif Alpha..."
                   value={tempBranchLabel}
                   onChange={(e) => setTempBranchLabel(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-zinc-500 font-mono text-xs"
+                  className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] font-mono text-xs"
                 />
               </div>
 
@@ -1481,13 +1479,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     setShowBranchModal(false);
                     setEditingBranch(null);
                   }}
-                  className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700"
+                  className="px-4 py-2 rounded-xl app-bg-main app-text-main border app-border font-semibold hover:app-bg-hover transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-zinc-700 text-white font-bold hover:bg-zinc-600 cursor-pointer"
+                  className="px-4 py-2 rounded-xl app-accent-bg text-white font-bold hover:opacity-90 cursor-pointer transition-all shadow-md"
                 >
                   Simpan
                 </button>
@@ -1532,48 +1530,48 @@ const SimpleNodeModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl text-white modal-animate-appear">
-        <div className="flex items-center justify-between mb-4 border-b border-zinc-800 pb-3">
-          <h3 className="text-sm font-bold flex items-center gap-2">
-            <Icons.Clock size={16} className="text-zinc-400" />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="w-full max-w-md app-bg-secondary border app-border rounded-2xl p-5 shadow-2xl app-text-main modal-animate-appear">
+        <div className="flex items-center justify-between mb-4 border-b app-border pb-3">
+          <h3 className="text-sm font-bold flex items-center gap-2 app-text-main">
+            <Icons.Clock size={16} className="app-accent-text" />
             <span>{node ? 'Ubah Kejadian Waktu' : 'Tambah Kejadian Baru'}</span>
           </h3>
-          <button type="button" onClick={onClose} className="p-1 rounded-lg text-zinc-400 hover:text-white">
+          <button type="button" onClick={onClose} className="p-1 rounded-lg app-text-muted hover:app-text-main hover:app-bg-hover">
             <Icons.X size={16} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           <div>
-            <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1">Judul Peristiwa / Kejadian</label>
+            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">Judul Peristiwa / Kejadian</label>
             <input
               type="text"
               required
               placeholder="Contoh: Perang Saudara / Penemuan Sihir..."
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-zinc-500 font-medium"
+              className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] font-medium"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1">Penanda Waktu / Era (Bebas / Relatif)</label>
+            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">Penanda Waktu / Era (Bebas / Relatif)</label>
             <input
               type="text"
               placeholder="Contoh: Era Kegelapan, 50 Thn Pasca Perang..."
               value={dateLabel}
               onChange={(e) => setDateLabel(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-zinc-500"
+              className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)]"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1">Hubungkan ke Kartu (Opsional)</label>
+            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">Hubungkan ke Kartu (Opsional)</label>
             <select
               value={cardId}
               onChange={(e) => setCardId(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-zinc-500"
+              className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)]"
             >
               <option value="">-- Tidak Ada Kartu --</option>
               {cards.map((c) => (
@@ -1585,13 +1583,13 @@ const SimpleNodeModal: React.FC<{
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1">Deskripsi Ringkas</label>
+            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">Deskripsi Ringkas</label>
             <textarea
               rows={3}
               placeholder="Penjelasan ringkas mengenai peristiwa ini..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-zinc-500 resize-none"
+              className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] resize-none"
             />
           </div>
 
@@ -1599,14 +1597,14 @@ const SimpleNodeModal: React.FC<{
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700"
+              className="px-4 py-2 rounded-xl app-bg-main app-text-main border app-border font-semibold hover:app-bg-hover transition-colors"
             >
               Batal
             </button>
             <button
               type="button"
               onClick={handleSubmit}
-              className="px-4 py-2 rounded-xl bg-zinc-700 text-white font-bold hover:bg-zinc-600 cursor-pointer"
+              className="px-4 py-2 rounded-xl app-accent-bg text-white font-bold hover:opacity-90 cursor-pointer transition-all shadow-md"
             >
               Simpan Kejadian
             </button>
