@@ -2,49 +2,93 @@
 
 /* Minimalist 2-Theme System: Dark & Light */
 :root {
-  --bg-primary: #121212;
-  --bg-secondary: #1e1e20;
-  --bg-hover: #27272a;
-  --border: #27272a;
-  --border-light: #3f3f46;
+  --bg-primary: #1c1d22;
+  --bg-secondary: #252830;
+  --bg-hover: #2d303a;
+  --border: #2d303a;
+  --border-light: #3d414e;
   --text-primary: #f4f4f5;
   --text-muted: #a1a1aa;
   --accent: #3b82f6;
-  --grid-dot: rgba(255, 255, 255, 0.25);
+  --grid-dot: rgba(255, 255, 255, 0.22);
   --line-stroke: #52525b;
   --line-stroke-highlight: #3b82f6;
 }
 
 body.theme-dark {
-  --bg-primary: #121212;
-  --bg-secondary: #1e1e20;
-  --bg-hover: #27272a;
-  --border: #27272a;
-  --border-light: #3f3f46;
+  --bg-primary: #1c1d22;
+  --bg-secondary: #252830;
+  --bg-hover: #2d303a;
+  --border: #2d303a;
+  --border-light: #3d414e;
   --text-primary: #f4f4f5;
   --text-muted: #a1a1aa;
   --accent: #3b82f6;
-  --grid-dot: rgba(255, 255, 255, 0.25);
+  --grid-dot: rgba(255, 255, 255, 0.22);
   --line-stroke: #52525b;
   --line-stroke-highlight: #3b82f6;
-  background-color: #121212;
+  background-color: #1c1d22;
   color: #f4f4f5;
 }
 
 body.theme-light {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-hover: #f1f5f9;
-  --border: #e2e8f0;
-  --border-light: #cbd5e1;
-  --text-primary: #0f172a;
-  --text-muted: #64748b;
-  --accent: #2563eb;
-  --grid-dot: rgba(0, 0, 0, 0.2);
-  --line-stroke: #94a3b8;
-  --line-stroke-highlight: #2563eb;
-  background-color: #ffffff;
-  color: #0f172a;
+  --bg-primary: #f7f4ed;
+  --bg-secondary: #ece7dc;
+  --bg-hover: #e2dcd0;
+  --border: #dbd4c6;
+  --border-light: #ccc4b3;
+  --text-primary: #292524;
+  --text-muted: #78716c;
+  --accent: #f97316;
+  --grid-dot: rgba(120, 113, 108, 0.22);
+  --line-stroke: #a8a29e;
+  --line-stroke-highlight: #f97316;
+  background-color: #f7f4ed;
+  color: #292524;
+}
+
+/* Light Theme Accent Overrides (Blue -> Pastel Orange) */
+body.theme-light .focus\:border-blue-500:focus {
+  border-color: #f97316 !important;
+}
+body.theme-light .hover\:border-blue-400:hover,
+body.theme-light .hover\:border-blue-500\/70:hover {
+  border-color: #fb923c !important;
+}
+body.theme-light .border-blue-500,
+body.theme-light .border-blue-400,
+body.theme-light .border-blue-500\/40,
+body.theme-light .border-blue-500\/30,
+body.theme-light .border-blue-500\/70 {
+  border-color: #f97316 !important;
+}
+body.theme-light .bg-blue-600 {
+  background-color: #ea580c !important;
+}
+body.theme-light .bg-blue-500 {
+  background-color: #f97316 !important;
+}
+body.theme-light .bg-blue-500\/10,
+body.theme-light .bg-blue-600\/10,
+body.theme-light .bg-blue-500\/5 {
+  background-color: rgba(249, 115, 22, 0.12) !important;
+}
+body.theme-light .bg-blue-500\/20,
+body.theme-light .bg-blue-950\/85 {
+  background-color: rgba(249, 115, 22, 0.2) !important;
+}
+body.theme-light .bg-blue-600\/40 {
+  background-color: rgba(249, 115, 22, 0.4) !important;
+}
+body.theme-light .text-blue-400,
+body.theme-light .text-blue-500,
+body.theme-light .text-blue-300 {
+  color: #ea580c !important;
+}
+body.theme-light .ring-blue-500\/50,
+body.theme-light .ring-blue-500\/40,
+body.theme-light .ring-blue-400\/40 {
+  --tw-ring-color: rgba(249, 115, 22, 0.4) !important;
 }
 
 body {
