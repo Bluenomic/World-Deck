@@ -65,6 +65,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const [modalX, setModalX] = useState<number>(300);
   const [editingNode, setEditingNode] = useState<SimpleTimelineNode | null>(null);
   const [selectedNode, setSelectedNode] = useState<SimpleTimelineNode | null>(null);
+  const [readerNode, setReaderNode] = useState<SimpleTimelineNode | null>(null);
 
   // Dragging Node State
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
@@ -171,6 +172,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     if (e.button === 0 && (e.target === containerRef.current || (e.target as HTMLElement).id === 'timeline-center-bg')) {
       setIsPanning(true);
       setPanStartX(e.clientX - scrollX);
+      setReaderNode(null);
     }
   };
 
@@ -237,12 +239,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const handleDeleteNode = (id: string) => {
     setNodes((prev) => prev.filter((n) => n.id !== id));
     if (selectedNode?.id === id) setSelectedNode(null);
+    if (readerNode?.id === id) setReaderNode(null);
   };
 
   const handleClearAll = () => {
     if (window.confirm('Bersihkan semua kejadian di timeline?')) {
       setNodes([]);
       setSelectedNode(null);
+      setReaderNode(null);
     }
   };
 
@@ -255,7 +259,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     setShowTrackNameModal(false);
   };
 
-  const linkedCardForSelected = selectedNode?.cardId ? cards.find((c) => c.id === selectedNode.cardId) : null;
+  const linkedCardForReader = readerNode?.cardId ? cards.find((c) => c.id === readerNode.cardId) : null;
 
   return (
     <div className="flex-1 bg-black text-white flex flex-col relative overflow-hidden select-none">
@@ -412,12 +416,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       e.stopPropagation();
                       setSelectedNode(node);
                     }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedNode(node);
+                      setReaderNode(node);
+                    }}
                     className={`absolute -left-4 -top-4 w-8 h-8 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing z-30 transition-all ${
                       isSelected
                         ? 'bg-zinc-200 text-black ring-4 ring-zinc-400/60 scale-125'
                         : 'bg-zinc-900 border-2 border-zinc-400 hover:border-white hover:scale-125 hover:ring-4 hover:ring-zinc-500/40'
                     }`}
-                    title="Tekan & tahan lingkaran titik ini untuk menggeser kejadian di garis waktu"
+                    title="Klik untuk memilih, double-click untuk membuka detail, drag untuk menggeser"
                   >
                     <div className="w-3 h-3 rounded-full bg-zinc-100 pointer-events-none" />
                   </div>
@@ -427,6 +436,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedNode(node);
+                    }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedNode(node);
+                      setReaderNode(node);
                     }}
                     className={`absolute left-1/2 -translate-x-1/2 w-64 p-3.5 rounded-2xl bg-zinc-900 border transition-all duration-200 cursor-pointer shadow-xl group ${
                       isUpper ? '-translate-y-full' : ''
@@ -438,6 +452,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     style={{
                       top: isUpper ? `-${stemHeight + 10}px` : `${stemHeight + 10}px`,
                     }}
+                    title="Double-click untuk membuka detail kejadian"
                   >
                     {/* Header Label */}
                     <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -516,8 +531,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           </div>
         )}
 
-        {/* Right Drawer Slide-over Panel for Selected Node */}
-        {selectedNode && (
+        {/* Right Drawer Slide-over Panel for Reader Node (Opens on Double-Click) */}
+        {readerNode && (
           <div className="w-80 sm:w-96 bg-zinc-950 border-l border-zinc-800 flex flex-col z-30 shadow-2xl animate-in slide-in-from-right duration-200 text-white">
             <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -526,7 +541,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedNode(null)}
+                onClick={() => setReaderNode(null)}
                 className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
               >
                 <Icons.X size={16} />
@@ -536,16 +551,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
-                  {selectedNode.dateLabel || 'Garis Waktu'}
+                  {readerNode.dateLabel || 'Garis Waktu'}
                 </span>
                 <h2 className="text-base font-bold text-white mt-2 leading-tight">
-                  {selectedNode.title}
+                  {readerNode.title}
                 </h2>
               </div>
 
-              {selectedNode.description && (
+              {readerNode.description && (
                 <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 leading-relaxed">
-                  {selectedNode.description}
+                  {readerNode.description}
                 </div>
               )}
 
@@ -554,17 +569,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
                   Kartu Database Terhubung
                 </h4>
-                {linkedCardForSelected ? (
+                {linkedCardForReader ? (
                   <div
-                    onClick={() => onCardClick(linkedCardForSelected)}
+                    onClick={() => onCardClick(linkedCardForReader)}
                     className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-500 cursor-pointer transition-all flex items-center justify-between group"
                   >
                     <div>
                       <div className="text-[10px] uppercase font-semibold text-zinc-400">
-                        {linkedCardForSelected.category}
+                        {linkedCardForReader.category}
                       </div>
                       <div className="font-bold text-white group-hover:text-zinc-300 transition-colors">
-                        {linkedCardForSelected.title}
+                        {linkedCardForReader.title}
                       </div>
                     </div>
                     <Icons.ChevronRight size={16} className="text-zinc-500 group-hover:translate-x-1 transition-transform" />
@@ -581,8 +596,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setEditingNode(selectedNode);
-                  setModalX(selectedNode.x);
+                  setEditingNode(readerNode);
+                  setModalX(readerNode.x);
                   setShowNodeModal(true);
                 }}
                 className="flex-1 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-500 text-xs font-semibold text-white flex items-center justify-center gap-1.5 cursor-pointer"
@@ -592,7 +607,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => handleDeleteNode(selectedNode.id)}
+                onClick={() => handleDeleteNode(readerNode.id)}
                 className="px-3 py-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Icons.Trash2 size={13} />
