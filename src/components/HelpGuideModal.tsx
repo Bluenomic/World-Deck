@@ -18,13 +18,15 @@ export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({ onClose }) => {
         
         {/* Header */}
         <div className="px-6 py-4 app-bg-main border-b app-border flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg app-accent-bg flex items-center justify-center text-white font-bold">
-              <Icons.BookOpen size={18} />
-            </div>
+          <div className="flex items-center gap-3.5">
+            <img
+              src="/wd-logo-circle.png"
+              alt="World Deck Logo"
+              className="w-10 h-10 object-contain rounded-xl shadow-md border app-border"
+            />
             <div>
-              <h2 className="text-base font-bold app-text-main">Panduan Notion Worldbuilding Canvas</h2>
-              <p className="text-xs app-text-muted">Petunjuk penggunaan dan panduan build Tauri PC & Android</p>
+              <h2 className="text-base font-bold app-text-main">Panduan World Deck</h2>
+              <p className="text-xs app-text-muted">Petunjuk penggunaan dan panduan worldbuilding canvas</p>
             </div>
           </div>
 

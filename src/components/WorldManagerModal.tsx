@@ -87,12 +87,15 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
         
         {/* Header */}
         <div className="px-6 py-4 app-bg-main border-b app-border flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg app-accent-bg flex items-center justify-center text-white font-bold">
-              <Icons.Globe size={18} />
-            </div>
+          <div className="flex items-center gap-3.5">
+            <img
+              src="/wd-logo-transparent.png"
+              alt="World Deck Logo"
+              className="h-9 w-auto object-contain"
+            />
             <div>
-              <h2 className="text-base font-bold app-text-main">Pengelola Workspace</h2>
+              <h2 className="text-base font-bold app-text-main">Pengelola Workspace & Dunia</h2>
+              <p className="text-xs app-text-muted">Kelola, buat, dan impor universe worldbuilding Anda</p>
             </div>
           </div>
 

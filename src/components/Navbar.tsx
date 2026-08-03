@@ -57,18 +57,21 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="h-12 app-bg-main border-b app-border px-3 md:px-4 flex items-center justify-between z-40 relative select-none transition-colors">
       
-      {/* Breadcrumbs */}
-      <div className="flex items-center gap-2 text-xs">
+      {/* Breadcrumbs & App Logo */}
+      <div className="flex items-center gap-2.5 text-xs">
         <button
           type="button"
           onClick={onOpenWorldManager}
-          className="flex items-center gap-1.5 px-2 py-1 rounded-md app-text-muted hover:app-text-main app-bg-hover transition-colors font-medium"
-          title="Pengelola Workspace"
+          className="flex items-center gap-2 px-2 py-1 rounded-lg app-text-main hover:app-bg-hover transition-all font-semibold group cursor-pointer"
+          title="Pengelola Workspace World Deck"
         >
-          <Icons.Globe size={15} className="app-accent-text" />
-          <span>{projectName}</span>
+          <img
+            src="/wd-logo-circle.png"
+            alt="World Deck Logo"
+            className="w-6 h-6 object-contain rounded-full shadow-sm group-hover:scale-105 transition-transform"
+          />
+          <span className="truncate max-w-[150px] sm:max-w-[200px]">{projectName}</span>
         </button>
-
       </div>
 
       {/* View Mode Switcher (Database Tabs) */}
@@ -183,7 +186,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {isMenuOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-52 app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 z-50 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 space-y-0.5 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1.5 w-56 app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 z-50 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 space-y-0.5 overflow-hidden">
+              <div className="px-3 py-2 border-b app-border app-bg-main flex items-center gap-2.5">
+                <img src="/wd-logo-circle.png" alt="World Deck" className="w-6 h-6 object-contain rounded-full" />
+                <div>
+                  <div className="font-bold text-xs app-text-main leading-tight">World Deck</div>
+                  <div className="text-[10px] app-text-muted">Cards Worldbuilding</div>
+                </div>
+              </div>
+
               {localDirectoryName && (
                 <>
                   <div className="px-3 py-2 bg-emerald-950/30 text-emerald-400 font-semibold border-b app-border flex items-center gap-1.5 select-none" title={`Folder Workspace: ${localDirectoryName}`}>

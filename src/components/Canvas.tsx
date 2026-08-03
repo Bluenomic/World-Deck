@@ -955,9 +955,11 @@ export const Canvas: React.FC<CanvasProps> = ({
       {cards.length === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center pointer-events-none z-20">
           <div className="app-bg-secondary border app-border p-6 md:p-8 rounded-2xl max-w-md space-y-3 shadow-2xl pointer-events-auto app-text-main">
-            <div className="w-12 h-12 rounded-xl app-accent-bg/20 border border-blue-500/40 text-blue-400 flex items-center justify-center mx-auto text-lg font-bold">
-              📄
-            </div>
+            <img
+              src="/wd-logo-circle.png"
+              alt="World Deck Logo"
+              className="w-14 h-14 object-contain rounded-2xl shadow-md mx-auto"
+            />
             <h3 className="text-base font-bold app-text-main">Canvas Worldbuilding Masih Kosong</h3>
             <p className="text-xs app-text-muted leading-relaxed">
               Mulailah membuat halaman kartu untuk karakter, faksi, lokasi, lore, item, atau peristiwa timeline.
