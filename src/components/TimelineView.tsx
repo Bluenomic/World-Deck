@@ -184,13 +184,23 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     setScrollX((prev) => prev - delta * 0.9);
   };
 
-  // Right Click Context Menu Handler
+  // Right Click Context Menu Handler (Only near center timeline line)
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-    });
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const centerY = rect.height / 2;
+    const mouseY = e.clientY - rect.top;
+
+    // Trigger context menu ONLY when right-clicking near center line (35px tolerance)
+    if (Math.abs(mouseY - centerY) <= 35) {
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+      });
+    } else {
+      setContextMenu(null);
+    }
   };
 
   // Node Dragging Start
@@ -246,7 +256,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   };
 
   const linkedCardForSelected = selectedNode?.cardId ? cards.find((c) => c.id === selectedNode.cardId) : null;
-  const viewportHeight = containerRef.current ? containerRef.current.getBoundingClientRect().height : 400;
 
   return (
     <div className="flex-1 bg-black text-white flex flex-col relative overflow-hidden select-none">
@@ -316,24 +325,27 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     strokeWidth={2.5}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    transform={`translate(${arrowX}, ${viewportHeight / 2})`}
+                    transform={`translate(${arrowX}, 0)`}
+                    style={{ transform: `translate(${arrowX}px, 50%)` }}
                   />
                 );
               })}
 
               {/* Google Maps Style Repeating Track Name Labels Along Center Line */}
-              {Array.from({ length: 40 }).map((_, idx) => {
+              {Array.from({ length: 50 }).map((_, idx) => {
                 const labelX = -800 + idx * 360;
                 return (
                   <text
                     key={`label-${idx}`}
                     x={labelX}
-                    y={viewportHeight / 2 - 12}
-                    fill="#71717a"
-                    fillOpacity={0.22}
+                    y="50%"
+                    dy="-12"
+                    fill="#a1a1aa"
+                    fillOpacity={0.35}
                     fontSize={11}
                     fontWeight="700"
                     letterSpacing="0.25em"
+                    textAnchor="middle"
                     className="uppercase select-none font-mono"
                   >
                     {trackName}
@@ -421,7 +433,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     } ${
                       isSelected
                         ? 'border-zinc-300 ring-2 ring-zinc-400/30 scale-102'
-                        : 'border-zinc-800 hover:border-zinc-600 hover:-translate-y-1'
+                        : 'border-zinc-800 hover:border-zinc-500'
                     }`}
                     style={{
                       top: isUpper ? `-${stemHeight + 10}px` : `${stemHeight + 10}px`,
