@@ -361,6 +361,13 @@ export const Canvas: React.FC<CanvasProps> = ({
         e.preventDefault();
         const factor = e.deltaY < 0 ? 1.15 : 0.85;
         zoomAtPoint(zoomRef.current * factor, e.clientX, e.clientY);
+      } else if (e.shiftKey) {
+        e.preventDefault();
+        // Shift + Mouse Wheel = Horizontal scroll / pan
+        const scrollDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        const nextPanX = panRef.current.x - scrollDelta * 0.8;
+        panRef.current = { ...panRef.current, x: nextPanX };
+        setPan((prev) => ({ ...prev, x: nextPanX }));
       } else {
         const nextPanX = panRef.current.x - e.deltaX * 0.8;
         const nextPanY = panRef.current.y - e.deltaY * 0.8;
@@ -821,11 +828,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     >
       {/* Background Dot Grid */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-30"
+        className="absolute inset-0 pointer-events-none transition-opacity duration-300"
         style={{
-          backgroundImage: `radial-gradient(var(--grid-dot) 1px, transparent 1px)`,
+          backgroundImage: `radial-gradient(var(--grid-dot) ${1.25 * zoom}px, transparent ${1.25 * zoom}px)`,
           backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
           backgroundPosition: `${pan.x}px ${pan.y}px`,
+          opacity: Math.min(0.85, Math.max(0.15, zoom * 0.7)),
         }}
       />
 

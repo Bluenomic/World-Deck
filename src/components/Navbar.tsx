@@ -97,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           }`}
         >
           <Icons.LayoutGrid size={13} />
-          <span>Canvas Graph</span>
+          <span>Canvas</span>
         </button>
 
         <button

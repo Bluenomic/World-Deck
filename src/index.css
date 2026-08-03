@@ -10,7 +10,7 @@
   --text-primary: #f4f4f5;
   --text-muted: #a1a1aa;
   --accent: #3b82f6;
-  --grid-dot: #27272a;
+  --grid-dot: rgba(255, 255, 255, 0.25);
   --line-stroke: #52525b;
   --line-stroke-highlight: #3b82f6;
 }
@@ -24,7 +24,7 @@ body.theme-dark {
   --text-primary: #f4f4f5;
   --text-muted: #a1a1aa;
   --accent: #3b82f6;
-  --grid-dot: #27272a;
+  --grid-dot: rgba(255, 255, 255, 0.25);
   --line-stroke: #52525b;
   --line-stroke-highlight: #3b82f6;
   background-color: #121212;
@@ -40,7 +40,7 @@ body.theme-light {
   --text-primary: #0f172a;
   --text-muted: #64748b;
   --accent: #2563eb;
-  --grid-dot: #cbd5e1;
+  --grid-dot: rgba(0, 0, 0, 0.2);
   --line-stroke: #94a3b8;
   --line-stroke-highlight: #2563eb;
   background-color: #ffffff;
