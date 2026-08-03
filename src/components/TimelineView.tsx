@@ -157,6 +157,32 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   // Custom Delete Modal Target State
   const [deleteTarget, setDeleteTarget] = useState<TimelineDeleteTarget | null>(null);
 
+  // Measure Container Bounds for 100% Centered Initial Render
+  const [containerBounds, setContainerBounds] = useState<{ width: number; height: number }>({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight - 48 : 700,
+  });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const updateBounds = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        if (rect.height > 0 && rect.width > 0) {
+          setContainerBounds({ width: rect.width, height: rect.height });
+        }
+      }
+    };
+
+    updateBounds();
+
+    const observer = new ResizeObserver(updateBounds);
+    observer.observe(containerRef.current);
+
+    return () => observer.disconnect();
+  }, []);
+
   // Dragging Node State
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dragStartX, setDragStartX] = useState<number>(0);
@@ -539,7 +565,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   }, [nodes]);
 
   const linkedCardForReader = readerNode?.cardId ? cards.find((c) => c.id === readerNode.cardId) : null;
-  const viewportHeight = containerRef.current ? containerRef.current.getBoundingClientRect().height : 600;
+  const viewportHeight = containerBounds.height;
 
   return (
     <div className="flex-1 bg-black text-white flex flex-col relative overflow-hidden select-none">

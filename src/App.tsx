@@ -906,8 +906,6 @@ export const App: React.FC = () => {
         canRedo={historyIndex < historyStack.length - 1}
         onUndo={handleUndo}
         onRedo={handleRedo}
-        isSidebarOpen={isSidebarOpen}
-        onToggleSidebar={viewMode === 'canvas' ? handleToggleSidebar : undefined}
       />
 
       {/* Main Workspace Area */}

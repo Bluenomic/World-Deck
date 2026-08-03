@@ -19,8 +19,6 @@ interface NavbarProps {
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
-  isSidebarOpen?: boolean;
-  onToggleSidebar?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -40,8 +38,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   canRedo,
   onUndo,
   onRedo,
-  isSidebarOpen,
-  onToggleSidebar,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -63,16 +59,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-xs">
-        {onToggleSidebar && (
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="p-1.5 rounded-lg app-text-muted hover:app-text-main app-bg-hover transition-colors mr-1 cursor-pointer"
-            title={isSidebarOpen ? "Sembunyikan Sidebar (Ctrl + \\)" : "Tampilkan Sidebar (Ctrl + \\)"}
-          >
-            {isSidebarOpen ? <Icons.PanelLeftClose size={16} /> : <Icons.PanelLeft size={16} />}
-          </button>
-        )}
         <button
           type="button"
           onClick={onOpenWorldManager}
