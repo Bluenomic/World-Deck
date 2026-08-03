@@ -3,8 +3,15 @@ import type { WorldCard, CardConnection } from '../types';
 import { generateId } from '../utils/helpers';
 import * as Icons from 'lucide-react';
 
+interface TimelineTrack {
+  id: string;
+  name: string;
+  order: number; // Vertical order index (-2, -1, 0, 1, 2...)
+}
+
 interface SimpleTimelineNode {
   id: string;
+  trackId: string;
   x: number;
   title: string;
   dateLabel?: string;
@@ -19,8 +26,67 @@ interface TimelineViewProps {
   activeWorldId?: string;
 }
 
-// Minimum gap between adjacent events to prevent overlapping
+// Minimum gap between adjacent events on the same track
 const MIN_EVENT_GAP = 240;
+
+// Dynamic Inter-Track Spacing Engine
+const calculateTrackLayout = (sortedTracks: TimelineTrack[], allNodes: SimpleTimelineNode[]) => {
+  const relativeYMap: { [trackId: string]: number } = {};
+  if (sortedTracks.length === 0) return { relativeYMap, totalSpan: 0, stackCenter: 0 };
+
+  let currentY = 0;
+  relativeYMap[sortedTracks[0].id] = 0;
+
+  for (let i = 0; i < sortedTracks.length - 1; i++) {
+    const trackUpper = sortedTracks[i];
+    const trackLower = sortedTracks[i + 1];
+
+    const upperNodes = allNodes.filter((n) => n.trackId === trackUpper.id);
+    const lowerNodes = allNodes.filter((n) => n.trackId === trackLower.id);
+
+    // Find max downward extension from upper track
+    let maxDownward = 0;
+    upperNodes.forEach((node, idx) => {
+      const isUpperStem = idx % 2 === 0;
+      if (!isUpperStem) {
+        // Lower stem extending DOWNWARD towards trackLower
+        const cardHeight = node.description ? 150 : 120;
+        maxDownward = Math.max(maxDownward, 70 + cardHeight);
+      }
+    });
+
+    // Find max upward extension from lower track
+    let maxUpward = 0;
+    lowerNodes.forEach((node, idx) => {
+      const isUpperStem = idx % 2 === 0;
+      if (isUpperStem) {
+        // Upper stem extending UPWARD towards trackUpper
+        const cardHeight = node.description ? 150 : 120;
+        maxUpward = Math.max(maxUpward, 70 + cardHeight);
+      }
+    });
+
+    // Calculate required gap between trackUpper and trackLower
+    let gap = 240; // Base gap when empty or no opposing cards
+
+    if (maxDownward > 0 && maxUpward > 0) {
+      // Both tracks have cards extending towards each other! Expand gap dynamically!
+      gap = maxDownward + maxUpward + 50; // e.g. 210 + 210 + 50 = 470px clearance!
+    } else if (maxDownward > 0) {
+      gap = Math.max(240, maxDownward + 80);
+    } else if (maxUpward > 0) {
+      gap = Math.max(240, maxUpward + 80);
+    }
+
+    currentY += gap;
+    relativeYMap[trackLower.id] = currentY;
+  }
+
+  const totalSpan = currentY;
+  const stackCenter = totalSpan / 2;
+
+  return { relativeYMap, totalSpan, stackCenter };
+};
 
 export const TimelineView: React.FC<TimelineViewProps> = ({
   cards,
@@ -28,40 +94,59 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   activeWorldId = 'default',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const storageKey = `worlddeck_timeline_v3_${activeWorldId}`;
+  const storageKey = `worlddeck_timeline_v4_${activeWorldId}`;
 
-  // Timeline Track Name (Google Maps style repeating label)
-  const [trackName, setTrackName] = useState<string>(() => {
+  // Timeline Tracks State
+  const [tracks, setTracks] = useState<TimelineTrack[]>(() => {
     try {
-      const saved = localStorage.getItem(`${storageKey}_trackname`);
-      if (saved) return saved;
+      const saved = localStorage.getItem(`${storageKey}_tracks`);
+      if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return 'GARIS WAKTU UTAMA';
+    return [
+      { id: 'track_main', name: 'GARIS WAKTU UTAMA', order: 0 },
+    ];
   });
 
-  // Timeline Nodes
+  // Timeline Nodes State
   const [nodes, setNodes] = useState<SimpleTimelineNode[]>(() => {
     try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) return JSON.parse(saved);
+      const saved = localStorage.getItem(`${storageKey}_nodes`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.map((n: any) => ({ ...n, trackId: n.trackId || 'track_main' }));
+      }
     } catch (e) {}
     return [];
   });
 
-  // Horizontal Pan Offset (No Zooming)
+  // 2D Pan Offset (Horizontal & Bounded Vertical)
   const [scrollX, setScrollX] = useState<number>(100);
+  const [scrollY, setScrollY] = useState<number>(0);
   const [isPanning, setIsPanning] = useState<boolean>(false);
-  const [panStartX, setPanStartX] = useState<number>(0);
+  const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Mouse Hover position on center axis line
+  // Hover state on track axis line
+  const [hoverTrackId, setHoverTrackId] = useState<string | null>(null);
   const [hoverWorldX, setHoverWorldX] = useState<number | null>(null);
 
-  // Context Menu & Modals
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const [showTrackNameModal, setShowTrackNameModal] = useState<boolean>(false);
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    targetTrack?: TimelineTrack;
+    isAbove?: boolean;
+    clickOrderPosition?: number;
+  } | null>(null);
+
+  // Track Name Modal State
+  const [showTrackModal, setShowTrackModal] = useState<boolean>(false);
+  const [editingTrack, setEditingTrack] = useState<TimelineTrack | null>(null);
+  const [newTrackOrderPosition, setNewTrackOrderPosition] = useState<number | null>(null);
   const [tempTrackName, setTempTrackName] = useState<string>('');
 
+  // Node Modal & Readers
   const [showNodeModal, setShowNodeModal] = useState<boolean>(false);
+  const [targetTrackId, setTargetTrackId] = useState<string>('track_main');
   const [modalX, setModalX] = useState<number>(300);
   const [editingNode, setEditingNode] = useState<SimpleTimelineNode | null>(null);
   const [selectedNode, setSelectedNode] = useState<SimpleTimelineNode | null>(null);
@@ -72,13 +157,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const [dragStartX, setDragStartX] = useState<number>(0);
   const [initialNodeX, setInitialNodeX] = useState<number>(0);
 
+  // Layout Calculations
+  const sortedTracks = [...tracks].sort((a, b) => a.order - b.order);
+  const { relativeYMap, totalSpan, stackCenter } = calculateTrackLayout(sortedTracks, nodes);
+
   // Persist State
   useEffect(() => {
     try {
-      localStorage.setItem(storageKey, JSON.stringify(nodes));
-      localStorage.setItem(`${storageKey}_trackname`, trackName);
+      localStorage.setItem(`${storageKey}_tracks`, JSON.stringify(tracks));
+      localStorage.setItem(`${storageKey}_nodes`, JSON.stringify(nodes));
     } catch (e) {}
-  }, [nodes, trackName, storageKey]);
+  }, [tracks, nodes, storageKey]);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -87,25 +176,38 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     return () => window.removeEventListener('click', handleCloseMenu);
   }, []);
 
+  const maxScrollOffset = (vHeight: number) => {
+    return Math.max(0, (totalSpan + 350 - vHeight) / 2 + 100);
+  };
+
+  // Helper to calculate Y center on screen for a given track
+  const getTrackCenterY = (trackId: string, viewportHeight: number) => {
+    const trackRelY = relativeYMap[trackId] ?? 0;
+    return viewportHeight / 2 + scrollY + (trackRelY - stackCenter);
+  };
+
   // Global Window Mouse Move & Mouse Up Listener for Dragging Nodes Smoothly
   useEffect(() => {
     if (!draggingNodeId) return;
+
+    const draggingNode = nodes.find((n) => n.id === draggingNodeId);
+    if (!draggingNode) return;
 
     const handleWindowMouseMove = (e: MouseEvent) => {
       const deltaX = e.clientX - dragStartX;
       const rawNextX = initialNodeX + deltaX;
 
-      const otherNodes = nodes.filter((n) => n.id !== draggingNodeId);
-      const sortedOthers = [...otherNodes].sort((a, b) => a.x - b.x);
+      const sameTrackNodes = nodes.filter(
+        (n) => n.trackId === draggingNode.trackId && n.id !== draggingNodeId
+      );
+      const sortedSameTrack = [...sameTrackNodes].sort((a, b) => a.x - b.x);
 
-      // Find nearest left neighbor and nearest right neighbor
-      const leftNeighbor = [...sortedOthers].reverse().find((n) => n.x <= initialNodeX);
-      const rightNeighbor = sortedOthers.find((n) => n.x >= initialNodeX);
+      const leftNeighbor = [...sortedSameTrack].reverse().find((n) => n.x <= initialNodeX);
+      const rightNeighbor = sortedSameTrack.find((n) => n.x >= initialNodeX);
 
       const minAllowedX = leftNeighbor ? leftNeighbor.x + MIN_EVENT_GAP : 20;
       const maxAllowedX = rightNeighbor ? rightNeighbor.x - MIN_EVENT_GAP : Infinity;
 
-      // Hard Stop / Clamp
       const clampedX = Math.max(minAllowedX, Math.min(maxAllowedX, Math.round(rawNextX)));
 
       setNodes((prev) => prev.map((n) => (n.id === draggingNodeId ? { ...n, x: clampedX } : n)));
@@ -124,46 +226,67 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     };
   }, [draggingNodeId, dragStartX, initialNodeX, nodes]);
 
-  // Auto-Spacing Helper Function for initial creation or fallback
-  const applyAutoSpacing = (eventList: SimpleTimelineNode[]): SimpleTimelineNode[] => {
-    if (eventList.length <= 1) return eventList;
-    const sorted = [...eventList].sort((a, b) => a.x - b.x);
+  // Auto-Spacing Helper Function
+  const applyAutoSpacing = (eventList: SimpleTimelineNode[], trackId: string): SimpleTimelineNode[] => {
+    const trackEvents = eventList.filter((n) => n.trackId === trackId);
+    const otherEvents = eventList.filter((n) => n.trackId !== trackId);
+
+    if (trackEvents.length <= 1) return eventList;
+
+    const sorted = [...trackEvents].sort((a, b) => a.x - b.x);
     for (let i = 1; i < sorted.length; i++) {
       const prevX = sorted[i - 1].x;
       if (sorted[i].x < prevX + MIN_EVENT_GAP) {
         sorted[i] = { ...sorted[i], x: prevX + MIN_EVENT_GAP };
       }
     }
-    return sorted;
+
+    return [...otherEvents, ...sorted];
   };
 
   // Pointer Movement Handlers
   const handlePointerMove = (e: React.MouseEvent) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const viewportHeight = rect.height;
+
     if (isPanning) {
-      setScrollX(e.clientX - panStartX);
+      setScrollX(e.clientX - panStart.x);
+      const rawY = e.clientY - panStart.y;
+      const clampedY = Math.max(
+        -maxScrollOffset(viewportHeight),
+        Math.min(maxScrollOffset(viewportHeight), rawY)
+      );
+      setScrollY(clampedY);
       return;
     }
 
     if (draggingNodeId) return;
 
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const centerY = rect.height / 2;
     const mouseY = e.clientY - rect.top;
+    const worldX = Math.round(e.clientX - rect.left - scrollX);
 
-    // Check if mouse is hovering near vertical center axis line (35px tolerance)
-    if (Math.abs(mouseY - centerY) <= 35) {
-      const worldX = Math.round(e.clientX - rect.left - scrollX);
-      
-      // Suppress (+) add icon when hovering near an existing node dot (80px radius tolerance)
-      const isNearExistingNode = nodes.some((n) => Math.abs(n.x - worldX) < 80);
+    // Check hover proximity to any track line
+    let foundTrackId: string | null = null;
 
-      if (isNearExistingNode) {
-        setHoverWorldX(null);
-      } else {
-        setHoverWorldX(worldX);
+    for (const track of sortedTracks) {
+      const trackY = getTrackCenterY(track.id, viewportHeight);
+      if (Math.abs(mouseY - trackY) <= 35) {
+        const trackNodes = nodes.filter((n) => n.trackId === track.id);
+        const isNearNode = trackNodes.some((n) => Math.abs(n.x - worldX) < 80);
+
+        if (!isNearNode) {
+          foundTrackId = track.id;
+        }
+        break;
       }
+    }
+
+    if (foundTrackId) {
+      setHoverTrackId(foundTrackId);
+      setHoverWorldX(worldX);
     } else {
+      setHoverTrackId(null);
       setHoverWorldX(null);
     }
   };
@@ -171,7 +294,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const handleMouseDownBg = (e: React.MouseEvent) => {
     if (e.button === 0 && (e.target === containerRef.current || (e.target as HTMLElement).id === 'timeline-center-bg')) {
       setIsPanning(true);
-      setPanStartX(e.clientX - scrollX);
+      setPanStart({ x: e.clientX - scrollX, y: e.clientY - scrollY });
       setReaderNode(null);
     }
   };
@@ -182,26 +305,79 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    setScrollX((prev) => prev - delta * 0.9);
+    if (!containerRef.current) return;
+    const viewportHeight = containerRef.current.getBoundingClientRect().height;
+
+    if (e.shiftKey) {
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      setScrollX((prev) => prev - delta * 0.9);
+    } else {
+      setScrollY((prev) => {
+        const rawY = prev - e.deltaY * 0.9;
+        const maxLimit = maxScrollOffset(viewportHeight);
+        return Math.max(-maxLimit, Math.min(maxLimit, rawY));
+      });
+    }
   };
 
-  // Right Click Context Menu Handler (Only near center timeline line)
+  // Right Click Context Menu Handler (Parallel Timelines)
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!containerRef.current) return;
+
     const rect = containerRef.current.getBoundingClientRect();
-    const centerY = rect.height / 2;
+    const viewportHeight = rect.height;
     const mouseY = e.clientY - rect.top;
 
-    // Trigger context menu ONLY when right-clicking near center line (35px tolerance)
-    if (Math.abs(mouseY - centerY) <= 35) {
+    // Check if right clicked directly on an existing track line
+    let targetTrack: TimelineTrack | undefined;
+    for (const track of sortedTracks) {
+      const trackY = getTrackCenterY(track.id, viewportHeight);
+      if (Math.abs(mouseY - trackY) <= 35) {
+        targetTrack = track;
+        break;
+      }
+    }
+
+    if (targetTrack) {
       setContextMenu({
         x: e.clientX,
         y: e.clientY,
+        targetTrack,
       });
     } else {
-      setContextMenu(null);
+      // Right-clicked on EMPTY SPACE: Calculate relative order position
+      const firstTrackY = getTrackCenterY(sortedTracks[0].id, viewportHeight);
+      const lastTrackY = getTrackCenterY(sortedTracks[sortedTracks.length - 1].id, viewportHeight);
+
+      let isAbove = false;
+      let newOrder = 0;
+
+      if (mouseY < firstTrackY) {
+        isAbove = true;
+        newOrder = sortedTracks[0].order - 1;
+      } else if (mouseY > lastTrackY) {
+        isAbove = false;
+        newOrder = sortedTracks[sortedTracks.length - 1].order + 1;
+      } else {
+        // Inserted between tracks
+        for (let i = 0; i < sortedTracks.length - 1; i++) {
+          const y1 = getTrackCenterY(sortedTracks[i].id, viewportHeight);
+          const y2 = getTrackCenterY(sortedTracks[i + 1].id, viewportHeight);
+          if (mouseY >= y1 && mouseY <= y2) {
+            newOrder = (sortedTracks[i].order + sortedTracks[i + 1].order) / 2;
+            isAbove = mouseY < (y1 + y2) / 2;
+            break;
+          }
+        }
+      }
+
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        isAbove,
+        clickOrderPosition: newOrder,
+      });
     }
   };
 
@@ -213,22 +389,23 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     setInitialNodeX(node.x);
   };
 
-  // Save Node & Apply Auto Spacing
+  // Save Event Node
   const handleSaveNode = (data: { title: string; dateLabel?: string; description?: string; cardId?: string }) => {
     if (editingNode) {
       setNodes((prev) => {
         const updated = prev.map((n) => (n.id === editingNode.id ? { ...n, ...data } : n));
-        return applyAutoSpacing(updated);
+        return applyAutoSpacing(updated, editingNode.trackId);
       });
     } else {
       const newNode: SimpleTimelineNode = {
         id: generateId('tnode'),
+        trackId: targetTrackId,
         x: modalX,
         ...data,
       };
       setNodes((prev) => {
         const updated = [...prev, newNode];
-        return applyAutoSpacing(updated);
+        return applyAutoSpacing(updated, targetTrackId);
       });
       setSelectedNode(newNode);
     }
@@ -242,24 +419,56 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     if (readerNode?.id === id) setReaderNode(null);
   };
 
+  // Add Parallel Track
+  const handleAddParallelTrack = (orderPos: number) => {
+    setEditingTrack(null);
+    setNewTrackOrderPosition(orderPos);
+    setTempTrackName(`GARIS WAKTU PARALEL ${tracks.length + 1}`);
+    setShowTrackModal(true);
+  };
+
+  // Delete Parallel Track
+  const handleDeleteTrack = (trackId: string) => {
+    if (tracks.length <= 1) {
+      alert('Tidak dapat menghapus garis waktu terakhir.');
+      return;
+    }
+    if (window.confirm('Hapus garis waktu paralel ini beserta semua kejadiannya?')) {
+      setTracks((prev) => prev.filter((t) => t.id !== trackId));
+      setNodes((prev) => prev.filter((n) => n.trackId !== trackId));
+    }
+  };
+
+  // Save Track Name or New Track
+  const handleSaveTrackModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = tempTrackName.trim().toUpperCase() || 'GARIS WAKTU PARALEL';
+
+    if (editingTrack) {
+      setTracks((prev) => prev.map((t) => (t.id === editingTrack.id ? { ...t, name: cleanName } : t)));
+    } else if (newTrackOrderPosition !== null) {
+      const newTrack: TimelineTrack = {
+        id: generateId('track'),
+        name: cleanName,
+        order: newTrackOrderPosition,
+      };
+      setTracks((prev) => [...prev, newTrack].sort((a, b) => a.order - b.order));
+    }
+    setShowTrackModal(false);
+    setEditingTrack(null);
+    setNewTrackOrderPosition(null);
+  };
+
   const handleClearAll = () => {
-    if (window.confirm('Bersihkan semua kejadian di timeline?')) {
+    if (window.confirm('Bersihkan semua kejadian di seluruh garis waktu?')) {
       setNodes([]);
       setSelectedNode(null);
       setReaderNode(null);
     }
   };
 
-  // Save Track Name
-  const handleSaveTrackName = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (tempTrackName.trim()) {
-      setTrackName(tempTrackName.trim().toUpperCase());
-    }
-    setShowTrackNameModal(false);
-  };
-
   const linkedCardForReader = readerNode?.cardId ? cards.find((c) => c.id === readerNode.cardId) : null;
+  const viewportHeight = containerRef.current ? containerRef.current.getBoundingClientRect().height : 600;
 
   return (
     <div className="flex-1 bg-black text-white flex flex-col relative overflow-hidden select-none">
@@ -272,18 +481,30 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-white leading-none">Timeline</h2>
+              <h2 className="text-sm font-bold text-white leading-none">Timeline Multi-Track</h2>
               <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
-                {trackName}
+                {tracks.length} Garis Waktu Paralel
               </span>
             </div>
             <p className="text-[11px] text-zinc-400 mt-0.5">
-              Klik kanan pada garis waktu untuk mengganti nama timeline. Arahkan kursor ke garis untuk ikon `(+)`.
+              Jarak vertikal menyesuaikan otomatis agar kartu kejadian tidak pernah bertabrakan. Scroll dibatasi pada area timeline.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const lastOrder = Math.max(...tracks.map((t) => t.order)) + 1;
+              handleAddParallelTrack(lastOrder);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-200 hover:text-white hover:bg-zinc-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Icons.Plus size={14} />
+            <span>+ Garis Waktu Baru</span>
+          </button>
+
           {nodes.length > 0 && (
             <button
               type="button"
@@ -311,94 +532,131 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           {/* Transparent Click Target Area */}
           <div id="timeline-center-bg" className="absolute inset-0 w-full h-full bg-black" />
 
-          {/* Center Horizontal Line (Thick Grey Line in Middle of Screen) */}
-          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1.5 bg-zinc-600 pointer-events-none shadow-[0_0_10px_rgba(161,161,170,0.25)]" />
+          {/* Render Multi-Track Horizontal Lines & Labels */}
+          {sortedTracks.map((track) => {
+            const trackCenterY = getTrackCenterY(track.id, viewportHeight);
 
-          {/* SVG Layer for Arrows & Google Maps Style Repeating Track Name Labels */}
+            return (
+              <React.Fragment key={track.id}>
+                {/* Thick Grey Horizontal Timeline Axis Line */}
+                <div
+                  style={{ top: `${trackCenterY}px` }}
+                  className="absolute left-0 right-0 -translate-y-1/2 h-1.5 bg-zinc-600 pointer-events-none shadow-[0_0_10px_rgba(161,161,170,0.25)] transition-all duration-300 ease-out"
+                />
+
+                {/* Floating Track Name Badge on Left Margin */}
+                <div
+                  style={{ top: `${trackCenterY}px` }}
+                  className="absolute left-6 -translate-y-1/2 z-20 pointer-events-none transition-all duration-300 ease-out"
+                >
+                  <span className="px-2.5 py-1 rounded-lg bg-zinc-900/90 border border-zinc-700/80 text-[10px] font-mono font-bold text-zinc-300 shadow-lg backdrop-blur-xs uppercase tracking-wider">
+                    {track.name}
+                  </span>
+                </div>
+              </React.Fragment>
+            );
+          })}
+
+          {/* SVG Layer for Directional Arrows & Google Maps Style Repeating Track Names */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none">
             <g transform={`translate(${scrollX}, 0)`}>
-              {/* Directional Arrow Markers */}
-              {Array.from({ length: 60 }).map((_, idx) => {
-                const arrowX = -1000 + idx * 160;
-                return (
-                  <path
-                    key={`arrow-${idx}`}
-                    d="M 0 -5 L 8 0 L 0 5"
-                    fill="none"
-                    stroke="#a1a1aa"
-                    strokeWidth={2.5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    transform={`translate(${arrowX}, 0)`}
-                    style={{ transform: `translate(${arrowX}px, 50%)` }}
-                  />
-                );
-              })}
+              {sortedTracks.map((track) => {
+                const trackY = getTrackCenterY(track.id, viewportHeight);
 
-              {/* Google Maps Style Repeating Track Name Labels Along Center Line */}
-              {Array.from({ length: 50 }).map((_, idx) => {
-                const labelX = -800 + idx * 360;
                 return (
-                  <text
-                    key={`label-${idx}`}
-                    x={labelX}
-                    y="50%"
-                    dy="-12"
-                    fill="#a1a1aa"
-                    fillOpacity={0.35}
-                    fontSize={11}
-                    fontWeight="700"
-                    letterSpacing="0.25em"
-                    textAnchor="middle"
-                    className="uppercase select-none font-mono"
-                  >
-                    {trackName}
-                  </text>
+                  <g key={`svg-track-${track.id}`}>
+                    {/* Directional Arrow Markers along each Track */}
+                    {Array.from({ length: 50 }).map((_, idx) => {
+                      const arrowX = -1000 + idx * 180;
+                      return (
+                        <path
+                          key={`arrow-${track.id}-${idx}`}
+                          d="M 0 -5 L 8 0 L 0 5"
+                          fill="none"
+                          stroke="#a1a1aa"
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ transform: `translate(${arrowX}px, ${trackY}px)` }}
+                        />
+                      );
+                    })}
+
+                    {/* Google Maps Style Repeating Track Name Labels along each Track */}
+                    {Array.from({ length: 40 }).map((_, idx) => {
+                      const labelX = -750 + idx * 400;
+                      return (
+                        <text
+                          key={`label-${track.id}-${idx}`}
+                          x={labelX}
+                          y={trackY - 12}
+                          fill="#a1a1aa"
+                          fillOpacity={0.35}
+                          fontSize={11}
+                          fontWeight="700"
+                          letterSpacing="0.25em"
+                          textAnchor="middle"
+                          className="uppercase select-none font-mono transition-all duration-300 ease-out"
+                        >
+                          {track.name}
+                        </text>
+                      );
+                    })}
+                  </g>
                 );
               })}
             </g>
           </svg>
 
-          {/* Floating Hover (+) Icon Button on Center Line (No Text Label) */}
-          {hoverWorldX !== null && !isPanning && !draggingNodeId && (
+          {/* Floating Hover (+) Button on Target Track Axis Line */}
+          {hoverTrackId !== null && hoverWorldX !== null && !isPanning && !draggingNodeId && (
             <div
               onClick={() => {
                 setEditingNode(null);
+                setTargetTrackId(hoverTrackId);
                 setModalX(hoverWorldX);
                 setShowNodeModal(true);
               }}
               style={{
                 left: `${hoverWorldX + scrollX}px`,
+                top: `${getTrackCenterY(hoverTrackId, viewportHeight)}px`,
               }}
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-40 cursor-pointer animate-in zoom-in-75 duration-150"
+              className="absolute -translate-y-1/2 -translate-x-1/2 z-40 cursor-pointer animate-in zoom-in-75 duration-150"
             >
               <button
                 type="button"
                 className="w-8 h-8 rounded-full bg-zinc-700 hover:bg-zinc-500 text-white flex items-center justify-center shadow-lg hover:scale-125 active:scale-95 transition-all ring-4 ring-zinc-500/30 cursor-pointer"
-                title={`Tambah Kejadian (${hoverWorldX}px)`}
+                title="Klik untuk menambah kejadian di posisi ini"
               >
                 <Icons.Plus size={18} />
               </button>
             </div>
           )}
 
-          {/* Render Timeline Event Nodes (Alternating Upper/Lower Stem Nodes) */}
+          {/* Render Timeline Nodes grouped by Track */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{ transform: `translateX(${scrollX}px)` }}
           >
             {nodes.map((node, index) => {
-              const isUpper = index % 2 === 0;
+              const nodeTrack = tracks.find((t) => t.id === node.trackId) || sortedTracks[0];
+              const trackY = getTrackCenterY(nodeTrack.id, viewportHeight);
+
+              // Calculate index within same track for upper/lower alternating stems
+              const sameTrackNodes = nodes.filter((n) => n.trackId === nodeTrack.id).sort((a, b) => a.x - b.x);
+              const nodeTrackIndex = sameTrackNodes.findIndex((n) => n.id === node.id);
+              const isUpper = (nodeTrackIndex >= 0 ? nodeTrackIndex : index) % 2 === 0;
+
               const stemHeight = 70;
               const isSelected = selectedNode?.id === node.id;
 
               return (
                 <div
                   key={node.id}
-                  className="absolute pointer-events-auto top-1/2"
-                  style={{ left: `${node.x}px` }}
+                  className="absolute pointer-events-auto transition-all duration-300 ease-out"
+                  style={{ left: `${node.x}px`, top: `${trackY}px` }}
                 >
-                  {/* Stem Line connected to Center Horizontal Line */}
+                  {/* Stem Line connected to Track Horizontal Line */}
                   <div
                     className={`absolute left-1/2 -translate-x-1/2 w-0.5 transition-colors ${
                       isSelected ? 'bg-zinc-300 shadow-[0_0_8px_rgba(255,255,255,0.6)]' : 'bg-zinc-700'
@@ -409,7 +667,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     }}
                   />
 
-                  {/* Center Line Node Point Dot */}
+                  {/* Node Point Dot Circle */}
                   <div
                     onMouseDown={(e) => handleStartDragNode(node, e)}
                     onClick={(e) => {
@@ -483,6 +741,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingNode(node);
+                          setTargetTrackId(node.trackId);
                           setModalX(node.x);
                           setShowNodeModal(true);
                         }}
@@ -510,28 +769,87 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           </div>
         </div>
 
-        {/* Right Click Context Menu */}
+        {/* Dynamic Context Menu (Parallel Timelines) */}
         {contextMenu && (
           <div
             style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
-            className="fixed z-50 bg-zinc-900 border border-zinc-800 rounded-xl p-1.5 shadow-2xl animate-in zoom-in-95 duration-100 text-xs min-w-[180px]"
+            className="fixed z-50 bg-zinc-900 border border-zinc-800 rounded-xl p-1.5 shadow-2xl animate-in zoom-in-95 duration-100 text-xs min-w-[220px]"
           >
-            <button
-              type="button"
-              onClick={() => {
-                setTempTrackName(trackName);
-                setShowTrackNameModal(true);
-                setContextMenu(null);
-              }}
-              className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
-            >
-              <Icons.Edit3 size={14} className="text-zinc-400" />
-              <span>Ubah Nama Garis Waktu</span>
-            </button>
+            {contextMenu.targetTrack ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingTrack(contextMenu.targetTrack!);
+                    setTempTrackName(contextMenu.targetTrack!.name);
+                    setShowTrackModal(true);
+                    setContextMenu(null);
+                  }}
+                  className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+                >
+                  <Icons.Edit3 size={14} className="text-zinc-400" />
+                  <span>Ubah Nama ({contextMenu.targetTrack.name})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAddParallelTrack(contextMenu.targetTrack!.order - 1);
+                    setContextMenu(null);
+                  }}
+                  className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+                >
+                  <Icons.Plus size={14} className="text-zinc-400" />
+                  <span>+ Garis Waktu Paralel di Atas</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAddParallelTrack(contextMenu.targetTrack!.order + 1);
+                    setContextMenu(null);
+                  }}
+                  className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+                >
+                  <Icons.Plus size={14} className="text-zinc-400" />
+                  <span>+ Garis Waktu Paralel di Bawah</span>
+                </button>
+
+                {tracks.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleDeleteTrack(contextMenu.targetTrack!.id);
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left text-rose-400 hover:bg-rose-500/10 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors border-t border-zinc-800/80 mt-1 pt-2"
+                  >
+                    <Icons.Trash2 size={14} />
+                    <span>Hapus Garis Waktu Ini</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (contextMenu.clickOrderPosition !== undefined) {
+                    handleAddParallelTrack(contextMenu.clickOrderPosition);
+                  }
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
+              >
+                <Icons.Plus size={14} className="text-zinc-400" />
+                <span>
+                  + Buat Garis Waktu Paralel ({contextMenu.isAbove ? 'di Atas' : 'di Bawah'})
+                </span>
+              </button>
+            )}
           </div>
         )}
 
-        {/* Right Drawer Slide-over Panel for Reader Node (Opens on Double-Click) */}
+        {/* Right Drawer Slide-over Panel for Reader Node */}
         {readerNode && (
           <div className="w-80 sm:w-96 bg-zinc-950 border-l border-zinc-800 flex flex-col z-30 shadow-2xl animate-in slide-in-from-right duration-200 text-white">
             <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
@@ -597,6 +915,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 type="button"
                 onClick={() => {
                   setEditingNode(readerNode);
+                  setTargetTrackId(readerNode.trackId);
                   setModalX(readerNode.x);
                   setShowNodeModal(true);
                 }}
@@ -617,7 +936,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         )}
       </div>
 
-      {/* Add / Edit Node Modal */}
+      {/* Add / Edit Event Node Modal */}
       {showNodeModal && (
         <SimpleNodeModal
           node={editingNode}
@@ -630,25 +949,29 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         />
       )}
 
-      {/* Rename Track Modal */}
-      {showTrackNameModal && (
+      {/* Track Name / New Track Modal */}
+      {showTrackModal && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl text-white modal-animate-appear">
             <div className="flex items-center justify-between mb-4 border-b border-zinc-800 pb-3">
               <h3 className="text-sm font-bold flex items-center gap-2">
                 <Icons.Edit3 size={16} className="text-zinc-400" />
-                <span>Ubah Nama Garis Waktu</span>
+                <span>{editingTrack ? 'Ubah Nama Garis Waktu' : 'Garis Waktu Paralel Baru'}</span>
               </h3>
               <button
                 type="button"
-                onClick={() => setShowTrackNameModal(false)}
+                onClick={() => {
+                  setShowTrackModal(false);
+                  setEditingTrack(null);
+                  setNewTrackOrderPosition(null);
+                }}
                 className="p-1 rounded-lg text-zinc-400 hover:text-white"
               >
                 <Icons.X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveTrackName} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveTrackModal} className="space-y-3 text-xs">
               <div>
                 <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1">
                   Nama Garis Waktu
@@ -656,7 +979,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: GARIS WAKTU UTAMA, KERAJAAN A..."
+                  placeholder="Contoh: KERAJAAN UTARA, KISAH HERO..."
                   value={tempTrackName}
                   onChange={(e) => setTempTrackName(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-zinc-500 font-mono text-xs uppercase"
@@ -666,7 +989,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowTrackNameModal(false)}
+                  onClick={() => {
+                    setShowTrackModal(false);
+                    setEditingTrack(null);
+                    setNewTrackOrderPosition(null);
+                  }}
                   className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700"
                 >
                   Batal
@@ -675,7 +1002,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   type="submit"
                   className="px-4 py-2 rounded-xl bg-zinc-700 text-white font-bold hover:bg-zinc-600 cursor-pointer"
                 >
-                  Simpan Nama
+                  Simpan
                 </button>
               </div>
             </form>
