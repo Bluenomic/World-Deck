@@ -320,7 +320,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     }
   };
 
-  // Right Click Context Menu Handler (Parallel Timelines)
+  // Right Click Context Menu Handler (Only on an existing track line)
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!containerRef.current) return;
@@ -329,7 +329,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     const viewportHeight = rect.height;
     const mouseY = e.clientY - rect.top;
 
-    // Check if right clicked directly on an existing track line
+    // Check if right clicked directly on an existing track line (35px tolerance)
     let targetTrack: TimelineTrack | undefined;
     for (const track of sortedTracks) {
       const trackY = getTrackCenterY(track.id, viewportHeight);
@@ -346,38 +346,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         targetTrack,
       });
     } else {
-      // Right-clicked on EMPTY SPACE: Calculate relative order position
-      const firstTrackY = getTrackCenterY(sortedTracks[0].id, viewportHeight);
-      const lastTrackY = getTrackCenterY(sortedTracks[sortedTracks.length - 1].id, viewportHeight);
-
-      let isAbove = false;
-      let newOrder = 0;
-
-      if (mouseY < firstTrackY) {
-        isAbove = true;
-        newOrder = sortedTracks[0].order - 1;
-      } else if (mouseY > lastTrackY) {
-        isAbove = false;
-        newOrder = sortedTracks[sortedTracks.length - 1].order + 1;
-      } else {
-        // Inserted between tracks
-        for (let i = 0; i < sortedTracks.length - 1; i++) {
-          const y1 = getTrackCenterY(sortedTracks[i].id, viewportHeight);
-          const y2 = getTrackCenterY(sortedTracks[i + 1].id, viewportHeight);
-          if (mouseY >= y1 && mouseY <= y2) {
-            newOrder = (sortedTracks[i].order + sortedTracks[i + 1].order) / 2;
-            isAbove = mouseY < (y1 + y2) / 2;
-            break;
-          }
-        }
-      }
-
-      setContextMenu({
-        x: e.clientX,
-        y: e.clientY,
-        isAbove,
-        clickOrderPosition: newOrder,
-      });
+      setContextMenu(null);
     }
   };
 
@@ -419,21 +388,50 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     if (readerNode?.id === id) setReaderNode(null);
   };
 
+  // Helper to check if a track is the Main Timeline track (protected)
+  const isMainTrack = (track: TimelineTrack) => {
+    return track.id === 'track_main';
+  };
+
+  // Helpers to calculate exact order position relative to targeted track
+  const getNewOrderAbove = (targetTrack: TimelineTrack) => {
+    const sorted = [...tracks].sort((a, b) => a.order - b.order);
+    const idx = sorted.findIndex((t) => t.id === targetTrack.id);
+    if (idx <= 0) {
+      return targetTrack.order - 1;
+    }
+    return (sorted[idx - 1].order + targetTrack.order) / 2;
+  };
+
+  const getNewOrderBelow = (targetTrack: TimelineTrack) => {
+    const sorted = [...tracks].sort((a, b) => a.order - b.order);
+    const idx = sorted.findIndex((t) => t.id === targetTrack.id);
+    if (idx === -1 || idx === sorted.length - 1) {
+      return targetTrack.order + 1;
+    }
+    return (targetTrack.order + sorted[idx + 1].order) / 2;
+  };
+
   // Add Parallel Track
   const handleAddParallelTrack = (orderPos: number) => {
     setEditingTrack(null);
     setNewTrackOrderPosition(orderPos);
-    setTempTrackName(`GARIS WAKTU PARALEL ${tracks.length + 1}`);
+    setTempTrackName(`GARIS WAKTU PARALEL ${tracks.length}`);
     setShowTrackModal(true);
   };
 
-  // Delete Parallel Track
+  // Delete Parallel Track (Protected Main Track)
   const handleDeleteTrack = (trackId: string) => {
+    const trackToDelete = tracks.find((t) => t.id === trackId);
+    if (!trackToDelete || isMainTrack(trackToDelete)) {
+      alert('Garis waktu utama tidak dapat dihapus.');
+      return;
+    }
     if (tracks.length <= 1) {
       alert('Tidak dapat menghapus garis waktu terakhir.');
       return;
     }
-    if (window.confirm('Hapus garis waktu paralel ini beserta semua kejadiannya?')) {
+    if (window.confirm(`Hapus garis waktu "${trackToDelete.name}" beserta semua kejadiannya?`)) {
       setTracks((prev) => prev.filter((t) => t.id !== trackId));
       setNodes((prev) => prev.filter((n) => n.trackId !== trackId));
     }
@@ -535,23 +533,44 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           {/* Render Multi-Track Horizontal Lines & Labels */}
           {sortedTracks.map((track) => {
             const trackCenterY = getTrackCenterY(track.id, viewportHeight);
+            const isMain = isMainTrack(track);
 
             return (
               <React.Fragment key={track.id}>
-                {/* Thick Grey Horizontal Timeline Axis Line */}
-                <div
-                  style={{ top: `${trackCenterY}px` }}
-                  className="absolute left-0 right-0 -translate-y-1/2 h-1.5 bg-zinc-600 pointer-events-none shadow-[0_0_10px_rgba(161,161,170,0.25)]"
-                />
+                {/* Horizontal Timeline Axis Line (Minimalist Double-Rail for Main Track) */}
+                {isMain ? (
+                  <div
+                    style={{ top: `${trackCenterY}px` }}
+                    className="absolute left-0 right-0 -translate-y-1/2 pointer-events-none"
+                  >
+                    {/* Upper thin parallel accent line */}
+                    <div className="absolute left-0 right-0 -top-1.5 h-0.5 bg-zinc-500/60" />
+                    {/* Main center line */}
+                    <div className="h-2 bg-zinc-300 shadow-[0_0_8px_rgba(255,255,255,0.2)]" />
+                    {/* Lower thin parallel accent line */}
+                    <div className="absolute left-0 right-0 -bottom-1.5 h-0.5 bg-zinc-500/60" />
+                  </div>
+                ) : (
+                  <div
+                    style={{ top: `${trackCenterY}px` }}
+                    className="absolute left-0 right-0 -translate-y-1/2 h-1.5 bg-zinc-600 pointer-events-none shadow-[0_0_10px_rgba(161,161,170,0.25)]"
+                  />
+                )}
 
                 {/* Floating Track Name Badge on Left Margin */}
                 <div
                   style={{ top: `${trackCenterY}px` }}
                   className="absolute left-6 -translate-y-1/2 z-20 pointer-events-none"
                 >
-                  <span className="px-2.5 py-1 rounded-lg bg-zinc-900/90 border border-zinc-700/80 text-[10px] font-mono font-bold text-zinc-300 shadow-lg backdrop-blur-xs uppercase tracking-wider">
-                    {track.name}
-                  </span>
+                  {isMain ? (
+                    <span className="px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-400 text-[10px] font-mono font-bold text-zinc-100 shadow-md backdrop-blur-xs uppercase tracking-wider">
+                      [UTAMA] {track.name}
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-lg bg-zinc-900/90 border border-zinc-700/80 text-[10px] font-mono font-bold text-zinc-400 shadow-lg backdrop-blur-xs uppercase tracking-wider">
+                      {track.name}
+                    </span>
+                  )}
                 </div>
               </React.Fragment>
             );
@@ -562,6 +581,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             <g transform={`translate(${scrollX}, 0)`}>
               {sortedTracks.map((track) => {
                 const trackY = getTrackCenterY(track.id, viewportHeight);
+                const isMain = isMainTrack(track);
 
                 return (
                   <g key={`svg-track-${track.id}`}>
@@ -573,8 +593,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                           key={`arrow-${track.id}-${idx}`}
                           d="M 0 -5 L 8 0 L 0 5"
                           fill="none"
-                          stroke="#a1a1aa"
-                          strokeWidth={2.5}
+                          stroke={isMain ? '#d4d4d8' : '#71717a'}
+                          strokeWidth={isMain ? 2.5 : 2}
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           style={{ transform: `translate(${arrowX}px, ${trackY}px)` }}
@@ -589,9 +609,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                         <text
                           key={`label-${track.id}-${idx}`}
                           x={labelX}
-                          y={trackY - 12}
-                          fill="#a1a1aa"
-                          fillOpacity={0.35}
+                          y={trackY - 14}
+                          fill={isMain ? '#d4d4d8' : '#a1a1aa'}
+                          fillOpacity={isMain ? 0.45 : 0.25}
                           fontSize={11}
                           fontWeight="700"
                           letterSpacing="0.25em"
@@ -641,6 +661,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             {nodes.map((node, index) => {
               const nodeTrack = tracks.find((t) => t.id === node.trackId) || sortedTracks[0];
               const trackY = getTrackCenterY(nodeTrack.id, viewportHeight);
+              const isMain = isMainTrack(nodeTrack);
 
               // Calculate index within same track for upper/lower alternating stems
               const sameTrackNodes = nodes.filter((n) => n.trackId === nodeTrack.id).sort((a, b) => a.x - b.x);
@@ -659,7 +680,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   {/* Stem Line connected to Track Horizontal Line */}
                   <div
                     className={`absolute left-1/2 -translate-x-1/2 w-0.5 transition-colors ${
-                      isSelected ? 'bg-zinc-300 shadow-[0_0_8px_rgba(255,255,255,0.6)]' : 'bg-zinc-700'
+                      isSelected
+                        ? 'bg-zinc-300 shadow-[0_0_8px_rgba(255,255,255,0.6)]'
+                        : isMain
+                        ? 'bg-zinc-400'
+                        : 'bg-zinc-700'
                     }`}
                     style={{
                       top: isUpper ? `-${stemHeight}px` : '0px',
@@ -682,11 +707,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     className={`absolute -left-4 -top-4 w-8 h-8 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing z-30 transition-all ${
                       isSelected
                         ? 'bg-zinc-200 text-black ring-4 ring-zinc-400/60 scale-125'
-                        : 'bg-zinc-900 border-2 border-zinc-400 hover:border-white hover:scale-125 hover:ring-4 hover:ring-zinc-500/40'
+                        : isMain
+                        ? 'bg-zinc-950 border-2 border-zinc-200 ring-2 ring-zinc-500/40 hover:scale-125'
+                        : 'bg-zinc-900 border-2 border-zinc-500 hover:border-white hover:scale-125 hover:ring-4 hover:ring-zinc-500/40'
                     }`}
                     title="Klik untuk memilih, double-click untuk membuka detail, drag untuk menggeser"
                   >
-                    <div className="w-3 h-3 rounded-full bg-zinc-100 pointer-events-none" />
+                    <div
+                      className={`w-3 h-3 rounded-full pointer-events-none ${
+                        isMain ? 'bg-zinc-100 font-bold' : 'bg-zinc-300'
+                      }`}
+                    />
                   </div>
 
                   {/* Event Card (Alternating Top / Bottom) */}
@@ -794,7 +825,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    handleAddParallelTrack(contextMenu.targetTrack!.order - 1);
+                    const newOrder = getNewOrderAbove(contextMenu.targetTrack!);
+                    handleAddParallelTrack(newOrder);
                     setContextMenu(null);
                   }}
                   className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
@@ -806,7 +838,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    handleAddParallelTrack(contextMenu.targetTrack!.order + 1);
+                    const newOrder = getNewOrderBelow(contextMenu.targetTrack!);
+                    handleAddParallelTrack(newOrder);
                     setContextMenu(null);
                   }}
                   className="w-full px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors"
@@ -815,7 +848,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   <span>+ Garis Waktu Paralel di Bawah</span>
                 </button>
 
-                {tracks.length > 1 && (
+                {!isMainTrack(contextMenu.targetTrack!) && (
                   <button
                     type="button"
                     onClick={() => {
@@ -825,7 +858,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     className="w-full px-3 py-2 text-left text-rose-400 hover:bg-rose-500/10 rounded-lg flex items-center gap-2 font-medium cursor-pointer transition-colors border-t border-zinc-800/80 mt-1 pt-2"
                   >
                     <Icons.Trash2 size={14} />
-                    <span>Hapus Garis Waktu Ini</span>
+                    <span>Hapus Garis Waktu ({contextMenu.targetTrack.name})</span>
                   </button>
                 )}
               </>
