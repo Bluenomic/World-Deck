@@ -541,13 +541,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 {/* Thick Grey Horizontal Timeline Axis Line */}
                 <div
                   style={{ top: `${trackCenterY}px` }}
-                  className="absolute left-0 right-0 -translate-y-1/2 h-1.5 bg-zinc-600 pointer-events-none shadow-[0_0_10px_rgba(161,161,170,0.25)] transition-all duration-300 ease-out"
+                  className="absolute left-0 right-0 -translate-y-1/2 h-1.5 bg-zinc-600 pointer-events-none shadow-[0_0_10px_rgba(161,161,170,0.25)]"
                 />
 
                 {/* Floating Track Name Badge on Left Margin */}
                 <div
                   style={{ top: `${trackCenterY}px` }}
-                  className="absolute left-6 -translate-y-1/2 z-20 pointer-events-none transition-all duration-300 ease-out"
+                  className="absolute left-6 -translate-y-1/2 z-20 pointer-events-none"
                 >
                   <span className="px-2.5 py-1 rounded-lg bg-zinc-900/90 border border-zinc-700/80 text-[10px] font-mono font-bold text-zinc-300 shadow-lg backdrop-blur-xs uppercase tracking-wider">
                     {track.name}
@@ -596,7 +596,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                           fontWeight="700"
                           letterSpacing="0.25em"
                           textAnchor="middle"
-                          className="uppercase select-none font-mono transition-all duration-300 ease-out"
+                          className="uppercase select-none font-mono"
                         >
                           {track.name}
                         </text>
@@ -653,7 +653,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               return (
                 <div
                   key={node.id}
-                  className="absolute pointer-events-auto transition-all duration-300 ease-out"
+                  className="absolute pointer-events-auto"
                   style={{ left: `${node.x}px`, top: `${trackY}px` }}
                 >
                   {/* Stem Line connected to Track Horizontal Line */}
