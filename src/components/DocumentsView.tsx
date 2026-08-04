@@ -22,6 +22,14 @@ const CATEGORIES: { id: DocumentCategory | 'all'; label: string }[] = [
   { id: 'character_log', label: 'Karakter' },
 ];
 
+const FONT_SIZES = [
+  { label: 'Kecil (12px)', size: '12px', cmdSize: '2' },
+  { label: 'Normal (16px)', size: '16px', cmdSize: '3' },
+  { label: 'Sedang (20px)', size: '20px', cmdSize: '4' },
+  { label: 'Besar (24px)', size: '24px', cmdSize: '5' },
+  { label: 'Sangat Besar (32px)', size: '32px', cmdSize: '6' },
+];
+
 const EMOJI_LIST = [
   '📖', '📜', '⚔️', '🏰', '🔮', '👑', '🛡️', '✍️', '🌟', '📍',
   '🐉', '🌿', '💡', '⚡', '🗝️', '🗺️', '🧭', '🎭', '💎', '⏳', '📜', '✒️'
@@ -54,6 +62,23 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const [draftTitle, setDraftTitle] = useState('');
   const [draftCategory, setDraftCategory] = useState<DocumentCategory>('story');
 
+  // Active Toolbar Format State Indicator (Google Docs Style)
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+    bulletList: false,
+    numberedList: false,
+    alignLeft: false,
+    alignCenter: false,
+    alignRight: false,
+    alignJustify: false,
+    h1: false,
+    h2: false,
+    h3: false,
+  });
+
   // Editable div reference for Google Docs style WYSIWYG
   const editorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -81,9 +106,47 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
       if (mode === 'editing' && editorRef.current) {
         editorRef.current.innerHTML = activeDoc.content || '<p><br/></p>';
+        updateToolbarState();
       }
     }
   }, [activeDocId, mode]);
+
+  // Update Toolbar Command Active Indicators
+  const updateToolbarState = () => {
+    try {
+      if (document.queryCommandState) {
+        const formatBlock = document.queryCommandValue('formatBlock').toLowerCase();
+        setActiveFormats({
+          bold: document.queryCommandState('bold'),
+          italic: document.queryCommandState('italic'),
+          underline: document.queryCommandState('underline'),
+          strikethrough: document.queryCommandState('strikeThrough'),
+          bulletList: document.queryCommandState('insertUnorderedList'),
+          numberedList: document.queryCommandState('insertOrderedList'),
+          alignLeft: document.queryCommandState('justifyLeft'),
+          alignCenter: document.queryCommandState('justifyCenter'),
+          alignRight: document.queryCommandState('justifyRight'),
+          alignJustify: document.queryCommandState('justifyFull'),
+          h1: formatBlock === 'h1',
+          h2: formatBlock === 'h2',
+          h3: formatBlock === 'h3',
+        });
+      }
+    } catch (_err) {
+      // ignore
+    }
+  };
+
+  // Listen to Selection Change across Document for active toolbar updates
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      if (mode === 'editing') {
+        updateToolbarState();
+      }
+    };
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, [mode]);
 
   // Filtered documents list
   const filteredDocs = useMemo(() => {
@@ -122,6 +185,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     if (!editorRef.current) return;
     editorRef.current.focus();
     document.execCommand(command, false, value);
+    updateToolbarState();
   };
 
   // Insert HTML Snippet directly at cursor
@@ -129,15 +193,61 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     if (!editorRef.current) return;
     editorRef.current.focus();
     document.execCommand('insertHTML', false, htmlSnippet);
+    updateToolbarState();
   };
 
-  // Handle Header Selection
-  const handleHeaderChange = (tag: string) => {
-    if (!tag) return;
+  // Handle Header Selection Direct Toggle
+  const toggleHeader = (tag: 'h1' | 'h2' | 'h3' | 'p') => {
     if (tag === 'p') {
       execCmd('formatBlock', '<p>');
     } else {
       execCmd('formatBlock', `<${tag}>`);
+    }
+  };
+
+  // Handle Font Size Selection
+  const handleFontSizeChange = (sizeObj: typeof FONT_SIZES[0]) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    execCmd('fontSize', sizeObj.cmdSize);
+  };
+
+  // Keyboard Event Handler: Tab for Indent, Shift+Tab & Backspace for Outdent
+  const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        execCmd('outdent');
+      } else {
+        execCmd('indent');
+      }
+      return;
+    }
+
+    if (e.key === 'Backspace') {
+      const selection = window.getSelection();
+      if (selection && selection.isCollapsed && selection.anchorOffset === 0) {
+        // At start of line/block, perform outdent if indented
+        try {
+          execCmd('outdent');
+        } catch (_err) {
+          // ignore
+        }
+      }
+    }
+
+    if (e.ctrlKey || e.metaKey) {
+      const key = e.key.toLowerCase();
+      if (key === 'b') {
+        e.preventDefault();
+        execCmd('bold');
+      } else if (key === 'i') {
+        e.preventDefault();
+        execCmd('italic');
+      } else if (key === 'u') {
+        e.preventDefault();
+        execCmd('underline');
+      }
     }
   };
 
@@ -171,6 +281,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
   // Handle Inline @ Mention in ContentEditable
   const handleEditorKeyUp = () => {
+    updateToolbarState();
     const selection = window.getSelection();
     if (!selection || !selection.focusNode) return;
 
@@ -200,9 +311,6 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
   // Insert Mentioned Card as Rich Pill Badge
   const insertMentionCard = (card: WorldCard) => {
-    const selection = window.getSelection();
-    if (!selection || !selection.rangeCount) return;
-
     const badgeHtml = `<span contenteditable="false" data-card-id="${card.id}" class="card-mention-badge inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs font-semibold shadow-xs select-none cursor-pointer hover:bg-blue-500/30 transition-colors">@${card.title}</span>&nbsp;`;
     insertHtmlAtCursor(badgeHtml);
     setMentionState({ isOpen: false, query: '' });
@@ -212,7 +320,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const insertLayoutTemplate = (type: '2col' | 'sidebar' | 'callout' | 'divider') => {
     setShowLayoutMenu(false);
     if (type === '2col') {
-      const html = `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0;" class="my-6"><div style="padding: 0.75rem; border: 1px border-slate-800 rounded-xl bg-slate-900/40"><h3 class="text-lg font-bold text-white mb-2">Kolom Kiri</h3><p>Tulis naskah kolom kiri di sini...</p></div><div style="padding: 0.75rem; border: 1px border-slate-800 rounded-xl bg-slate-900/40"><h3 class="text-lg font-bold text-white mb-2">Kolom Kanan</h3><p>Tulis naskah kolom kanan di sini...</p></div></div><p><br/></p>`;
+      const html = `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0;" class="my-6"><div style="padding: 0.75rem; border: 1px solid rgba(255,255,255,0.1); rounded-xl bg-slate-900/40"><h3 class="text-lg font-bold text-white mb-2">Kolom Kiri</h3><p>Tulis naskah kolom kiri di sini...</p></div><div style="padding: 0.75rem; border: 1px solid rgba(255,255,255,0.1); rounded-xl bg-slate-900/40"><h3 class="text-lg font-bold text-white mb-2">Kolom Kanan</h3><p>Tulis naskah kolom kanan di sini...</p></div></div><p><br/></p>`;
       insertHtmlAtCursor(html);
     } else if (type === 'sidebar') {
       const html = `<div style="display: grid; grid-template-columns: 1fr 2.5fr; gap: 1.5rem; margin: 1.5rem 0;" class="my-6"><div style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.1);"><h4 class="text-xs font-bold uppercase text-slate-400 mb-1">Catatan Samping</h4><p class="text-xs text-slate-300">Ringkasan info atau lore tambahan...</p></div><div><h3 class="text-xl font-bold text-white mb-2">Naskah Utama</h3><p>Tulis narasi utama di sini...</p></div></div><p><br/></p>`;
@@ -496,58 +604,165 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               </div>
             </div>
 
-            {/* Google Docs Style Rich WYSIWYG Format Toolbar (Active ONLY in Edit Mode) */}
+            {/* Google Docs Style Rich WYSIWYG Format Toolbar with Active Indicators */}
             {mode === 'editing' && (
               <div className="relative z-40 px-6 py-2 app-bg-secondary/90 border-b border-slate-800/40 backdrop-blur-md flex items-center gap-1.5 text-xs text-slate-300 shrink-0 select-none">
-                {/* Header Style Select */}
+                {/* Header Style Direct Action Buttons (H1, H2, H3, P) without container */}
+                <div className="flex items-center gap-0.5 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleHeader('h1')}
+                    className={`px-2 py-1 rounded text-xs font-extrabold transition-all cursor-pointer ${
+                      activeFormats.h1 ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    }`}
+                    title="Judul Utama (H1)"
+                  >
+                    H1
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleHeader('h2')}
+                    className={`px-2 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
+                      activeFormats.h2 ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    }`}
+                    title="Sub Judul (H2)"
+                  >
+                    H2
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleHeader('h3')}
+                    className={`px-2 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
+                      activeFormats.h3 ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    }`}
+                    title="Bagian (H3)"
+                  >
+                    H3
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleHeader('p')}
+                    className="px-2 py-1 rounded text-xs font-medium hover:bg-slate-800 text-slate-400 transition-colors cursor-pointer"
+                    title="Paragraf Normal"
+                  >
+                    P
+                  </button>
+                </div>
+
+                <div className="h-4 w-px bg-slate-800 mx-1" />
+
+                {/* Font Size Dropdown Control */}
                 <select
                   onChange={(e) => {
-                    handleHeaderChange(e.target.value);
+                    const found = FONT_SIZES.find((f) => f.size === e.target.value);
+                    if (found) handleFontSizeChange(found);
                     e.target.value = '';
                   }}
-                  className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 font-semibold focus:outline-none cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 font-semibold focus:outline-none cursor-pointer"
                 >
-                  <option value="">Gaya Teks...</option>
-                  <option value="p">Paragraf Normal</option>
-                  <option value="h1">Judul Utama (H1)</option>
-                  <option value="h2">Sub Judul (H2)</option>
-                  <option value="h3">Bagian (H3)</option>
+                  <option value="">Ukuran Font...</option>
+                  {FONT_SIZES.map((f) => (
+                    <option key={f.size} value={f.size}>
+                      {f.label}
+                    </option>
+                  ))}
                 </select>
 
                 <div className="h-4 w-px bg-slate-800 mx-1" />
 
-                {/* Text Formatting Controls */}
+                {/* Text Formatting Controls with Live Active Indicators */}
                 <button
                   type="button"
                   onClick={() => execCmd('bold')}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 font-bold transition-colors"
-                  title="Cetak Tebal (Bold)"
+                  className={`p-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                    activeFormats.bold ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
+                  title="Cetak Tebal (Ctrl + B)"
                 >
                   <Icons.Bold size={14} />
                 </button>
+
                 <button
                   type="button"
                   onClick={() => execCmd('italic')}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-                  title="Cetak Miring (Italic)"
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeFormats.italic ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
+                  title="Cetak Miring (Ctrl + I)"
                 >
                   <Icons.Italic size={14} />
                 </button>
+
                 <button
                   type="button"
                   onClick={() => execCmd('underline')}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 underline transition-colors"
-                  title="Garis Bawah (Underline)"
+                  className={`p-1.5 rounded-lg underline transition-all cursor-pointer ${
+                    activeFormats.underline ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
+                  title="Garis Bawah (Ctrl + U)"
                 >
                   <Icons.Underline size={14} />
                 </button>
+
                 <button
                   type="button"
                   onClick={() => execCmd('strikeThrough')}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 line-through transition-colors"
+                  className={`p-1.5 rounded-lg line-through transition-all cursor-pointer ${
+                    activeFormats.strikethrough ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
                   title="Coret (Strikethrough)"
                 >
                   <Icons.Strikethrough size={14} />
+                </button>
+
+                <div className="h-4 w-px bg-slate-800 mx-1" />
+
+                {/* Alignment Controls (Justify, Left, Center, Right) */}
+                <button
+                  type="button"
+                  onClick={() => execCmd('justifyLeft')}
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeFormats.alignLeft ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
+                  title="Rata Kiri"
+                >
+                  <Icons.AlignLeft size={14} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => execCmd('justifyCenter')}
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeFormats.alignCenter ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
+                  title="Rata Tengah"
+                >
+                  <Icons.AlignCenter size={14} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => execCmd('justifyRight')}
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeFormats.alignRight ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
+                  title="Rata Kanan"
+                >
+                  <Icons.AlignRight size={14} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => execCmd('justifyFull')}
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeFormats.alignJustify ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
+                  title="Rata Kanan-Kiri (Justify)"
+                >
+                  <Icons.AlignJustify size={14} />
                 </button>
 
                 <div className="h-4 w-px bg-slate-800 mx-1" />
@@ -556,32 +771,39 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => execCmd('insertUnorderedList')}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeFormats.bulletList ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
                   title="Daftar Poin (Bullet List)"
                 >
                   <Icons.List size={14} />
                 </button>
+
                 <button
                   type="button"
                   onClick={() => execCmd('insertOrderedList')}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    activeFormats.numberedList ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
                   title="Daftar Angka (Numbered List)"
                 >
                   <Icons.ListOrdered size={14} />
                 </button>
+
                 <button
                   type="button"
                   onClick={() => execCmd('indent')}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-                  title="Tambah Indentasi"
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
+                  title="Tambah Indentasi (Tab)"
                 >
                   <Icons.Indent size={14} />
                 </button>
+
                 <button
                   type="button"
                   onClick={() => execCmd('outdent')}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-                  title="Kurangi Indentasi (Outdent)"
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
+                  title="Kurangi Indentasi (Shift + Tab / Backspace)"
                 >
                   <Icons.Outdent size={14} />
                 </button>
@@ -718,7 +940,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
                     {/* Live Rendered Content */}
                     <div
-                      className="prose prose-invert max-w-none text-base leading-relaxed text-slate-200 space-y-4 font-sans"
+                      className="prose prose-invert max-w-none text-base leading-relaxed text-slate-200 space-y-4 font-sans [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1"
                       dangerouslySetInnerHTML={{ __html: activeDoc.content || '<p class="text-slate-500 italic">Dokumen kosong...</p>' }}
                       onClick={(e) => {
                         const target = e.target as HTMLElement;
@@ -766,8 +988,10 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                         id="doc-editor-textarea"
                         ref={editorRef}
                         contentEditable={true}
+                        onKeyDown={handleEditorKeyDown}
                         onKeyUp={handleEditorKeyUp}
-                        className="w-full flex-1 bg-transparent text-base leading-relaxed app-text-main focus:outline-none resize-none font-sans space-y-3 p-1 min-h-[650px] border-0"
+                        onClick={updateToolbarState}
+                        className="w-full flex-1 bg-transparent text-base leading-relaxed app-text-main focus:outline-none resize-none font-sans space-y-3 p-1 min-h-[650px] border-0 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:text-3xl [&_h1]:font-extrabold [&_h1]:my-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:my-3 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:my-2"
                       />
 
                       {/* Inline @ Mention Suggestion Overlay */}
