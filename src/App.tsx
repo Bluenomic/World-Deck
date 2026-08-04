@@ -24,6 +24,8 @@ import { CanvasModal } from './components/CanvasModal';
 import { DeckModal } from './components/DeckModal';
 import { CardReaderSidebar } from './components/CardReaderSidebar';
 import { isTauriAvailable, saveWorldToDisk, listWorldsFromDisk } from './utils/tauriStorage';
+import { ConfirmModal } from './components/ConfirmModal';
+import type { ConfirmModalConfig } from './components/ConfirmModal';
 
 
 const STORAGE_THEME_KEY = 'worlddeck_theme_v1';
@@ -112,6 +114,21 @@ export const App: React.FC = () => {
   // Undo & Redo History State
   const [historyStack, setHistoryStack] = useState<WorldProject[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
+
+  // Custom Confirm & Alert Modal State
+  const [confirmModalConfig, setConfirmModalConfig] = useState<ConfirmModalConfig | null>(null);
+
+  const showAlertModal = (title: string, description: string, variant: 'danger' | 'warning' | 'info' | 'success' = 'info') => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title,
+      description,
+      isAlertOnly: true,
+      variant,
+      confirmLabel: 'Mengerti',
+      onConfirm: () => setConfirmModalConfig(null),
+    });
+  };
 
   // Async Load State on Startup from Tauri Disk, IndexedDB, or LocalStorage
   useEffect(() => {
@@ -490,14 +507,21 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteDeck = (deckId: string) => {
-    if (window.confirm('Hapus Deck ini? Kartu di dalamnya tidak akan terhapus.')) {
-      updateActiveWorld((prev) => ({
-        ...prev,
-        updatedAt: Date.now(),
-        decks: (prev.decks || []).filter((d) => d.id !== deckId),
-        cards: prev.cards.map((c) => (c.deckId === deckId ? { ...c, deckId: undefined } : c)),
-      }));
-    }
+    setConfirmModalConfig({
+      isOpen: true,
+      title: 'Hapus Deck / Folder',
+      description: 'Apakah Anda yakin ingin menghapus Deck ini? Kartu-kartu di dalamnya tidak akan terhapus dan akan dikembalikan menjadi kartu mandiri.',
+      confirmLabel: 'Hapus Deck',
+      variant: 'danger',
+      onConfirm: () => {
+        updateActiveWorld((prev) => ({
+          ...prev,
+          updatedAt: Date.now(),
+          decks: (prev.decks || []).filter((d) => d.id !== deckId),
+          cards: prev.cards.map((c) => (c.deckId === deckId ? { ...c, deckId: undefined } : c)),
+        }));
+      },
+    });
   };
 
   const handleAssignCardToDeck = (cardId: string, deckId?: string) => {
@@ -611,7 +635,7 @@ export const App: React.FC = () => {
       (c) => (c.sourceId === sourceId && c.targetId === targetId) || (c.sourceId === targetId && c.targetId === sourceId)
     );
     if (existing) {
-      alert('Dua kartu ini sudah saling terhubung!');
+      showAlertModal('Koneksi Sudah Ada', 'Dua kartu ini sudah saling terhubung satu sama lain.', 'warning');
       return;
     }
 
@@ -667,27 +691,33 @@ export const App: React.FC = () => {
   const handleCreateWorld = (newWorld: WorldProject) => {
     setWorlds((prev) => [...prev, newWorld]);
     setActiveWorldId(newWorld.id);
-
   };
 
   const handleDeleteWorld = (worldId: string) => {
     if (worlds.length <= 1) {
-      alert('Anda harus memiliki setidaknya satu dunia.');
+      showAlertModal('Tidak Dapat Menghapus Dunia', 'Anda harus memiliki setidaknya satu dunia dalam workspace.', 'warning');
       return;
     }
-    if (window.confirm('Hapus dunia ini secara permanen dari daftar dunia Anda?')) {
-      const remaining = worlds.filter((w) => w.id !== worldId);
-      setWorlds(remaining);
-      
-      // Delete project file from local directory
-      if (localDirectoryHandle) {
-        deleteProjectFromDirectory(localDirectoryHandle, worldId);
-      }
+    setConfirmModalConfig({
+      isOpen: true,
+      title: 'Hapus Dunia / Workspace',
+      description: 'Apakah Anda yakin ingin menghapus dunia ini secara permanen dari daftar dunia Anda?',
+      confirmLabel: 'Hapus Permanen',
+      variant: 'danger',
+      onConfirm: () => {
+        const remaining = worlds.filter((w) => w.id !== worldId);
+        setWorlds(remaining);
+        
+        // Delete project file from local directory
+        if (localDirectoryHandle) {
+          deleteProjectFromDirectory(localDirectoryHandle, worldId);
+        }
 
-      if (activeWorldId === worldId) {
-        setActiveWorldId(remaining[0].id);
-      }
-    }
+        if (activeWorldId === worldId) {
+          setActiveWorldId(remaining[0].id);
+        }
+      },
+    });
   };
 
   const handleDuplicateWorld = (worldId: string) => {
@@ -769,31 +799,37 @@ export const App: React.FC = () => {
       ? activeWorld.canvases
       : [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }];
     if (canvases.length <= 1) {
-      alert('Anda harus menyisakan setidaknya satu kanvas.');
+      showAlertModal('Tidak Dapat Menghapus Kanvas', 'Anda harus menyisakan setidaknya satu kanvas.', 'warning');
       return;
     }
-    if (window.confirm('Hapus kanvas ini beserta semua kartu di dalamnya secara permanen?')) {
-      updateActiveWorld((prev) => {
-        const remainingCanvases = (prev.canvases || []).filter((c) => c.id !== canvasId);
-        return {
-          ...prev,
-          canvases: remainingCanvases,
-          cards: prev.cards.filter((c) => (c.canvasId || 'default') !== canvasId),
-          connections: prev.connections.filter((conn) => {
-            const sourceCard = prev.cards.find((c) => c.id === conn.sourceId);
-            const targetCard = prev.cards.find((c) => c.id === conn.targetId);
-            return (
-              sourceCard && (sourceCard.canvasId || 'default') !== canvasId &&
-              targetCard && (targetCard.canvasId || 'default') !== canvasId
-            );
-          }),
-          updatedAt: Date.now(),
-        };
-      });
-      // Switch active canvas
-      const remaining = canvases.filter((c) => c.id !== canvasId);
-      setActiveCanvasId(remaining[0].id);
-    }
+    setConfirmModalConfig({
+      isOpen: true,
+      title: 'Hapus Kanvas',
+      description: 'Apakah Anda yakin ingin menghapus kanvas ini beserta lokasi kartu di dalamnya secara permanen?',
+      confirmLabel: 'Hapus Kanvas',
+      variant: 'danger',
+      onConfirm: () => {
+        updateActiveWorld((prev) => {
+          const remainingCanvases = (prev.canvases || []).filter((c) => c.id !== canvasId);
+          return {
+            ...prev,
+            canvases: remainingCanvases,
+            cards: prev.cards.filter((c) => (c.canvasId || 'default') !== canvasId),
+            connections: prev.connections.filter((conn) => {
+              const sourceCard = prev.cards.find((c) => c.id === conn.sourceId);
+              const targetCard = prev.cards.find((c) => c.id === conn.targetId);
+              return (
+                sourceCard && (sourceCard.canvasId || 'default') !== canvasId &&
+                targetCard && (targetCard.canvasId || 'default') !== canvasId
+              );
+            }),
+            updatedAt: Date.now(),
+          };
+        });
+        const remaining = canvases.filter((c) => c.id !== canvasId);
+        setActiveCanvasId(remaining[0].id);
+      },
+    });
   };
 
   const handleUpdateWorldInfo = (worldId: string, name: string, description: string, author: string) => {
@@ -809,7 +845,6 @@ export const App: React.FC = () => {
   // Export JSON
   const handleExport = () => {
     downloadProjectJson(activeWorld);
-
   };
 
   // Import JSON
@@ -831,12 +866,12 @@ export const App: React.FC = () => {
           setWorlds((prev) => [...prev, newWorld]);
           setActiveWorldId(newWorld.id);
 
-          alert(`Berhasil mengimpor dunia: ${newWorld.name}`);
+          showAlertModal('Sukses Impor Dunia', `Berhasil mengimpor dunia: ${newWorld.name}`, 'success');
         } else {
-          alert('Format berkas JSON tidak valid.');
+          showAlertModal('Gagal Impor', 'Format berkas JSON tidak valid.', 'danger');
         }
       } catch (err) {
-        alert('Gagal membaca berkas JSON.');
+        showAlertModal('Gagal Membaca Berkas', 'Gagal membaca berkas JSON yang dipilih.', 'danger');
       }
     };
     reader.readAsText(file);
@@ -847,14 +882,21 @@ export const App: React.FC = () => {
     if (viewMode === 'timeline') {
       window.dispatchEvent(new CustomEvent('worlddeck_clear_timeline'));
     } else {
-      if (window.confirm('Bersihkan semua kartu pada dunia ini dan mulai canvas kosong?')) {
-        updateActiveWorld((prev) => ({
-          ...prev,
-          cards: [],
-          connections: [],
-          updatedAt: Date.now(),
-        }));
-      }
+      setConfirmModalConfig({
+        isOpen: true,
+        title: 'Bersihkan Seluruh Kartu',
+        description: 'Apakah Anda yakin ingin membersihkan seluruh kartu pada dunia ini dan memulai dari kanvas kosong?',
+        confirmLabel: 'Bersihkan Kartu',
+        variant: 'danger',
+        onConfirm: () => {
+          updateActiveWorld((prev) => ({
+            ...prev,
+            cards: [],
+            connections: [],
+            updatedAt: Date.now(),
+          }));
+        },
+      });
     }
   };
 
@@ -1150,6 +1192,12 @@ export const App: React.FC = () => {
         }}
         deck={editingDeck}
         onSaveDeck={handleSaveDeck}
+      />
+
+      {/* Universal Reusable Custom Confirm & Alert Modal */}
+      <ConfirmModal
+        config={confirmModalConfig}
+        onClose={() => setConfirmModalConfig(null)}
       />
     </div>
   );

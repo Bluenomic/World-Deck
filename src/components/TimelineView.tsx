@@ -4,6 +4,8 @@ import { generateId } from '../utils/helpers';
 import * as Icons from 'lucide-react';
 import { TimelineDeleteModal } from './TimelineDeleteModal';
 import type { TimelineDeleteTarget } from './TimelineDeleteModal';
+import { ConfirmModal } from './ConfirmModal';
+import type { ConfirmModalConfig } from './ConfirmModal';
 
 interface TimelineTrack {
   id: string;
@@ -160,6 +162,21 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     isAbove?: boolean;
     clickOrderPosition?: number;
   } | null>(null);
+
+  // Notice Modal State
+  const [noticeModal, setNoticeModal] = useState<ConfirmModalConfig | null>(null);
+
+  const showNotice = (title: string, description: string) => {
+    setNoticeModal({
+      isOpen: true,
+      title,
+      description,
+      isAlertOnly: true,
+      variant: 'warning',
+      confirmLabel: 'Mengerti',
+      onConfirm: () => setNoticeModal(null),
+    });
+  };
 
   // Track Name Modal State
   const [showTrackModal, setShowTrackModal] = useState<boolean>(false);
@@ -610,11 +627,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const handleDeleteTrack = (trackId: string) => {
     const trackToDelete = tracks.find((t) => t.id === trackId);
     if (!trackToDelete || isMainTrack(trackToDelete)) {
-      alert('Garis waktu utama tidak dapat dihapus.');
+      showNotice('Garis Waktu Dilindungi', 'Garis waktu utama dilindungi dan tidak dapat dihapus.');
       return;
     }
     if (tracks.length <= 1) {
-      alert('Tidak dapat menghapus garis waktu terakhir.');
+      showNotice('Garis Waktu Terakhir', 'Tidak dapat menghapus garis waktu terakhir.');
       return;
     }
 
@@ -1530,6 +1547,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         target={deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleConfirmDelete}
+      />
+
+      {/* Custom Reusable Notice Modal */}
+      <ConfirmModal
+        config={noticeModal}
+        onClose={() => setNoticeModal(null)}
       />
     </div>
   );
