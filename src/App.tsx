@@ -864,7 +864,7 @@ export const App: React.FC = () => {
     if (viewMode !== 'canvas') setViewMode('canvas');
   };
 
-  if (isLoaded && (!localDirectoryHandle || needDirectoryPermission)) {
+  if (isLoaded && !isTauriAvailable() && (!localDirectoryHandle || needDirectoryPermission)) {
     return (
       <div className="h-screen w-screen flex items-center justify-center app-bg-main app-text-main font-sans relative overflow-hidden">
         {/* Background Decorative Gradients */}
