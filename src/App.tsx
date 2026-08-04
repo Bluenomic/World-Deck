@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme } from './types';
+import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme, WorldDocument } from './types';
 import { SAMPLE_WORLD } from './data/sampleWorld';
 import { generateId, downloadProjectJson } from './utils/helpers';
 import { saveLocalFileHandle, loadLocalFileHandle, loadWorkspacePreferences, saveWorkspacePreferences } from './utils/storage';
@@ -14,7 +14,7 @@ import { SidebarFilter } from './components/SidebarFilter';
 import { Canvas } from './components/Canvas';
 import { LibraryView } from './components/LibraryView';
 import { TimelineView } from './components/TimelineView';
-import { RelationListView } from './components/RelationListView';
+import { DocumentsView } from './components/DocumentsView';
 import { CardEditorModal } from './components/CardEditorModal';
 import { ConnectionModal } from './components/ConnectionModal';
 import { HelpGuideModal } from './components/HelpGuideModal';
@@ -541,6 +541,47 @@ export const App: React.FC = () => {
         cards: updatedCards,
         decks: updatedDecks,
       };
+    });
+  };
+
+  // Document Management Handlers
+  const handleSaveDocument = (updatedDoc: WorldDocument) => {
+    updateActiveWorld((prev) => {
+      const existingDocs = prev.documents || [];
+      const exists = existingDocs.some((d) => d.id === updatedDoc.id);
+      const docs = exists
+        ? existingDocs.map((d) => (d.id === updatedDoc.id ? updatedDoc : d))
+        : [...existingDocs, updatedDoc];
+      return {
+        ...prev,
+        documents: docs,
+        updatedAt: Date.now(),
+      };
+    });
+  };
+
+  const handleCreateDocument = (newDoc: WorldDocument) => {
+    updateActiveWorld((prev) => ({
+      ...prev,
+      documents: [...(prev.documents || []), newDoc],
+      updatedAt: Date.now(),
+    }));
+  };
+
+  const handleDeleteDocument = (docId: string) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: 'Hapus Dokumen',
+      description: 'Apakah Anda yakin ingin menghapus dokumen naskah ini secara permanen?',
+      confirmLabel: 'Hapus Dokumen',
+      variant: 'danger',
+      onConfirm: () => {
+        updateActiveWorld((prev) => ({
+          ...prev,
+          documents: (prev.documents || []).filter((d) => d.id !== docId),
+          updatedAt: Date.now(),
+        }));
+      },
     });
   };
 
@@ -1074,13 +1115,14 @@ export const App: React.FC = () => {
             />
           )}
 
-          {viewMode === 'relations' && (
-            <RelationListView
-              connections={activeCanvasConnections}
-              cards={activeCanvasCards}
-              onEditConnection={(conn) => setEditingConnection(conn)}
-              onDeleteConnection={handleDeleteConnection}
-              onNavigateToCard={handleNavigateToCard}
+          {viewMode === 'documents' && (
+            <DocumentsView
+              documents={activeWorld.documents || []}
+              cards={activeWorld.cards}
+              onSaveDocument={handleSaveDocument}
+              onDeleteDocument={handleDeleteDocument}
+              onCreateDocument={handleCreateDocument}
+              onOpenCard={(card) => setReaderCardId(card.id)}
             />
           )}
         </main>

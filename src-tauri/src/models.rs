@@ -33,6 +33,23 @@ pub struct WorldDeck {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct WorldDocument {
+    pub id: String,
+    pub title: String,
+    pub content: String,
+    pub category: String,
+    #[serde(default)]
+    pub summary: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub associated_card_ids: Vec<String>,
+    pub created_at: f64,
+    pub updated_at: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorldCard {
     pub id: String,
     pub title: String,
@@ -95,6 +112,8 @@ pub struct WorldProject {
     pub canvases: Option<Vec<WorldCanvas>>,
     #[serde(default)]
     pub decks: Option<Vec<WorldDeck>>,
+    #[serde(default)]
+    pub documents: Option<Vec<WorldDocument>>,
     pub created_at: f64,
     pub updated_at: f64,
 }

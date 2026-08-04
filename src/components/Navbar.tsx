@@ -117,15 +117,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <button
           type="button"
-          onClick={() => onViewModeChange('relations')}
-          className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all ${
-            viewMode === 'relations'
+          onClick={() => onViewModeChange('documents')}
+          className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+            viewMode === 'documents'
               ? 'app-bg-main app-text-main shadow-sm font-semibold'
               : 'app-text-muted hover:app-text-main app-bg-hover'
           }`}
         >
-          <Icons.GitCommit size={13} />
-          <span>Tabel Relasi</span>
+          <Icons.BookOpen size={13} />
+          <span>Dokumen</span>
         </button>
       </div>
 

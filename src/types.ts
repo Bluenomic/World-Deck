@@ -74,6 +74,25 @@ export interface CardConnection {
   description?: string;
 }
 
+export type DocumentCategory = 
+  | 'story'
+  | 'note'
+  | 'chapter'
+  | 'world_guide'
+  | 'character_log';
+
+export interface WorldDocument {
+  id: string;
+  title: string;
+  content: string;
+  category: DocumentCategory;
+  summary?: string;
+  tags?: string[];
+  associatedCardIds?: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface WorldProject {
   id: string;
   name: string;
@@ -84,6 +103,7 @@ export interface WorldProject {
   connections: CardConnection[];
   canvases?: WorldCanvas[];
   decks?: WorldDeck[];
+  documents?: WorldDocument[];
   createdAt: number;
   updatedAt: number;
 }
@@ -99,7 +119,7 @@ export interface TimelineBranch {
   label?: string;
 }
 
-export type ViewMode = 'canvas' | 'library' | 'timeline' | 'relations';
+export type ViewMode = 'canvas' | 'library' | 'timeline' | 'documents';
 
 export type AppTheme = 'dark' | 'light';
 
