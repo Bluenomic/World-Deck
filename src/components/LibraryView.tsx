@@ -411,8 +411,18 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const handleDrop = (e: React.DragEvent, deckId: string) => {
     e.preventDefault();
     const cardId = e.dataTransfer.getData('text/plain') || draggedCardIdRef.current || draggedCardId;
-    if (cardId) {
-      onAssignCardToDeck(cardId, deckId);
+
+    const cardsToAssign =
+      selectedCardIds.size > 0
+        ? Array.from(new Set(cardId ? [...Array.from(selectedCardIds), cardId] : Array.from(selectedCardIds)))
+        : cardId
+        ? [cardId]
+        : [];
+
+    if (cardsToAssign.length > 0) {
+      cardsToAssign.forEach((id) => onAssignCardToDeck(id, deckId));
+      setSelectedCardIds(new Set());
+      setIsSelectionMode(false);
       setSuccessDeckId(deckId);
 
       setTimeout(() => setSuccessDeckId(null), 1200);
