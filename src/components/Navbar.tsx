@@ -21,6 +21,13 @@ interface NavbarProps {
   onRedo: () => void;
 }
 
+const VIEW_TABS: { id: ViewMode; label: string; icon: any }[] = [
+  { id: 'canvas', label: 'Canvas', icon: Icons.LayoutGrid },
+  { id: 'library', label: 'Galeri', icon: Icons.Library },
+  { id: 'timeline', label: 'Timeline', icon: Icons.Clock },
+  { id: 'documents', label: 'Dokumen', icon: Icons.BookOpen },
+];
+
 export const Navbar: React.FC<NavbarProps> = ({
   projectName,
   viewMode,
@@ -55,121 +62,91 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   return (
-    <header className="h-12 app-bg-main border-b app-border px-3 md:px-4 flex items-center justify-between z-40 relative select-none transition-colors">
+    <header className="h-12 app-bg-main px-4 md:px-6 flex items-center justify-between z-40 relative select-none transition-colors">
       
-      {/* Breadcrumbs & App Logo */}
-      <div className="flex items-center gap-2.5 text-xs">
+      {/* LEFT: Project Name & Workspace Switcher Trigger */}
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={onOpenWorldManager}
-          className="flex items-center gap-2 px-2 py-1 rounded-lg app-text-main hover:app-bg-hover transition-all font-semibold group cursor-pointer"
-          title="Pengelola Workspace World Deck"
+          className="flex items-center gap-2 px-2 py-1 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/40 transition-all font-bold group cursor-pointer"
+          title="Buka Pengelola Workspace & Dunia"
         >
           <img
             src="/wd-logo-circle.png"
             alt="World Deck Logo"
-            className="w-6 h-6 object-contain rounded-full shadow-sm group-hover:scale-105 transition-transform"
+            className="w-6 h-6 object-contain rounded-full shadow-md group-hover:scale-105 transition-transform"
           />
-          <span className="truncate max-w-[150px] sm:max-w-[200px]">{projectName}</span>
+          <span className="text-xs md:text-sm font-extrabold tracking-tight truncate max-w-[140px] sm:max-w-[200px]">
+            {projectName}
+          </span>
+          <Icons.ChevronDown size={13} className="text-slate-500 group-hover:text-slate-300 transition-colors" />
         </button>
       </div>
 
-      {/* View Mode Switcher (Database Tabs) */}
-      <div className="hidden lg:flex items-center gap-0.5 app-bg-secondary p-1 rounded-lg border app-border">
-        <button
-          type="button"
-          onClick={() => onViewModeChange('canvas')}
-          className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all ${
-            viewMode === 'canvas'
-              ? 'app-bg-main app-text-main shadow-sm font-semibold'
-              : 'app-text-muted hover:app-text-main app-bg-hover'
-          }`}
-        >
-          <Icons.LayoutGrid size={13} />
-          <span>Canvas</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onViewModeChange('library')}
-          className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all ${
-            viewMode === 'library'
-              ? 'app-bg-main app-text-main shadow-sm font-semibold'
-              : 'app-text-muted hover:app-text-main app-bg-hover'
-          }`}
-        >
-          <Icons.Library size={13} />
-          <span>Galeri</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onViewModeChange('timeline')}
-          className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all ${
-            viewMode === 'timeline'
-              ? 'app-bg-main app-text-main shadow-sm font-semibold'
-              : 'app-text-muted hover:app-text-main app-bg-hover'
-          }`}
-        >
-          <Icons.Clock size={13} />
-          <span>Timeline</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onViewModeChange('documents')}
-          className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
-            viewMode === 'documents'
-              ? 'app-bg-main app-text-main shadow-sm font-semibold'
-              : 'app-text-muted hover:app-text-main app-bg-hover'
-          }`}
-        >
-          <Icons.BookOpen size={13} />
-          <span>Dokumen</span>
-        </button>
+      {/* CENTER: Minimalist Navigation Controls */}
+      <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-1">
+        {VIEW_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = viewMode === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onViewModeChange(tab.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs md:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-slate-800/90 text-white font-bold shadow-xs'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+              }`}
+            >
+              <Icon size={15} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Right Controls Area */}
+      {/* RIGHT: Action Controls (Undo, Redo, Theme, Menu) */}
       <div className="flex items-center gap-2">
-        
-        {/* Undo / Redo Buttons */}
-        <div className="flex items-center gap-0.5 app-bg-secondary border app-border rounded-lg p-0.5">
+        {/* Undo / Redo Controls */}
+        <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={onUndo}
             disabled={!canUndo}
-            className={`p-1.5 rounded-md transition-colors ${
+            className={`p-2 rounded-xl transition-all ${
               canUndo
-                ? 'app-text-main hover:app-bg-hover cursor-pointer'
-                : 'app-text-muted opacity-30 cursor-not-allowed'
+                ? 'text-slate-300 hover:text-white hover:bg-slate-800/40 cursor-pointer active:scale-95'
+                : 'text-slate-600 opacity-40 cursor-not-allowed'
             }`}
             title="Undo / Batal Perubahan (Ctrl + Z)"
           >
-            <Icons.Undo2 size={14} />
+            <Icons.Undo2 size={16} />
           </button>
           <button
             type="button"
             onClick={onRedo}
             disabled={!canRedo}
-            className={`p-1.5 rounded-md transition-colors ${
+            className={`p-2 rounded-xl transition-all ${
               canRedo
-                ? 'app-text-main hover:app-bg-hover cursor-pointer'
-                : 'app-text-muted opacity-30 cursor-not-allowed'
+                ? 'text-slate-300 hover:text-white hover:bg-slate-800/40 cursor-pointer active:scale-95'
+                : 'text-slate-600 opacity-40 cursor-not-allowed'
             }`}
             title="Redo / Ulangi Perubahan (Ctrl + Y)"
           >
-            <Icons.Redo2 size={14} />
+            <Icons.Redo2 size={16} />
           </button>
         </div>
 
-        {/* Dark / Light Theme Toggle Button */}
+        {/* Theme Toggle Button */}
         <button
           type="button"
           onClick={() => onThemeChange(currentTheme === 'dark' ? 'light' : 'dark')}
-          className="p-1.5 rounded-lg app-bg-secondary border app-border app-text-main hover:app-bg-hover transition-colors cursor-pointer"
+          className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/40 transition-colors cursor-pointer"
           title={currentTheme === 'dark' ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'}
         >
-          {currentTheme === 'dark' ? <Icons.Sun size={15} /> : <Icons.Moon size={15} />}
+          {currentTheme === 'dark' ? <Icons.Sun size={17} /> : <Icons.Moon size={17} />}
         </button>
 
         {/* Consolidated Actions Dropdown Menu */}
@@ -177,31 +154,29 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="px-2.5 py-1 rounded-lg app-bg-secondary border app-border app-text-main hover:app-bg-hover text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+            className="px-3 py-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/40 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
             title="Opsi & Menu Proyek"
           >
-            <Icons.SlidersHorizontal size={14} className="app-text-muted" />
-            <span className="hidden sm:inline">Menu Proyek</span>
-            <Icons.ChevronDown size={13} className={`app-text-muted transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
+            <Icons.SlidersHorizontal size={15} className="text-slate-400" />
+            <span className="hidden sm:inline">Menu</span>
+            <Icons.ChevronDown size={13} className={`text-slate-400 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {isMenuOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-56 app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 z-50 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 space-y-0.5 overflow-hidden">
-              <div className="px-3 py-2 border-b app-border app-bg-main flex items-center gap-2.5">
+            <div className="absolute right-0 top-full mt-2 w-56 app-bg-secondary border border-slate-700/60 rounded-2xl shadow-2xl py-1.5 z-50 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 space-y-0.5 overflow-hidden">
+              <div className="px-3 py-2 border-b border-slate-800 app-bg-main flex items-center gap-2.5">
                 <img src="/wd-logo-circle.png" alt="World Deck" className="w-6 h-6 object-contain rounded-full" />
                 <div>
                   <div className="font-bold text-xs app-text-main leading-tight">World Deck</div>
-                  <div className="text-[10px] app-text-muted">Cards Worldbuilding</div>
+                  <div className="text-[10px] text-slate-400">Cards Worldbuilding</div>
                 </div>
               </div>
 
               {localDirectoryName && (
-                <>
-                  <div className="px-3 py-2 bg-emerald-950/30 text-emerald-400 font-semibold border-b app-border flex items-center gap-1.5 select-none" title={`Folder Workspace: ${localDirectoryName}`}>
-                    <Icons.FolderClosed size={13} className="text-emerald-400 min-w-[13px]" />
-                    <span className="truncate">WS: {localDirectoryName}</span>
-                  </div>
-                </>
+                <div className="px-3 py-2 bg-emerald-950/30 text-emerald-400 font-semibold border-b border-slate-800 flex items-center gap-1.5 select-none" title={`Folder Workspace: ${localDirectoryName}`}>
+                  <Icons.FolderClosed size={13} className="text-emerald-400 min-w-[13px]" />
+                  <span className="truncate">WS: {localDirectoryName}</span>
+                </div>
               )}
 
               <button
@@ -210,13 +185,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setIsMenuOpen(false);
                   onChangeDirectory();
                 }}
-                className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-medium text-amber-500"
+                className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors font-medium text-amber-500 cursor-pointer"
               >
                 <Icons.FolderOpen size={14} />
                 <span>Ganti Folder Workspace</span>
               </button>
 
-              <div className="my-1 border-t app-border opacity-50" />
+              <div className="my-1 border-t border-slate-800" />
 
               <button
                 type="button"
@@ -224,9 +199,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setIsMenuOpen(false);
                   onExport();
                 }}
-                className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors"
+                className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
               >
-                <Icons.Download size={14} className="app-accent-text" />
+                <Icons.Download size={14} className="text-blue-400" />
                 <span>Ekspor Proyek (JSON)</span>
               </button>
 
@@ -236,9 +211,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setIsMenuOpen(false);
                   fileInputRef.current?.click();
                 }}
-                className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors"
+                className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
               >
-                <Icons.Upload size={14} className="app-accent-text" />
+                <Icons.Upload size={14} className="text-blue-400" />
                 <span>Impor Proyek (JSON)</span>
               </button>
               <input
@@ -252,7 +227,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="hidden"
               />
 
-              <div className="my-1 border-t app-border opacity-50" />
+              <div className="my-1 border-t border-slate-800" />
 
               {/* Theme Selector inside Dropdown */}
               <button
@@ -261,18 +236,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   onThemeChange(currentTheme === 'dark' ? 'light' : 'dark');
                   setIsMenuOpen(false);
                 }}
-                className="w-full px-3 py-2 flex items-center justify-between hover:app-bg-hover transition-colors text-xs font-semibold"
+                className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-800 transition-colors text-xs font-semibold cursor-pointer"
               >
                 <div className="flex items-center gap-2">
-                  <Icons.Palette size={14} className="app-text-muted" />
+                  <Icons.Palette size={14} className="text-slate-400" />
                   <span>Tema Aplikasi</span>
                 </div>
-                <span className="text-xs font-medium app-text-muted">
+                <span className="text-xs font-medium text-slate-400">
                   {currentTheme === 'dark' ? 'Mode Gelap' : 'Mode Terang'}
                 </span>
               </button>
 
-              <div className="my-1 border-t app-border opacity-50" />
+              <div className="my-1 border-t border-slate-800" />
 
               <button
                 type="button"
@@ -280,9 +255,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setIsMenuOpen(false);
                   onOpenHelp();
                 }}
-                className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors"
+                className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
               >
-                <Icons.HelpCircle size={14} className="app-text-muted" />
+                <Icons.HelpCircle size={14} className="text-slate-400" />
                 <span>Panduan Worldbuilding</span>
               </button>
 
@@ -292,10 +267,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setIsMenuOpen(false);
                   onResetWorld();
                 }}
-                className="w-full px-3 py-2 text-left hover:app-bg-hover text-amber-500 flex items-center gap-2 transition-colors"
+                className="w-full px-3 py-2 text-left hover:bg-slate-800 text-rose-400 flex items-center gap-2 transition-colors cursor-pointer"
               >
                 <Icons.RotateCcw size={14} />
-                <span>Bersihkan</span>
+                <span>Bersihkan Workspace</span>
               </button>
             </div>
           )}
