@@ -23,6 +23,7 @@ import { DeleteCardModal } from './components/DeleteCardModal';
 import { CanvasModal } from './components/CanvasModal';
 import { DeckModal } from './components/DeckModal';
 import { CardReaderSidebar } from './components/CardReaderSidebar';
+import { isTauriAvailable, saveWorldToDisk, listWorldsFromDisk } from './utils/tauriStorage';
 
 
 const STORAGE_THEME_KEY = 'worlddeck_theme_v1';
@@ -112,9 +113,29 @@ export const App: React.FC = () => {
   const [historyStack, setHistoryStack] = useState<WorldProject[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
-  // Async Load State on Startup from IndexedDB & LocalStorage
+  // Async Load State on Startup from Tauri Disk, IndexedDB, or LocalStorage
   useEffect(() => {
-    // Load persisted local directory handle from IndexedDB
+    if (isTauriAvailable()) {
+      listWorldsFromDisk().then(async (projects) => {
+        if (projects.length > 0) {
+          setWorlds(projects);
+          const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
+          if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
+            setActiveWorldId(savedActiveId);
+          } else {
+            setActiveWorldId(projects[0].id);
+          }
+        } else {
+          await saveWorldToDisk(SAMPLE_WORLD);
+          setWorlds([SAMPLE_WORLD]);
+          setActiveWorldId(SAMPLE_WORLD.id);
+        }
+        setIsLoaded(true);
+      });
+      return;
+    }
+
+    // Load persisted local directory handle from IndexedDB (for Web)
     loadLocalFileHandle().then(async (handle) => {
       if (handle) {
         try {
@@ -173,9 +194,14 @@ export const App: React.FC = () => {
     localStorage.setItem('worlddeck_active_id_v2', activeWorldId);
   }, [activeWorldId, isLoaded]);
 
-  // Auto save active world directly to linked local directory
+  // Auto save active world directly to Tauri disk or linked local directory
   useEffect(() => {
-    if (!isLoaded || !localDirectoryHandle || needDirectoryPermission) return;
+    if (!isLoaded) return;
+    if (isTauriAvailable()) {
+      saveWorldToDisk(activeWorld);
+      return;
+    }
+    if (!localDirectoryHandle || needDirectoryPermission) return;
     writeProjectToDirectory(localDirectoryHandle, activeWorld);
   }, [activeWorld, localDirectoryHandle, isLoaded, needDirectoryPermission]);
 

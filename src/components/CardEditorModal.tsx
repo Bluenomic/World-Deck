@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { WorldCard, CardCategory, CustomAttribute, CardConnection } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import { generateId, parseMentions } from '../utils/helpers';
+import { isTauriAvailable, saveImageAsset } from '../utils/tauriStorage';
 import * as Icons from 'lucide-react';
 
 const SUGGESTED_ATTRIBUTES_BY_CATEGORY: Record<string, string[]> = {
@@ -90,9 +91,18 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       if (event.target?.result) {
-        setImageUrl(event.target.result as string);
+        const base64Data = event.target.result as string;
+        if (isTauriAvailable()) {
+          const assetUrl = await saveImageAsset(base64Data, title || 'cover');
+          if (assetUrl) {
+            setImageUrl(assetUrl);
+            setShowCoverInput(false);
+            return;
+          }
+        }
+        setImageUrl(base64Data);
         setShowCoverInput(false);
       }
     };
