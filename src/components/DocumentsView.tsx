@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import type { WorldDocument, DocumentCategory, WorldCard } from '../types';
+import type { WorldDocument, WorldCard } from '../types';
 import { generateId } from '../utils/helpers';
 import { isTauriAvailable, saveImageAsset } from '../utils/tauriStorage';
 import * as Icons from 'lucide-react';
@@ -12,15 +12,6 @@ interface DocumentsViewProps {
   onCreateDocument: (doc: WorldDocument) => void;
   onOpenCard?: (card: WorldCard) => void;
 }
-
-const CATEGORIES: { id: DocumentCategory | 'all'; label: string }[] = [
-  { id: 'all', label: 'Semua' },
-  { id: 'story', label: 'Cerita' },
-  { id: 'chapter', label: 'Bab' },
-  { id: 'note', label: 'Catatan' },
-  { id: 'world_guide', label: 'Panduan' },
-  { id: 'character_log', label: 'Karakter' },
-];
 
 const FONT_SIZES = [
   { label: 'Kecil (12px)', size: '12px', cmdSize: '2' },
@@ -46,7 +37,6 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const [activeDocId, setActiveDocId] = useState<string | null>(
     documents.length > 0 ? documents[0].id : null
   );
-  const [selectedCategory, setSelectedCategory] = useState<DocumentCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isZenMode, setIsZenMode] = useState(false);
   const [showRefDrawer, setShowRefDrawer] = useState(false);
@@ -58,9 +48,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   // Workflow Mode State: 'viewing' (default when opening) vs 'editing'
   const [mode, setMode] = useState<'viewing' | 'editing'>('viewing');
 
-  // Draft document state while editing
+  // Draft document title while editing
   const [draftTitle, setDraftTitle] = useState('');
-  const [draftCategory, setDraftCategory] = useState<DocumentCategory>('story');
 
   // Active Toolbar Format State Indicator (Google Docs Style)
   const [activeFormats, setActiveFormats] = useState({
@@ -102,7 +91,6 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   useEffect(() => {
     if (activeDoc) {
       setDraftTitle(activeDoc.title || '');
-      setDraftCategory(activeDoc.category || 'story');
 
       if (mode === 'editing' && editorRef.current) {
         editorRef.current.innerHTML = activeDoc.content || '<p><br/></p>';
@@ -150,16 +138,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
   // Filtered documents list
   const filteredDocs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return documents.filter((doc) => {
-      const matchCat = selectedCategory === 'all' || doc.category === selectedCategory;
-      const q = searchQuery.trim().toLowerCase();
-      const matchSearch =
+      return (
         !q ||
         doc.title.toLowerCase().includes(q) ||
-        (doc.content && doc.content.toLowerCase().includes(q));
-      return matchCat && matchSearch;
+        (doc.content && doc.content.toLowerCase().includes(q))
+      );
     });
-  }, [documents, selectedCategory, searchQuery]);
+  }, [documents, searchQuery]);
 
   // Calculate Word Count
   const wordCount = useMemo(() => {
@@ -212,7 +199,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     execCmd('fontSize', sizeObj.cmdSize);
   };
 
-  // Keyboard Event Handler: Tab for Indent, Shift+Tab & Backspace for Outdent
+  // Keyboard Event Handler: Tab, Backspace, Ctrl+Z/Y/B/I/U Shortcuts
   const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -227,7 +214,6 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     if (e.key === 'Backspace') {
       const selection = window.getSelection();
       if (selection && selection.isCollapsed && selection.anchorOffset === 0) {
-        // At start of line/block, perform outdent if indented
         try {
           execCmd('outdent');
         } catch (_err) {
@@ -238,7 +224,17 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
     if (e.ctrlKey || e.metaKey) {
       const key = e.key.toLowerCase();
-      if (key === 'b') {
+      if (key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          execCmd('redo');
+        } else {
+          execCmd('undo');
+        }
+      } else if (key === 'y') {
+        e.preventDefault();
+        execCmd('redo');
+      } else if (key === 'b') {
         e.preventDefault();
         execCmd('bold');
       } else if (key === 'i') {
@@ -251,7 +247,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     }
   };
 
-  // Handle Image Upload into ContentEditable Canvas
+  // Handle Image Upload into ContentEditable Canvas (Clean Image, No Filename Text)
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -262,7 +258,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         const base64Data = event.target?.result as string;
         const savedUrl = await saveImageAsset(base64Data, file.name);
         if (savedUrl) {
-          const imgHtml = `<div class="my-6 text-center select-none" contenteditable="false"><img src="${savedUrl}" alt="${file.name}" class="max-h-[450px] rounded-2xl mx-auto border border-slate-700/60 shadow-2xl object-cover" /><span class="text-xs text-slate-400 mt-2 block font-medium">${file.name}</span></div><p><br/></p>`;
+          const imgHtml = `<div class="my-6 text-center select-none" contenteditable="false"><img src="${savedUrl}" alt="${file.name}" class="max-h-[450px] rounded-2xl mx-auto border border-slate-700/60 shadow-2xl object-cover" /></div><p><br/></p>`;
           insertHtmlAtCursor(imgHtml);
         }
       };
@@ -271,7 +267,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64Data = event.target?.result as string;
-        const imgHtml = `<div class="my-6 text-center select-none" contenteditable="false"><img src="${base64Data}" alt="${file.name}" class="max-h-[450px] rounded-2xl mx-auto border border-slate-700/60 shadow-2xl object-cover" /><span class="text-xs text-slate-400 mt-2 block font-medium">${file.name}</span></div><p><br/></p>`;
+        const imgHtml = `<div class="my-6 text-center select-none" contenteditable="false"><img src="${base64Data}" alt="${file.name}" class="max-h-[450px] rounded-2xl mx-auto border border-slate-700/60 shadow-2xl object-cover" /></div><p><br/></p>`;
         insertHtmlAtCursor(imgHtml);
       };
       reader.readAsDataURL(file);
@@ -335,19 +331,18 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   };
 
   // Create New Document
-  const handleCreateDocument = (category: DocumentCategory = 'story') => {
+  const handleCreateDocument = () => {
     const newDoc: WorldDocument = {
       id: generateId('doc'),
       title: 'Dokumen Tanpa Judul',
       content: '<h2>Bab 1</h2><p>Mulai menulis cerita Anda di sini...</p>',
-      category,
+      category: 'story',
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
     onCreateDocument(newDoc);
     setActiveDocId(newDoc.id);
     setDraftTitle(newDoc.title);
-    setDraftCategory(newDoc.category);
     setMode('editing');
   };
 
@@ -360,7 +355,6 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       ...activeDoc,
       title: draftTitle.trim() || 'Dokumen Tanpa Judul',
       content: finalContent,
-      category: draftCategory,
       updatedAt: Date.now(),
     };
     onSaveDocument(updatedDoc);
@@ -402,7 +396,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Dokumen</h2>
             <button
               type="button"
-              onClick={() => handleCreateDocument('story')}
+              onClick={handleCreateDocument}
               className="p-1.5 rounded-lg hover:app-bg-hover text-slate-400 hover:text-white transition-colors cursor-pointer"
               title="Buat Dokumen Baru"
             >
@@ -411,35 +405,17 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
           </div>
 
           {/* Minimal Search Bar */}
-          <div className="px-5 mb-3">
+          <div className="px-5 mb-4">
             <div className="relative">
               <Icons.Search size={13} className="absolute left-2.5 top-2.5 text-slate-500" />
               <input
                 type="text"
-                placeholder="Cari..."
+                placeholder="Cari dokumen..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg app-bg-main/60 border border-slate-800/80 app-text-main placeholder:text-slate-600 focus:outline-none focus:border-slate-600 transition-colors"
               />
             </div>
-          </div>
-
-          {/* Minimal Category Tabs */}
-          <div className="px-5 mb-3 flex gap-1.5 overflow-x-auto scrollbar-none text-[11px]">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-2 py-0.5 rounded-md transition-colors shrink-0 font-medium ${
-                  selectedCategory === cat.id
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-500 hover:text-slate-300'
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
           </div>
 
           {/* Clean Document List */}
@@ -449,7 +425,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 <p>Belum ada dokumen.</p>
                 <button
                   type="button"
-                  onClick={() => handleCreateDocument('story')}
+                  onClick={handleCreateDocument}
                   className="text-blue-400 hover:underline font-semibold"
                 >
                   + Tulis Sekarang
@@ -604,9 +580,32 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               </div>
             </div>
 
-            {/* Google Docs Style Rich WYSIWYG Format Toolbar with Active Indicators */}
+            {/* Google Docs Style Rich WYSIWYG Format Toolbar with Undo & Redo */}
             {mode === 'editing' && (
               <div className="relative z-40 px-6 py-2 app-bg-secondary/90 border-b border-slate-800/40 backdrop-blur-md flex items-center gap-1.5 text-xs text-slate-300 shrink-0 select-none">
+                {/* Undo & Redo Buttons */}
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => execCmd('undo')}
+                    className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
+                    title="Batal / Undo (Ctrl + Z)"
+                  >
+                    <Icons.Undo2 size={14} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => execCmd('redo')}
+                    className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
+                    title="Ulangi / Redo (Ctrl + Y)"
+                  >
+                    <Icons.Redo2 size={14} />
+                  </button>
+                </div>
+
+                <div className="h-4 w-px bg-slate-800 mx-1" />
+
                 {/* Header Style Direct Action Buttons (H1, H2, H3, P) without container */}
                 <div className="flex items-center gap-0.5 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
                   <button
@@ -918,14 +917,9 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 <div className="flex-1 overflow-y-auto px-6 py-10 flex justify-center app-bg-main">
                   <div className="w-full max-w-2xl flex flex-col space-y-6">
                     <div className="border-b border-slate-800 pb-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h1 className="text-3xl font-extrabold tracking-tight text-white">
-                          {activeDoc.title || 'Dokumen Tanpa Judul'}
-                        </h1>
-                        <span className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-semibold border border-slate-700">
-                          {CATEGORIES.find((c) => c.id === activeDoc.category)?.label || 'Cerita'}
-                        </span>
-                      </div>
+                      <h1 className="text-3xl font-extrabold tracking-tight text-white">
+                        {activeDoc.title || 'Dokumen Tanpa Judul'}
+                      </h1>
                       <p className="text-xs text-slate-500 font-mono">
                         Terakhir diubah:{' '}
                         {new Date(activeDoc.updatedAt).toLocaleString('id-ID', {
@@ -957,22 +951,6 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 /* EDITING MODE: Interactive Google Docs Style ContentEditable Canvas */
                 <div className="flex-1 overflow-y-auto px-6 py-10 flex justify-center">
                   <div className="w-full max-w-2xl flex flex-col space-y-6 relative">
-                    {/* Category Selector */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500 font-semibold">Kategori:</span>
-                      <select
-                        value={draftCategory}
-                        onChange={(e) => setDraftCategory(e.target.value as DocumentCategory)}
-                        className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 font-semibold focus:outline-none cursor-pointer"
-                      >
-                        {CATEGORIES.filter((c) => c.id !== 'all').map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
                     {/* Clean Title Input */}
                     <input
                       type="text"
@@ -1104,7 +1082,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
             <p className="text-xs">Pilih atau buat dokumen baru untuk mulai menulis.</p>
             <button
               type="button"
-              onClick={() => handleCreateDocument('story')}
+              onClick={handleCreateDocument}
               className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors cursor-pointer"
             >
               + Buat Dokumen
