@@ -41,13 +41,26 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
 
   // Context Menu State
-  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; targetCard: WorldCard | null }>({
-    visible: false, x: 0, y: 0, targetCard: null,
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    targetCard: WorldCard | null;
+    targetDeck: WorldDeck | null;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    targetCard: null,
+    targetDeck: null,
   });
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
   // Multi-Select State
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPressRef = useRef<boolean>(false);
 
   // Drag and Drop States for Decks
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
@@ -337,12 +350,34 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const shouldShowRemoveZone =
     activeDeck && (isSuccessRemove || (draggedCardId && (isNearTop || isHoveredRemoveZone)));
 
+  // Long-press handler to activate selection mode
+  const handleTouchMouseDown = (cardId: string) => {
+    isLongPressRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      setIsSelectionMode(true);
+      setSelectedCardIds((prev) => {
+        const next = new Set(prev);
+        next.add(cardId);
+        return next;
+      });
+    }, 400);
+  };
+
+  const handleTouchMouseUp = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
   // Container drag over to detect cursor approaching top area inside a deck
   const handleContainerDragOver = (e: React.DragEvent) => {
     if (activeDeck && (draggedCardId || draggedCardIdRef.current)) {
       const containerTop = e.currentTarget.getBoundingClientRect().top;
       const relativeY = e.clientY - containerTop;
-      if (relativeY < 280) {
+      if (relativeY < 360) {
         if (!isNearTop) setIsNearTop(true);
       } else {
         if (isNearTop) setIsNearTop(false);
@@ -419,8 +454,21 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const handleRemoveFromDeckDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const cardId = e.dataTransfer.getData('text/plain') || draggedCardIdRef.current || draggedCardId;
-    if (cardId) {
-      onAssignCardToDeck(cardId, undefined);
+
+    // Collect cards to remove: if multi-selected, remove all selected cards. Otherwise remove dragged card.
+    const cardsToRemove =
+      selectedCardIds.size > 0 && cardId && selectedCardIds.has(cardId)
+        ? Array.from(selectedCardIds)
+        : selectedCardIds.size > 0
+        ? Array.from(selectedCardIds)
+        : cardId
+        ? [cardId]
+        : [];
+
+    if (cardsToRemove.length > 0) {
+      cardsToRemove.forEach((id) => onAssignCardToDeck(id, undefined));
+      setSelectedCardIds(new Set());
+      setIsSelectionMode(false);
       setIsSuccessRemove(true);
 
       setTimeout(() => setIsSuccessRemove(false), 1200);
@@ -449,6 +497,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     return (
       <div
         key={`deck-${deck.id}`}
+        data-deck-id={deck.id}
         onClick={() => setActiveDeckId(deck.id)}
         onDragOver={(e) => handleDragOver(e, deck.id)}
         onDragLeave={(e) => handleDragLeave(e, deck.id)}
@@ -456,7 +505,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         style={{
           boxShadow: `inset 0 3px 0 0 ${isHovered ? '#60a5fa' : deckColor}`,
         }}
-        className={`group relative flex flex-col space-y-2 p-3.5 pt-4 cursor-pointer transition-all duration-300 rounded-2xl select-none app-bg-secondary border border-slate-700/60 hover:border-blue-500/70 ${
+        className={`deck-grid-item group relative flex flex-col space-y-2 p-3.5 pt-4 cursor-pointer transition-all duration-300 rounded-2xl select-none app-bg-secondary border border-slate-700/60 hover:border-blue-500/70 ${
           isSuccess
             ? 'scale-105 border-emerald-400 ring-4 ring-emerald-500/40'
             : isHovered
@@ -602,7 +651,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           else cardDomRefs.current.delete(card.id);
         }}
         draggable={true}
+        onMouseDown={() => handleTouchMouseDown(card.id)}
+        onMouseUp={handleTouchMouseUp}
+        onMouseLeave={handleTouchMouseUp}
+        onTouchStart={() => handleTouchMouseDown(card.id)}
+        onTouchEnd={handleTouchMouseUp}
         onDragStart={(e) => {
+          if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+          }
+          isLongPressRef.current = false;
           if (isDroppingRef.current) return;
           e.dataTransfer.setData('text/plain', card.id);
           e.dataTransfer.effectAllowed = 'move';
@@ -671,9 +730,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         onDrop={handleCardDrop}
         data-card-id={card.id}
         onClick={(e) => {
+          if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+          }
+
+          if (isLongPressRef.current) {
+            isLongPressRef.current = false;
+            return;
+          }
+
           if (!draggedCardIdRef.current && !isDroppingRef.current && !isCardDimmed) {
-            if (e.ctrlKey || e.metaKey) {
-              setSelectedCardIds(prev => {
+            if (isSelectionMode || e.ctrlKey || e.metaKey) {
+              setSelectedCardIds((prev) => {
                 const next = new Set(prev);
                 if (next.has(card.id)) next.delete(card.id);
                 else next.add(card.id);
@@ -804,16 +873,24 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       const cardId = cardEl.getAttribute('data-card-id');
       const card = cardId ? cards.find(c => c.id === cardId) : null;
       if (card) {
-        setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: card });
+        setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: card, targetDeck: null });
         return;
       }
     }
 
-    // Don't show on deck items
-    if (target.closest('.deck-grid-item')) return;
+    // Check if right-clicked on a deck
+    const deckEl = target.closest('.deck-grid-item');
+    if (deckEl) {
+      const deckId = deckEl.getAttribute('data-deck-id');
+      const deck = deckId ? decks.find(d => d.id === deckId) : null;
+      if (deck) {
+        setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: null, targetDeck: deck });
+        return;
+      }
+    }
 
     // Background click
-    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: null });
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: null, targetDeck: null });
   };
 
   useEffect(() => {
@@ -841,61 +918,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         
 
 
-        {/* Deck Navigation Breadcrumb (If inside a Deck) */}
+        {/* Back button to gallery when inside a Deck (Icon only) */}
         {activeDeck ? (
-          <div className="flex items-center justify-between p-3.5 rounded-2xl app-bg-secondary border border-blue-500/30 shadow-sm">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setActiveDeckId(null)}
-                className="px-3 py-1.5 rounded-xl app-bg-main border app-border hover:border-blue-400 text-xs font-bold app-text-main flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <Icons.ArrowLeft size={14} />
-                <span>Kembali ke Galeri</span>
-              </button>
-              <div className="h-4 w-[1px] bg-slate-700" />
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold"
-                  style={{ backgroundColor: activeDeck.color || '#3b82f6' }}
-                >
-                  <Icons.Layers size={14} />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold app-text-main flex items-center gap-2">
-                    <span>Deck: {activeDeck.name}</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold">
-                      {cardsToDisplay.length} Kartu
-                    </span>
-                  </h3>
-                  {activeDeck.description && (
-                    <p className="text-[11px] app-text-muted">{activeDeck.description}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onEditDeckRequest(activeDeck)}
-                className="px-2.5 py-1.5 rounded-lg app-bg-main border app-border hover:border-slate-500 text-xs font-semibold app-text-muted hover:app-text-main transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <Icons.Edit3 size={13} />
-                <span>Edit Deck</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onDeleteDeckRequest(activeDeck.id);
-                  setActiveDeckId(null);
-                }}
-                className="px-2.5 py-1.5 rounded-lg app-bg-main border app-border hover:border-rose-500 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <Icons.Trash2 size={13} />
-                <span>Hapus Deck</span>
-              </button>
-            </div>
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={() => setActiveDeckId(null)}
+              title="Kembali ke Galeri"
+              className="p-2.5 rounded-xl app-bg-secondary border app-border hover:border-blue-400 app-text-main flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-sm"
+            >
+              <Icons.ArrowLeft size={18} />
+            </button>
           </div>
         ) : (
           /* Filter Tabs */
@@ -940,41 +973,26 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
         )}
 
-        {/* Remove Card From Deck Drop Zone Bar (Only visible when dragging a card & cursor approaches top inside a Deck) */}
+        {/* Remove Card From Deck Drop Zone Bar (White icon only, no container box or text, enlarged drop area) */}
         {shouldShowRemoveZone && (
           <div
             onDragOver={handleRemoveFromDeckDragOver}
             onDragLeave={handleRemoveFromDeckDragLeave}
             onDrop={handleRemoveFromDeckDrop}
-            className={`w-full py-3 px-4 rounded-2xl border-2 border-dashed transition-all duration-300 flex items-center justify-center gap-2.5 select-none cursor-pointer animate-in fade-in slide-in-from-top-3 ${
-              isSuccessRemove
-                ? 'border-emerald-400 bg-emerald-950/40 text-emerald-300 scale-[1.01] ring-4 ring-emerald-500/40 shadow-xl'
-                : isHoveredRemoveZone
-                ? 'border-amber-400 bg-amber-950/50 text-amber-300 scale-[1.01] ring-4 ring-amber-500/40 shadow-xl'
-                : 'border-amber-500/60 bg-amber-950/30 text-amber-300 animate-pulse'
-            }`}
+            className="w-full py-10 flex items-center justify-center select-none cursor-pointer transition-all duration-300 min-h-[140px] animate-in fade-in zoom-in-95"
           >
             {isSuccessRemove ? (
-              <div className="flex items-center gap-2 pointer-events-none">
-                <Icons.CheckCircle2 size={18} className="text-emerald-400 animate-bounce shrink-0" />
-                <span className="text-xs font-bold text-emerald-300">
-                  Kartu Dikeluarkan dari Deck
-                </span>
-              </div>
+              <Icons.CheckCircle2
+                size={44}
+                className="text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] animate-bounce"
+              />
             ) : (
-              <div className="flex items-center gap-2 pointer-events-none">
-                <Icons.FolderOutput
-                  size={18}
-                  className={`shrink-0 transition-transform ${
-                    isHoveredRemoveZone ? 'animate-bounce text-amber-300' : 'text-amber-400'
-                  }`}
-                />
-                <span className="text-xs font-bold">
-                  {isHoveredRemoveZone
-                    ? '✨ Lepaskan untuk Mengeluarkan Kartu'
-                    : '📤 Keluarkan Kartu dari Deck'}
-                </span>
-              </div>
+              <Icons.FolderOutput
+                size={46}
+                className={`text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] transition-all duration-200 ${
+                  isHoveredRemoveZone ? 'scale-125 animate-bounce' : 'scale-100 opacity-90'
+                }`}
+              />
             )}
           </div>
         )}
@@ -1006,27 +1024,59 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         {/* ======================== */}
         {/* Right-Click Context Menu */}
         {/* Multi-Select Floating Toolbar */}
-        {selectedCardIds.size > 0 && (
+        {(selectedCardIds.size > 0 || isSelectionMode) && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[90] app-bg-secondary border app-border rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-3 duration-200">
             <div className="flex items-center gap-2 text-xs font-bold app-text-main">
               <Icons.CheckSquare size={16} className="text-blue-400" />
               <span>{selectedCardIds.size} kartu dipilih</span>
+              {isSelectionMode && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold">
+                  Mode Seleksi
+                </span>
+              )}
             </div>
+
             <div className="h-5 w-px bg-slate-600" />
+
+            {activeDeck && selectedCardIds.size > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    selectedCardIds.forEach((id) => onAssignCardToDeck(id, undefined));
+                    setSelectedCardIds(new Set());
+                    setIsSelectionMode(false);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Icons.FolderOutput size={14} />
+                  <span>Keluarkan dari Deck ({selectedCardIds.size})</span>
+                </button>
+                <div className="h-5 w-px bg-slate-600" />
+              </>
+            )}
+
+            {selectedCardIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteCardsRequest(Array.from(selectedCardIds));
+                  setSelectedCardIds(new Set());
+                  setIsSelectionMode(false);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Icons.Trash2 size={13} />
+                <span>Hapus Semua</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
-                onDeleteCardsRequest(Array.from(selectedCardIds));
                 setSelectedCardIds(new Set());
+                setIsSelectionMode(false);
               }}
-              className="px-3 py-1.5 rounded-lg bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Icons.Trash2 size={13} />
-              <span>Hapus Semua</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedCardIds(new Set())}
               className="px-3 py-1.5 rounded-lg app-bg-main app-text-muted hover:app-text-main text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer border app-border"
             >
               <Icons.X size={13} />
@@ -1043,7 +1093,54 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
             onClick={(e) => e.stopPropagation()}
           >
-            {contextMenu.targetCard ? (
+            {contextMenu.targetDeck ? (
+              <>
+                <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate flex items-center gap-1.5">
+                  <Icons.Layers size={12} className="text-blue-400 shrink-0" />
+                  <span className="truncate">{contextMenu.targetDeck.name}</span>
+                </div>
+
+                <div className="py-1 space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveDeckId(contextMenu.targetDeck!.id);
+                      setContextMenu(prev => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
+                  >
+                    <Icons.FolderOpen size={14} />
+                    <span>Buka Deck</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onEditDeckRequest(contextMenu.targetDeck!);
+                      setContextMenu(prev => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                  >
+                    <Icons.Edit3 size={14} />
+                    <span>Ganti Nama Deck</span>
+                  </button>
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDeleteDeckRequest(contextMenu.targetDeck!.id);
+                      setContextMenu(prev => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
+                  >
+                    <Icons.Trash2 size={14} />
+                    <span>Hapus Deck</span>
+                  </button>
+                </div>
+              </>
+            ) : contextMenu.targetCard ? (
               <>
                 <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
                   📄 {contextMenu.targetCard.title || 'Kartu'}
