@@ -492,6 +492,13 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     setShowMoreMenu(false);
   };
 
+  const canvasContainerWidthClass =
+    showOutline && showRefDrawer
+      ? 'max-w-2xl xl:max-w-3xl'
+      : showOutline || showRefDrawer
+      ? 'max-w-3xl xl:max-w-4xl'
+      : 'max-w-4xl lg:max-w-5xl';
+
   return (
     <div className="flex-1 flex app-bg-main overflow-hidden app-text-main h-full font-sans select-none">
       {/* Hidden Image File Input */}
@@ -1101,10 +1108,10 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
               {mode === 'viewing' ? (
                 /* VIEWING MODE: Clean Rendered Document */
-                <div className="flex-1 overflow-y-auto px-6 md:px-12 py-10 flex justify-center app-bg-main">
-                  <div className="w-full max-w-4xl lg:max-w-5xl flex flex-col space-y-6">
+                <div className="flex-1 overflow-y-auto px-6 md:px-12 py-10 flex justify-center app-bg-main min-w-0">
+                  <div className={`w-full ${canvasContainerWidthClass} flex flex-col space-y-6 transition-all duration-200 min-w-0`}>
                     <div className="border-b border-slate-800/80 pb-4 space-y-2">
-                      <h1 className="text-3xl font-extrabold tracking-tight app-text-main">
+                      <h1 className="text-3xl font-extrabold tracking-tight app-text-main break-words [overflow-wrap:anywhere]">
                         {activeDoc.title || 'Dokumen Tanpa Judul'}
                       </h1>
                       <p className="text-xs text-slate-400 font-mono">
@@ -1122,7 +1129,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     {/* Live Rendered Content */}
                     <div
                       id="doc-view-rendered-content"
-                      className="prose max-w-none text-base leading-relaxed app-text-main space-y-4 font-sans [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:app-text-main [&_h2]:app-text-main [&_h3]:app-text-main [&_strong]:app-text-main [&_p]:leading-relaxed"
+                      className="prose max-w-none text-base leading-relaxed app-text-main space-y-4 font-sans break-words [overflow-wrap:anywhere] min-w-0 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:app-text-main [&_h2]:app-text-main [&_h3]:app-text-main [&_strong]:app-text-main [&_p]:leading-relaxed"
                       dangerouslySetInnerHTML={{ __html: activeDoc.content || '<p class="text-slate-400 italic">Dokumen kosong...</p>' }}
                       onClick={(e) => {
                         const target = e.target as HTMLElement;
@@ -1181,19 +1188,19 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 </div>
               ) : (
                 /* EDITING MODE: Interactive Google Docs Style ContentEditable Canvas */
-                <div className="flex-1 overflow-y-auto px-6 md:px-12 py-10 flex justify-center">
-                  <div className="w-full max-w-4xl lg:max-w-5xl flex flex-col space-y-6 relative">
+                <div className="flex-1 overflow-y-auto px-6 md:px-12 py-10 flex justify-center min-w-0">
+                  <div className={`w-full ${canvasContainerWidthClass} flex flex-col space-y-6 relative transition-all duration-200 min-w-0`}>
                     {/* Clean Title Input */}
                     <input
                       type="text"
                       value={draftTitle}
                       onChange={(e) => setDraftTitle(e.target.value)}
                       placeholder="Judul naskah..."
-                      className="w-full text-3xl font-extrabold tracking-tight app-text-main bg-transparent border-0 focus:outline-none placeholder:text-slate-500"
+                      className="w-full text-3xl font-extrabold tracking-tight app-text-main bg-transparent border-0 focus:outline-none placeholder:text-slate-500 break-words [overflow-wrap:anywhere]"
                     />
 
                     {/* Live ContentEditable Canvas (Google Docs Style WYSIWYG) */}
-                    <div className="relative flex-1 flex flex-col">
+                    <div className="relative flex-1 flex flex-col min-w-0">
                       <div
                         id="doc-editor-textarea"
                         ref={editorRef}
@@ -1201,7 +1208,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                         onKeyDown={handleEditorKeyDown}
                         onKeyUp={handleEditorKeyUp}
                         onClick={updateToolbarState}
-                        className="w-full flex-1 bg-transparent text-base leading-relaxed app-text-main focus:outline-none resize-none font-sans space-y-3 p-1 min-h-[650px] border-0 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:text-3xl [&_h1]:font-extrabold [&_h1]:my-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:my-3 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:my-2"
+                        className="w-full flex-1 bg-transparent text-base leading-relaxed app-text-main focus:outline-none resize-none font-sans space-y-3 p-1 min-h-[650px] border-0 break-words [overflow-wrap:anywhere] min-w-0 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:text-3xl [&_h1]:font-extrabold [&_h1]:my-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:my-3 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:my-2"
                       />
 
                       {/* Inline @ Mention Suggestion Overlay */}

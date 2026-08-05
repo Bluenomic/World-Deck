@@ -237,6 +237,21 @@ h1, h2, h3, h4, h5, h6 {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease !important;
 }
 
+/* Document Content & Editor Word-Wrap Safeguard */
+#doc-view-rendered-content,
+#doc-editor-textarea {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+#doc-view-rendered-content *,
+#doc-editor-textarea * {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+
 /* Connection Handle Styles */
 .connection-handle-trigger {
   position: absolute;
