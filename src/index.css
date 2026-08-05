@@ -252,6 +252,38 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 100%;
 }
 
+/* Google Docs Style Image Placement & Text Wrapping */
+.doc-img-wrapper {
+  transition: all 0.2s ease-in-out;
+  user-select: none;
+  position: relative;
+}
+
+.doc-img-wrapper.img-mode-inline {
+  float: none !important;
+  display: block !important;
+  margin: 1.5rem auto !important;
+  text-align: center !important;
+  clear: both !important;
+  max-width: 100% !important;
+}
+
+.doc-img-wrapper.img-mode-wrap-left {
+  float: left !important;
+  display: block !important;
+  margin: 0.5rem 1.5rem 1rem 0 !important;
+  max-width: 45% !important;
+  clear: left !important;
+}
+
+.doc-img-wrapper.img-mode-wrap-right {
+  float: right !important;
+  display: block !important;
+  margin: 0.5rem 0 1rem 1.5rem !important;
+  max-width: 45% !important;
+  clear: right !important;
+}
+
 /* Connection Handle Styles */
 .connection-handle-trigger {
   position: absolute;

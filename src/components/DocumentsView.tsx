@@ -54,6 +54,13 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   } | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Selected Image State for Google Docs style alignment popover
+  const [selectedImage, setSelectedImage] = useState<{
+    wrapper: HTMLElement;
+    mode: 'inline' | 'wrap-left' | 'wrap-right';
+    rect: DOMRect;
+  } | null>(null);
+
   // Save Notification Toast State
   const [showSaveToast, setShowSaveToast] = useState(false);
 
@@ -348,6 +355,78 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     }
   };
 
+  // Handle Image Click & Placement Detection (Google Docs style)
+  const handleDocumentClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+
+    // Check if clicked badge for card preview
+    const cardId = target.getAttribute('data-card-id');
+    if (cardId && onOpenCard) {
+      const found = cards.find((c) => c.id === cardId);
+      if (found) onOpenCard(found);
+    }
+
+    // Check if clicked image or image wrapper
+    const imgEl = target.tagName === 'IMG' ? target : target.querySelector('img');
+    const wrapper = target.closest('.doc-img-wrapper') as HTMLElement || (imgEl ? imgEl.closest('.doc-img-wrapper') as HTMLElement : null);
+
+    if (wrapper && (imgEl || wrapper.querySelector('img'))) {
+      const rect = wrapper.getBoundingClientRect();
+      let mode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
+      if (wrapper.classList.contains('img-mode-wrap-left') || wrapper.style.float === 'left') {
+        mode = 'wrap-left';
+      } else if (wrapper.classList.contains('img-mode-wrap-right') || wrapper.style.float === 'right') {
+        mode = 'wrap-right';
+      }
+      setSelectedImage({ wrapper, mode, rect });
+    } else if (!target.closest('.doc-image-toolbar-popover')) {
+      setSelectedImage(null);
+    }
+  };
+
+  const applyImageMode = (mode: 'inline' | 'wrap-left' | 'wrap-right') => {
+    if (!selectedImage) return;
+    const { wrapper } = selectedImage;
+    wrapper.classList.remove('img-mode-inline', 'img-mode-wrap-left', 'img-mode-wrap-right');
+
+    if (mode === 'inline') {
+      wrapper.classList.add('img-mode-inline');
+      wrapper.style.float = 'none';
+      wrapper.style.display = 'block';
+      wrapper.style.margin = '1.5rem auto';
+      wrapper.style.textAlign = 'center';
+      wrapper.style.clear = 'both';
+      wrapper.style.maxWidth = '100%';
+    } else if (mode === 'wrap-left') {
+      wrapper.classList.add('img-mode-wrap-left');
+      wrapper.style.float = 'left';
+      wrapper.style.display = 'block';
+      wrapper.style.margin = '0.5rem 1.5rem 1rem 0';
+      wrapper.style.textAlign = 'left';
+      wrapper.style.clear = 'left';
+      wrapper.style.maxWidth = '45%';
+    } else if (mode === 'wrap-right') {
+      wrapper.classList.add('img-mode-wrap-right');
+      wrapper.style.float = 'right';
+      wrapper.style.display = 'block';
+      wrapper.style.margin = '0.5rem 0 1rem 1.5rem';
+      wrapper.style.textAlign = 'right';
+      wrapper.style.clear = 'right';
+      wrapper.style.maxWidth = '45%';
+    }
+
+    const rect = wrapper.getBoundingClientRect();
+    setSelectedImage({ wrapper, mode, rect });
+    updateToolbarState();
+  };
+
+  const deleteSelectedImage = () => {
+    if (!selectedImage) return;
+    selectedImage.wrapper.remove();
+    setSelectedImage(null);
+    updateToolbarState();
+  };
+
   // Handle Image Upload into ContentEditable Canvas (Clean Image, No Filename Text)
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -359,7 +438,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         const base64Data = event.target?.result as string;
         const savedUrl = await saveImageAsset(base64Data, file.name);
         if (savedUrl) {
-          const imgHtml = `<div class="my-6 text-center select-none" contenteditable="false"><img src="${savedUrl}" alt="${file.name}" class="max-h-[450px] rounded-2xl mx-auto border border-slate-700/60 shadow-2xl object-cover" /></div><p><br/></p>`;
+          const imgHtml = `<div class="doc-img-wrapper img-mode-inline my-6 text-center select-none" contenteditable="false" style="float: none; display: block; margin: 1.5rem auto; text-align: center; clear: both;"><img src="${savedUrl}" alt="${file.name}" class="max-h-[450px] rounded-2xl mx-auto border border-slate-700/60 shadow-2xl object-cover w-auto" /></div><p><br/></p>`;
           insertHtmlAtCursor(imgHtml);
         }
       };
@@ -368,7 +447,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64Data = event.target?.result as string;
-        const imgHtml = `<div class="my-6 text-center select-none" contenteditable="false"><img src="${base64Data}" alt="${file.name}" class="max-h-[450px] rounded-2xl mx-auto border border-slate-700/60 shadow-2xl object-cover" /></div><p><br/></p>`;
+        const imgHtml = `<div class="doc-img-wrapper img-mode-inline my-6 text-center select-none" contenteditable="false" style="float: none; display: block; margin: 1.5rem auto; text-align: center; clear: both;"><img src="${base64Data}" alt="${file.name}" class="max-h-[450px] rounded-2xl mx-auto border border-slate-700/60 shadow-2xl object-cover w-auto" /></div><p><br/></p>`;
         insertHtmlAtCursor(imgHtml);
       };
       reader.readAsDataURL(file);
@@ -1131,14 +1210,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                       id="doc-view-rendered-content"
                       className="prose max-w-none text-base leading-relaxed app-text-main space-y-4 font-sans break-words [overflow-wrap:anywhere] min-w-0 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:app-text-main [&_h2]:app-text-main [&_h3]:app-text-main [&_strong]:app-text-main [&_p]:leading-relaxed"
                       dangerouslySetInnerHTML={{ __html: activeDoc.content || '<p class="text-slate-400 italic">Dokumen kosong...</p>' }}
-                      onClick={(e) => {
-                        const target = e.target as HTMLElement;
-                        const cardId = target.getAttribute('data-card-id');
-                        if (cardId && onOpenCard) {
-                          const found = cards.find((c) => c.id === cardId);
-                          if (found) onOpenCard(found);
-                        }
-                      }}
+                      onClick={handleDocumentClick}
                     />
 
                     {/* Backlinks Section (Cards Mentioned in Document) */}
@@ -1207,7 +1279,10 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                         contentEditable={true}
                         onKeyDown={handleEditorKeyDown}
                         onKeyUp={handleEditorKeyUp}
-                        onClick={updateToolbarState}
+                        onClick={(e) => {
+                          updateToolbarState();
+                          handleDocumentClick(e);
+                        }}
                         className="w-full flex-1 bg-transparent text-base leading-relaxed app-text-main focus:outline-none resize-none font-sans space-y-3 p-1 min-h-[650px] border-0 break-words [overflow-wrap:anywhere] min-w-0 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:text-3xl [&_h1]:font-extrabold [&_h1]:my-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:my-3 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:my-2"
                       />
 
@@ -1441,6 +1516,77 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Floating Google Docs Style Image Options Toolbar */}
+      {selectedImage && (
+        <div
+          className="doc-image-toolbar-popover fixed z-[130] px-3 py-1.5 rounded-2xl app-bg-secondary border border-slate-700/80 shadow-2xl flex items-center gap-1.5 text-xs animate-in fade-in zoom-in-95 duration-150 select-none backdrop-blur-md"
+          style={{
+            top: `${Math.max(10, selectedImage.rect.top - 48)}px`,
+            left: `${Math.min(window.innerWidth - 340, Math.max(10, selectedImage.rect.left + selectedImage.rect.width / 2 - 150))}px`,
+          }}
+        >
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pr-1 border-r border-slate-800">
+            Gambar
+          </span>
+
+          <button
+            type="button"
+            onClick={() => applyImageMode('inline')}
+            className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+              selectedImage.mode === 'inline'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Sebaris dengan Teks (Tengah)"
+          >
+            <Icons.AlignJustify size={13} />
+            <span>Sebaris</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => applyImageMode('wrap-left')}
+            className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+              selectedImage.mode === 'wrap-left'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Penggabungan Teks Kiri (Wrap Left)"
+          >
+            <Icons.AlignLeft size={13} />
+            <span>Wrap Kiri</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => applyImageMode('wrap-right')}
+            className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+              selectedImage.mode === 'wrap-right'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Penggabungan Teks Kanan (Wrap Right)"
+          >
+            <Icons.AlignRight size={13} />
+            <span>Wrap Kanan</span>
+          </button>
+
+          {mode === 'editing' && (
+            <>
+              <div className="h-4 w-px bg-slate-800 mx-0.5" />
+              <button
+                type="button"
+                onClick={deleteSelectedImage}
+                className="p-1 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                title="Hapus Gambar"
+              >
+                <Icons.Trash2 size={13} />
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Save Notification Toast */}
       {showSaveToast && (
