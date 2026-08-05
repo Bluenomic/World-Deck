@@ -1592,7 +1592,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       {showSaveToast && (
         <div className="fixed bottom-6 right-6 z-[150] px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
           <Icons.CheckCircle2 size={16} />
-          <span>Dokumen berhasil disimpan (Ctrl + S)</span>
+          <span>Dokumen Tersimpan</span>
         </div>
       )}
     </div>

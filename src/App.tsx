@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme, WorldDocument } from './types';
 import { SAMPLE_WORLD } from './data/sampleWorld';
 import { generateId, downloadProjectJson } from './utils/helpers';
@@ -113,7 +113,8 @@ export const App: React.FC = () => {
 
   // Undo & Redo History State
   const [historyStack, setHistoryStack] = useState<WorldProject[]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const [historyIndex, setHistoryIndex] = useState<number>(0);
+  const isUndoRedoRef = useRef<boolean>(false);
 
   // Custom Confirm & Alert Modal State
   const [confirmModalConfig, setConfirmModalConfig] = useState<ConfirmModalConfig | null>(null);
@@ -192,7 +193,7 @@ export const App: React.FC = () => {
   }, []);
 
   // Derived Active World
-  const activeWorld = worlds.find((w) => w.id === activeWorldId) || worlds[0] || SAMPLE_WORLD;
+  const activeWorld = (worlds || []).filter(Boolean).find((w) => w && w.id === activeWorldId) || (worlds || []).filter(Boolean)[0] || SAMPLE_WORLD;
 
   // Derived active canvas cards and connections
   const activeWorldCanvases = activeWorld.canvases && activeWorld.canvases.length > 0
@@ -289,44 +290,91 @@ export const App: React.FC = () => {
     }
   };
 
+  // Initialize history stack when activeWorldId changes or on load
+  useEffect(() => {
+    const current = (worlds || []).filter(Boolean).find((w) => w.id === activeWorldId) || (worlds || []).filter(Boolean)[0];
+    if (current && isLoaded) {
+      setHistoryStack([JSON.parse(JSON.stringify(current))]);
+      setHistoryIndex(0);
+    }
+  }, [activeWorldId, isLoaded]);
+
   // Helper to update active world in worlds array with history recording
   const updateActiveWorld = (updater: (prevWorld: WorldProject) => WorldProject) => {
     setWorlds((prevWorlds) => {
-      const currentWorld = prevWorlds.find((w) => w.id === activeWorldId);
+      const validWorlds = (prevWorlds || []).filter(Boolean);
+      const currentWorld = validWorlds.find((w) => w.id === activeWorldId) || validWorlds[0];
       if (!currentWorld) return prevWorlds;
 
-      // Record snapshot to history stack
-      setHistoryStack((prev) => {
-        const sliced = prev.slice(0, historyIndex + 1);
-        return [...sliced, currentWorld];
-      });
-      setHistoryIndex((prev) => prev + 1);
-
       const updatedWorld = updater(currentWorld);
-      return prevWorlds.map((w) => (w.id === activeWorldId ? updatedWorld : w));
+
+      // Record snapshot if not an undo/redo action
+      if (!isUndoRedoRef.current) {
+        try {
+          setHistoryStack((prevStack) => {
+            const currentTop = prevStack[historyIndex];
+            const isDuplicate =
+              currentTop &&
+              JSON.stringify(currentTop.cards) === JSON.stringify(updatedWorld.cards) &&
+              JSON.stringify(currentTop.connections) === JSON.stringify(updatedWorld.connections) &&
+              JSON.stringify(currentTop.canvases) === JSON.stringify(updatedWorld.canvases);
+
+            if (isDuplicate) return prevStack;
+
+            const snapshot = JSON.parse(JSON.stringify(updatedWorld));
+            const sliced = prevStack.slice(0, historyIndex + 1);
+            setHistoryIndex(sliced.length);
+            return [...sliced, snapshot];
+          });
+        } catch (err) {
+          console.warn('Failed to record history snapshot:', err);
+        }
+      }
+
+      return validWorlds.map((w) => (w.id === activeWorldId ? updatedWorld : w));
     });
   };
 
-  // Undo / Redo Actions
+  // Undo / Redo Actions for Canvas Card State
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < historyStack.length - 1;
+
   const handleUndo = () => {
-    if (historyIndex < 0) return;
-    const targetSnapshot = historyStack[historyIndex];
-    setHistoryIndex((prev) => prev - 1);
+    if (historyIndex <= 0 || historyStack.length === 0) return;
+    const targetIndex = historyIndex - 1;
+    const targetSnapshot = historyStack[targetIndex];
+    if (!targetSnapshot || !targetSnapshot.id) return;
+
+    isUndoRedoRef.current = true;
+    const targetCopy = JSON.parse(JSON.stringify(targetSnapshot));
+    setHistoryIndex(targetIndex);
 
     setWorlds((prevWorlds) =>
-      prevWorlds.map((w) => (w.id === activeWorldId ? targetSnapshot : w))
+      (prevWorlds || []).filter(Boolean).map((w) => (w.id === activeWorldId ? targetCopy : w))
     );
+
+    setTimeout(() => {
+      isUndoRedoRef.current = false;
+    }, 50);
   };
 
   const handleRedo = () => {
-    if (historyIndex >= historyStack.length - 1) return;
-    const nextIndex = historyIndex + 1;
-    const targetSnapshot = historyStack[nextIndex];
-    setHistoryIndex(nextIndex);
+    if (historyIndex >= historyStack.length - 1 || historyStack.length === 0) return;
+    const targetIndex = historyIndex + 1;
+    const targetSnapshot = historyStack[targetIndex];
+    if (!targetSnapshot || !targetSnapshot.id) return;
+
+    isUndoRedoRef.current = true;
+    const targetCopy = JSON.parse(JSON.stringify(targetSnapshot));
+    setHistoryIndex(targetIndex);
 
     setWorlds((prevWorlds) =>
-      prevWorlds.map((w) => (w.id === activeWorldId ? targetSnapshot : w))
+      (prevWorlds || []).filter(Boolean).map((w) => (w.id === activeWorldId ? targetCopy : w))
     );
+
+    setTimeout(() => {
+      isUndoRedoRef.current = false;
+    }, 50);
   };
 
   // Hotkey Undo/Redo & Shortcuts
@@ -362,6 +410,19 @@ export const App: React.FC = () => {
       ...prev,
       updatedAt: Date.now(),
       cards: prev.cards.map((c) => (c.id === id ? { ...c, x, y } : c)),
+    }));
+  };
+
+  const handleUpdateCardPositionsBatch = (updates: { id: string; x: number; y: number }[]) => {
+    if (updates.length === 0) return;
+    const updateMap = new Map(updates.map((u) => [u.id, u]));
+    updateActiveWorld((prev) => ({
+      ...prev,
+      updatedAt: Date.now(),
+      cards: prev.cards.map((c) => {
+        const up = updateMap.get(c.id);
+        return up ? { ...c, x: up.x, y: up.y } : c;
+      }),
     }));
   };
 
@@ -1011,10 +1072,6 @@ export const App: React.FC = () => {
         onOpenWorldManager={() => setShowWorldManager(true)}
         localDirectoryName={localDirectoryName}
         onChangeDirectory={handleSelectWorkspaceDirectory}
-        canUndo={historyIndex >= 0}
-        canRedo={historyIndex < historyStack.length - 1}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
       />
 
       {/* Main Workspace Area */}
@@ -1066,6 +1123,7 @@ export const App: React.FC = () => {
                 setIsReaderFullPage(true);
               }}
               onUpdateCardPosition={handleUpdateCardPosition}
+              onUpdateCardPositionsBatch={handleUpdateCardPositionsBatch}
               onAddConnection={(src, tgt) => handleAddConnection(src, tgt, 'Terhubung')}
               onEditConnection={(conn) => setEditingConnection(conn)}
               onAddCardAtPosition={handleAddCardAtPosition}
@@ -1075,6 +1133,10 @@ export const App: React.FC = () => {
               onDeleteConnection={handleDeleteConnection}
               onDeleteConnections={handleDeleteConnections}
               onUpdateCardDimensions={handleUpdateCardDimensions}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
             />
           )}
 

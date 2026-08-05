@@ -20,6 +20,7 @@ interface CanvasProps {
   onEditCardRequest?: (card: WorldCard) => void;
   onOpenCardFullPageRequest?: (card: WorldCard) => void;
   onUpdateCardPosition: (id: string, x: number, y: number) => void;
+  onUpdateCardPositionsBatch?: (updates: { id: string; x: number; y: number }[]) => void;
   onAddConnection: (sourceId: string, targetId: string) => void;
   onEditConnection: (connection: CardConnection) => void;
   onAddCardAtPosition: (x: number, y: number) => void;
@@ -29,6 +30,10 @@ interface CanvasProps {
   onDeleteConnection?: (id: string) => void;
   onDeleteConnections?: (ids: string[]) => void;
   onUpdateCardDimensions?: (id: string, width: number, height: number) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -45,6 +50,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onEditCardRequest,
   onOpenCardFullPageRequest,
   onUpdateCardPosition,
+  onUpdateCardPositionsBatch,
   onAddConnection,
   onEditConnection,
   onAddCardAtPosition,
@@ -54,6 +60,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   onDeleteConnection,
   onDeleteConnections,
   onUpdateCardDimensions,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const targetCanvasId = activeCanvasId || 'default';
@@ -107,10 +117,11 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [showAddFromGalleryModal, setShowAddFromGalleryModal] = useState<boolean>(false);
   const [galleryTargetPos, setGalleryTargetPos] = useState<{ x: number; y: number }>({ x: 300, y: 300 });
 
-  // Card Dragging State
+  // Dragging State
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [dragCardPositions, setDragCardPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [localDragPositions, setLocalDragPositions] = useState<Record<string, { x: number; y: number }>>({});
 
   // Selected Connection IDs for Multi-Selection & Deletion
   const [selectedConnectionIds, setSelectedConnectionIds] = useState<string[]>([]);
@@ -465,6 +476,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
     });
     setDragCardPositions(initialPositions);
+    setLocalDragPositions(initialPositions);
   };
 
   // Start connection drag
@@ -517,16 +529,19 @@ export const Canvas: React.FC<CanvasProps> = ({
         const deltaX = newPrimaryX - primaryInitial.x;
         const deltaY = newPrimaryY - primaryInitial.y;
 
+        const updated: Record<string, { x: number; y: number }> = {};
         Object.keys(dragCardPositions).forEach((cId) => {
           const initPos = dragCardPositions[cId];
-          onUpdateCardPosition(cId, initPos.x + deltaX, initPos.y + deltaY);
+          updated[cId] = { x: initPos.x + deltaX, y: initPos.y + deltaY };
         });
+        setLocalDragPositions(updated);
       } else {
-        onUpdateCardPosition(
-          draggingCardId,
-          Math.round(worldPos.x - dragOffset.x),
-          Math.round(worldPos.y - dragOffset.y)
-        );
+        setLocalDragPositions({
+          [draggingCardId]: {
+            x: Math.round(worldPos.x - dragOffset.x),
+            y: Math.round(worldPos.y - dragOffset.y),
+          },
+        });
       }
       return;
     }
@@ -542,8 +557,26 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (isPanning) setIsPanning(false);
     if (isBoxSelecting) setIsBoxSelecting(false);
     if (draggingCardId) {
+      const updates: { id: string; x: number; y: number }[] = [];
+      Object.keys(localDragPositions).forEach((cId) => {
+        const startPos = dragCardPositions[cId];
+        const endPos = localDragPositions[cId];
+        if (endPos && startPos && (endPos.x !== startPos.x || endPos.y !== startPos.y)) {
+          updates.push({ id: cId, x: endPos.x, y: endPos.y });
+        }
+      });
+
+      if (updates.length > 0) {
+        if (onUpdateCardPositionsBatch) {
+          onUpdateCardPositionsBatch(updates);
+        } else {
+          updates.forEach((u) => onUpdateCardPosition(u.id, u.x, u.y));
+        }
+      }
+
       setDraggingCardId(null);
       setDragCardPositions({});
+      setLocalDragPositions({});
     }
 
     if (connectingSourceId) {
@@ -576,6 +609,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     const originX = Math.min(...targetCards.map((c) => c.x));
     const originY = Math.min(...targetCards.map((c) => c.y));
+    const updates: { id: string; x: number; y: number }[] = [];
 
     if (mode === 'grid') {
       const cols = Math.ceil(Math.sqrt(targetCards.length));
@@ -585,17 +619,17 @@ export const Canvas: React.FC<CanvasProps> = ({
       targetCards.forEach((card, index) => {
         const row = Math.floor(index / cols);
         const col = index % cols;
-        onUpdateCardPosition(card.id, originX + col * spacingX, originY + row * spacingY);
+        updates.push({ id: card.id, x: originX + col * spacingX, y: originY + row * spacingY });
       });
     } else if (mode === 'horizontal') {
       const spacingX = 420;
       targetCards.forEach((card, index) => {
-        onUpdateCardPosition(card.id, originX + index * spacingX, originY);
+        updates.push({ id: card.id, x: originX + index * spacingX, y: originY });
       });
     } else if (mode === 'vertical') {
       const spacingY = 300;
       targetCards.forEach((card, index) => {
-        onUpdateCardPosition(card.id, originX, originY + index * spacingY);
+        updates.push({ id: card.id, x: originX, y: originY + index * spacingY });
       });
     } else if (mode === 'circle') {
       const count = targetCards.length;
@@ -607,8 +641,16 @@ export const Canvas: React.FC<CanvasProps> = ({
         const angle = (index / count) * 2 * Math.PI - Math.PI / 2;
         const x = Math.round(centerX + radius * Math.cos(angle) - 144);
         const y = Math.round(centerY + radius * Math.sin(angle) - 80);
-        onUpdateCardPosition(card.id, x, y);
+        updates.push({ id: card.id, x, y });
       });
+    }
+
+    if (updates.length > 0) {
+      if (onUpdateCardPositionsBatch) {
+        onUpdateCardPositionsBatch(updates);
+      } else {
+        updates.forEach((u) => onUpdateCardPosition(u.id, u.x, u.y));
+      }
     }
   };
 
@@ -623,15 +665,18 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       if (!sourceCard || !targetCard) return null;
 
+      const sourcePos = localDragPositions[sourceCard.id] || { x: sourceCard.x, y: sourceCard.y };
+      const targetPos = localDragPositions[targetCard.id] || { x: targetCard.x, y: targetCard.y };
+
       const sourceW = sourceCard.width || 288;
       const targetW = targetCard.width || 288;
       const sourceH = cardHeightsRef.current.get(sourceCard.id) || sourceCard.height || 180;
       const targetH = cardHeightsRef.current.get(targetCard.id) || targetCard.height || 180;
 
-      const sourceCenterX = sourceCard.x + sourceW / 2;
-      const sourceCenterY = sourceCard.y + sourceH / 2;
-      const targetCenterX = targetCard.x + targetW / 2;
-      const targetCenterY = targetCard.y + targetH / 2;
+      const sourceCenterX = sourcePos.x + sourceW / 2;
+      const sourceCenterY = sourcePos.y + sourceH / 2;
+      const targetCenterX = targetPos.x + targetW / 2;
+      const targetCenterY = targetPos.y + targetH / 2;
 
       const dx = targetCenterX - sourceCenterX;
       const dy = targetCenterY - sourceCenterY;
@@ -650,11 +695,11 @@ export const Canvas: React.FC<CanvasProps> = ({
         dir = 'horizontal';
         if (dx >= 0) {
           // Source -> Target (Left to Right)
-          const sourceEdgeX = sourceCard.x + sourceW + 2;
-          const sourceEdgeY = Math.min(Math.max(targetCenterY, sourceCard.y + 24), sourceCard.y + sourceH - 24);
+          const sourceEdgeX = sourcePos.x + sourceW + 2;
+          const sourceEdgeY = Math.min(Math.max(targetCenterY, sourcePos.y + 24), sourcePos.y + sourceH - 24);
 
-          const targetEdgeX = targetCard.x - 2;
-          const targetEdgeY = Math.min(Math.max(sourceCenterY, targetCard.y + 24), targetCard.y + targetH - 24);
+          const targetEdgeX = targetPos.x - 2;
+          const targetEdgeY = Math.min(Math.max(sourceCenterY, targetPos.y + 24), targetPos.y + targetH - 24);
 
           x1 = dirMode === 'bidirectional' ? sourceEdgeX + arrowLen : sourceEdgeX;
           y1 = sourceEdgeY;
@@ -662,11 +707,11 @@ export const Canvas: React.FC<CanvasProps> = ({
           y2 = targetEdgeY;
         } else {
           // Source -> Target (Right to Left)
-          const sourceEdgeX = sourceCard.x - 2;
-          const sourceEdgeY = Math.min(Math.max(targetCenterY, sourceCard.y + 24), sourceCard.y + sourceH - 24);
+          const sourceEdgeX = sourcePos.x - 2;
+          const sourceEdgeY = Math.min(Math.max(targetCenterY, sourcePos.y + 24), sourcePos.y + sourceH - 24);
 
-          const targetEdgeX = targetCard.x + targetW + 2;
-          const targetEdgeY = Math.min(Math.max(sourceCenterY, targetCard.y + 24), targetCard.y + targetH - 24);
+          const targetEdgeX = targetPos.x + targetW + 2;
+          const targetEdgeY = Math.min(Math.max(sourceCenterY, targetPos.y + 24), targetPos.y + targetH - 24);
 
           x1 = dirMode === 'bidirectional' ? sourceEdgeX - arrowLen : sourceEdgeX;
           y1 = sourceEdgeY;
@@ -677,11 +722,11 @@ export const Canvas: React.FC<CanvasProps> = ({
         dir = 'vertical';
         if (dy >= 0) {
           // Source -> Target (Top to Bottom)
-          const sourceEdgeX = Math.min(Math.max(targetCenterX, sourceCard.x + 24), sourceCard.x + sourceW - 24);
-          const sourceEdgeY = sourceCard.y + sourceH + 2;
+          const sourceEdgeX = Math.min(Math.max(targetCenterX, sourcePos.x + 24), sourcePos.x + sourceW - 24);
+          const sourceEdgeY = sourcePos.y + sourceH + 2;
 
-          const targetEdgeX = Math.min(Math.max(sourceCenterX, targetCard.x + 24), targetCard.x + targetW - 24);
-          const targetEdgeY = targetCard.y - 2;
+          const targetEdgeX = Math.min(Math.max(sourceCenterX, targetPos.x + 24), targetPos.x + targetW - 24);
+          const targetEdgeY = targetPos.y - 2;
 
           x1 = sourceEdgeX;
           y1 = dirMode === 'bidirectional' ? sourceEdgeY + arrowLen : sourceEdgeY;
@@ -689,11 +734,11 @@ export const Canvas: React.FC<CanvasProps> = ({
           y2 = targetEdgeY - arrowLen;
         } else {
           // Source -> Target (Bottom to Top)
-          const sourceEdgeX = Math.min(Math.max(targetCenterX, sourceCard.x + 24), sourceCard.x + sourceW - 24);
-          const sourceEdgeY = sourceCard.y - 2;
+          const sourceEdgeX = Math.min(Math.max(targetCenterX, sourcePos.x + 24), sourcePos.x + sourceW - 24);
+          const sourceEdgeY = sourcePos.y - 2;
 
-          const targetEdgeX = Math.min(Math.max(sourceCenterX, targetCard.x + 24), targetCard.x + targetW - 24);
-          const targetEdgeY = targetCard.y + targetH + 2;
+          const targetEdgeX = Math.min(Math.max(sourceCenterX, targetPos.x + 24), targetPos.x + targetW - 24);
+          const targetEdgeY = targetPos.y + targetH + 2;
 
           x1 = sourceEdgeX;
           y1 = dirMode === 'bidirectional' ? sourceEdgeY - arrowLen : sourceEdgeY;
@@ -760,11 +805,12 @@ export const Canvas: React.FC<CanvasProps> = ({
             markerEnd={markerEnd}
             markerStart={markerStart}
           />
+          {/* Edge Label Pill */}
           <foreignObject
-            x={midX - 55}
-            y={midY - 12}
-            width={110}
-            height={24}
+            x={midX - 60}
+            y={midY - 14}
+            width={120}
+            height={28}
             className="overflow-visible"
           >
             <div
@@ -791,9 +837,10 @@ export const Canvas: React.FC<CanvasProps> = ({
     const sourceCard = cards.find((c) => c.id === connectingSourceId);
     if (!sourceCard) return null;
 
+    const sourcePos = localDragPositions[sourceCard.id] || { x: sourceCard.x, y: sourceCard.y };
     const sourceH = cardHeightsRef.current.get(sourceCard.id) || 180;
-    const x1 = sourceCard.x + 144;
-    const y1 = sourceCard.y + sourceH / 2;
+    const x1 = sourcePos.x + 144;
+    const y1 = sourcePos.y + sourceH / 2;
     const x2 = connectionMousePos.x;
     const y2 = connectionMousePos.y;
 
@@ -931,10 +978,13 @@ export const Canvas: React.FC<CanvasProps> = ({
           const isCategoryHighlighted = (selectedCategory !== 'all' || !!q) && matchesCategory && matchesSearch;
           const isCardSelected = selectedCardId === card.id || selectedCardIds.includes(card.id);
 
+          const displayPos = localDragPositions[card.id];
+          const cardToRender = displayPos ? { ...card, x: displayPos.x, y: displayPos.y } : card;
+
           return (
             <WorldCardNode
               key={card.id}
-              card={card}
+              card={cardToRender}
               isSelected={isCardSelected}
               isConnectingSource={connectingSourceId === card.id}
               isDimmed={isDimmed}
@@ -978,6 +1028,39 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       {/* Canvas Floating Controls */}
       <div className="absolute bottom-5 right-5 flex items-center gap-1 app-bg-secondary p-1.5 rounded-xl border app-border shadow-2xl z-50 text-xs">
+        {onUndo && onRedo && (
+          <>
+            <button
+              type="button"
+              onClick={onUndo}
+              disabled={!canUndo}
+              className={`p-1.5 rounded-lg transition-colors ${
+                canUndo
+                  ? 'app-text-muted hover:app-text-main app-bg-hover cursor-pointer active:scale-95'
+                  : 'app-text-muted opacity-30 cursor-not-allowed'
+              }`}
+              title="Undo / Batal Perubahan (Ctrl + Z)"
+            >
+              <Icons.Undo2 size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={onRedo}
+              disabled={!canRedo}
+              className={`p-1.5 rounded-lg transition-colors ${
+                canRedo
+                  ? 'app-text-muted hover:app-text-main app-bg-hover cursor-pointer active:scale-95'
+                  : 'app-text-muted opacity-30 cursor-not-allowed'
+              }`}
+              title="Redo / Ulangi Perubahan (Ctrl + Y)"
+            >
+              <Icons.Redo2 size={16} />
+            </button>
+
+            <div className="w-[1px] h-4 bg-[#444] opacity-30 my-auto mx-1" />
+          </>
+        )}
+
         <button
           type="button"
           onClick={() => handleZoom(0.15)}

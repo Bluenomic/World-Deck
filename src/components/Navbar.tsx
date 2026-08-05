@@ -15,10 +15,6 @@ interface NavbarProps {
   onOpenWorldManager: () => void;
   localDirectoryName: string | null;
   onChangeDirectory: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
 }
 
 const VIEW_TABS: { id: ViewMode; label: string; icon: any }[] = [
@@ -41,10 +37,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenWorldManager,
   localDirectoryName,
   onChangeDirectory,
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -107,38 +99,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         })}
       </div>
 
-      {/* RIGHT: Action Controls (Undo, Redo, Theme, Menu) */}
+      {/* RIGHT: Action Controls (Theme, Menu) */}
       <div className="flex items-center gap-2">
-        {/* Undo / Redo Controls */}
-        <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={onUndo}
-            disabled={!canUndo}
-            className={`p-2 rounded-xl transition-all ${
-              canUndo
-                ? 'text-slate-300 hover:text-white hover:bg-slate-800/40 cursor-pointer active:scale-95'
-                : 'text-slate-600 opacity-40 cursor-not-allowed'
-            }`}
-            title="Undo / Batal Perubahan (Ctrl + Z)"
-          >
-            <Icons.Undo2 size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={onRedo}
-            disabled={!canRedo}
-            className={`p-2 rounded-xl transition-all ${
-              canRedo
-                ? 'text-slate-300 hover:text-white hover:bg-slate-800/40 cursor-pointer active:scale-95'
-                : 'text-slate-600 opacity-40 cursor-not-allowed'
-            }`}
-            title="Redo / Ulangi Perubahan (Ctrl + Y)"
-          >
-            <Icons.Redo2 size={16} />
-          </button>
-        </div>
-
         {/* Theme Toggle Button */}
         <button
           type="button"
