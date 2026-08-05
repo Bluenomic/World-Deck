@@ -99,18 +99,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         })}
       </div>
 
-      {/* RIGHT: Action Controls (Theme, Menu) */}
+      {/* RIGHT: Action Controls (Menu) */}
       <div className="flex items-center gap-2">
-        {/* Theme Toggle Button */}
-        <button
-          type="button"
-          onClick={() => onThemeChange(currentTheme === 'dark' ? 'light' : 'dark')}
-          className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/40 transition-colors cursor-pointer"
-          title={currentTheme === 'dark' ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'}
-        >
-          {currentTheme === 'dark' ? <Icons.Sun size={17} /> : <Icons.Moon size={17} />}
-        </button>
-
         {/* Consolidated Actions Dropdown Menu */}
         <div className="relative" ref={menuRef}>
           <button
@@ -191,23 +181,40 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <div className="my-1 border-t border-slate-800" />
 
-              {/* Theme Selector inside Dropdown */}
-              <button
-                type="button"
-                onClick={() => {
-                  onThemeChange(currentTheme === 'dark' ? 'light' : 'dark');
-                  setIsMenuOpen(false);
-                }}
-                className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-800 transition-colors text-xs font-semibold cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Icons.Palette size={14} className="text-slate-400" />
+              {/* Theme Sub-Menu / Selector inside Dropdown */}
+              <div className="px-2.5 py-1.5 space-y-1.5">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
                   <span>Tema Aplikasi</span>
+                  <Icons.Palette size={12} className="text-slate-400" />
                 </div>
-                <span className="text-xs font-medium text-slate-400">
-                  {currentTheme === 'dark' ? 'Mode Gelap' : 'Mode Terang'}
-                </span>
-              </button>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onThemeChange('light')}
+                    className={`px-2.5 py-1.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                      currentTheme === 'light'
+                        ? 'bg-blue-600 text-white shadow-xs font-bold scale-[1.02]'
+                        : 'bg-slate-900/60 hover:bg-slate-800 text-slate-300'
+                    }`}
+                  >
+                    <Icons.Sun size={13} className={currentTheme === 'light' ? 'text-amber-300' : 'text-slate-400'} />
+                    <span>Terang</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onThemeChange('dark')}
+                    className={`px-2.5 py-1.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                      currentTheme === 'dark'
+                        ? 'bg-blue-600 text-white shadow-xs font-bold scale-[1.02]'
+                        : 'bg-slate-900/60 hover:bg-slate-800 text-slate-300'
+                    }`}
+                  >
+                    <Icons.Moon size={13} className={currentTheme === 'dark' ? 'text-blue-200' : 'text-slate-400'} />
+                    <span>Gelap</span>
+                  </button>
+                </div>
+              </div>
 
               <div className="my-1 border-t border-slate-800" />
 

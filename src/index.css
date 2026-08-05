@@ -47,6 +47,21 @@ body.theme-light {
   color: #292524;
 }
 
+/* Smooth Theme Switch Transition */
+body,
+.app-bg-main,
+.app-bg-secondary,
+.app-bg-hover,
+.app-border,
+.app-text-main,
+.app-text-muted {
+  transition: background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              fill 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              stroke 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
 /* Light Theme Accent Overrides (Blue -> Pastel Orange) */
 body.theme-light .focus\:border-blue-500:focus {
   border-color: #f97316 !important;
