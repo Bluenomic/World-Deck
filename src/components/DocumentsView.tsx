@@ -39,7 +39,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     documents.length > 0 ? documents[0].id : null
   );
   const [searchQuery, setSearchQuery] = useState('');
-  const [isZenMode, setIsZenMode] = useState(false);
+  // Sidebar Visibility State (Default Open)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showRefDrawer, setShowRefDrawer] = useState(false);
   const [selectedRefCard, setSelectedRefCard] = useState<WorldCard | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -911,7 +912,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     setTimeout(() => setShowSaveToast(false), 2200);
   };
 
-  // Global Keyboard Shortcut: Ctrl + S / Cmd + S to save document
+  // Global Keyboard Shortcut: Ctrl + S / Cmd + S to save document, Ctrl + \ to toggle sidebar
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -919,6 +920,9 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         if (mode === 'editing') {
           handleSaveDocument();
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+        e.preventDefault();
+        setIsSidebarOpen((prev) => !prev);
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -947,7 +951,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       : 'max-w-4xl lg:max-w-5xl';
 
   return (
-    <div className="flex-1 flex app-bg-main overflow-hidden app-text-main h-full font-sans select-none">
+    <div className="flex-1 flex app-bg-main overflow-hidden app-text-main h-full font-sans select-none relative">
       {/* Hidden Image File Input */}
       <input
         ref={imageInputRef}
@@ -957,37 +961,69 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         className="hidden"
       />
 
+      {/* Figma-style Sleek Floating Sidebar Toggle Button (When sidebar is hidden) */}
+      <button
+        type="button"
+        onClick={() => setIsSidebarOpen(true)}
+        className={`absolute top-3 left-3 z-40 p-2 rounded-xl app-bg-secondary border app-border text-slate-300 hover:text-white hover:app-bg-hover shadow-xl cursor-pointer flex items-center justify-center transition-all duration-300 ease-out ${
+          isSidebarOpen
+            ? '-translate-x-12 opacity-0 pointer-events-none delay-0'
+            : 'translate-x-0 opacity-100 pointer-events-auto delay-150 hover:scale-105'
+        }`}
+        title="Tampilkan Sidebar (Ctrl + \)"
+      >
+        <Icons.PanelLeftOpen size={18} className="app-accent-text" />
+      </button>
+
       {/* ========================================================= */}
       {/* MINIMALIST LEFT SIDEBAR */}
       {/* ========================================================= */}
-      {!isZenMode && (
-        <div className="w-72 border-r app-border/40 app-bg-secondary flex flex-col shrink-0">
-          {/* Header & Quick Add */}
-          <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+      <aside
+        className={`sidebar-panel-transition w-72 border-r app-border/40 app-bg-secondary flex flex-col shrink-0 z-30 transition-all duration-300 ease-out ${
+          isSidebarOpen
+            ? 'translate-x-0 ml-0 opacity-100'
+            : '-ml-72 opacity-0 pointer-events-none'
+        }`}
+      >
+        {/* Header & Hide Sidebar Toggle Button */}
+        <div className="px-5 pt-4 pb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">Dokumen</h2>
-            <button
-              type="button"
-              onClick={handleCreateDocument}
-              className="p-1.5 rounded-lg hover:app-bg-hover text-slate-300 hover:text-white transition-colors cursor-pointer"
-              title="Buat Dokumen Baru"
-            >
-              <Icons.Plus size={16} />
-            </button>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded app-bg-main text-slate-400 border border-slate-800">
+              {filteredDocs.length}
+            </span>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(false)}
+            className="p-1.5 rounded-lg hover:app-bg-hover text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center justify-center"
+            title="Sembunyikan Sidebar (Ctrl + \)"
+          >
+            <Icons.PanelLeftClose size={18} className="app-accent-text" />
+          </button>
+        </div>
 
-          {/* Minimal Search Bar */}
-          <div className="px-5 mb-4">
-            <div className="relative">
-              <Icons.Search size={13} className="absolute left-2.5 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Cari dokumen..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg app-bg-main/80 border border-slate-700/60 app-text-main placeholder:text-slate-400 focus:outline-none focus:border-slate-500 transition-colors"
-              />
-            </div>
+        {/* Search Bar & Add Document Button Aligned Side-by-Side */}
+        <div className="px-4 mb-4 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Icons.Search size={13} className="absolute left-2.5 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari dokumen..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg app-bg-main/80 border border-slate-700/60 app-text-main placeholder:text-slate-400 focus:outline-none focus:border-slate-500 transition-colors"
+            />
           </div>
+          <button
+            type="button"
+            onClick={handleCreateDocument}
+            className="p-1.5 rounded-lg app-bg-main/80 border border-slate-700/60 text-slate-300 hover:text-white hover:app-bg-hover transition-colors cursor-pointer shrink-0 flex items-center justify-center"
+            title="Buat Dokumen Baru"
+          >
+            <Icons.Plus size={16} />
+          </button>
+        </div>
 
           {/* Clean Document List */}
           <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-0.5">
@@ -1030,8 +1066,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               })
             )}
           </div>
-        </div>
-      )}
+      </aside>
 
       {/* ========================================================= */}
       {/* GOOGLE DOCS STYLE LIVE RICH EDITOR WORKSPACE */}
@@ -1042,50 +1077,9 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
             {/* Top Control Bar */}
             <div className="px-8 py-3 flex items-center justify-between text-xs text-slate-300 border-b border-slate-800/40 shrink-0">
               <div className="flex items-center gap-3">
-                {isZenMode && (
-                  <button
-                    type="button"
-                    onClick={() => setIsZenMode(false)}
-                    className="p-1 rounded-md text-slate-300 hover:text-white transition-colors cursor-pointer"
-                    title="Keluar Zen Mode"
-                  >
-                    <Icons.Minimize2 size={15} />
-                  </button>
-                )}
-
-                <span className="font-mono text-[11px] text-slate-400 font-medium">{wordCount} kata</span>
-
-                <div className="h-4 w-px bg-slate-800/60 mx-1" />
-
-                {/* Primary Mode Button: VIEWING MODE VS EDITING MODE */}
-                {mode === 'viewing' ? (
-                  <button
-                    type="button"
-                    onClick={() => setMode('editing')}
-                    className="px-3.5 py-1.5 rounded-xl app-accent-bg text-white font-bold text-xs shadow-md hover:brightness-110 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
-                  >
-                    <Icons.Edit3 size={14} />
-                    <span>Edit Dokumen</span>
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveDocument}
-                      className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
-                    >
-                      <Icons.Check size={14} />
-                      <span>Simpan Dokumen</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMode('viewing')}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-all cursor-pointer"
-                    >
-                      Batal
-                    </button>
-                  </div>
-                )}
+                <span className={`text-xs font-semibold text-slate-400 truncate transition-all ${!isSidebarOpen ? 'ml-9' : ''}`}>
+                  {activeDoc.title || 'Dokumen Tanpa Judul'}
+                </span>
               </div>
 
               {/* Action Buttons */}
@@ -1109,28 +1103,35 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   )}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setShowRefDrawer(!showRefDrawer)}
-                  className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
-                    showRefDrawer
-                      ? 'bg-blue-500/20 text-blue-300 font-semibold'
-                      : 'text-slate-300 hover:text-white'
-                  }`}
-                  title="Panel Referensi Kartu"
-                >
-                  <Icons.Layers size={14} />
-                  <span>Referensi</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsZenMode(!isZenMode)}
-                  className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/40 transition-colors cursor-pointer"
-                  title={isZenMode ? 'Keluar Zen Mode' : 'Zen Mode'}
-                >
-                  {isZenMode ? <Icons.Minimize2 size={14} /> : <Icons.Maximize2 size={14} />}
-                </button>
+                {/* Primary Mode Button: VIEWING MODE VS EDITING MODE */}
+                {mode === 'viewing' ? (
+                  <button
+                    type="button"
+                    onClick={() => setMode('editing')}
+                    className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800/70 hover:bg-slate-700/70 border border-slate-700/60 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Icons.Edit3 size={14} />
+                    <span>Edit</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleSaveDocument}
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800/70 hover:bg-slate-700/70 border border-slate-700/60 transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Icons.Save size={14} />
+                      <span>Simpan</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode('viewing')}
+                      className="px-2.5 py-1 rounded-lg text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                )}
 
                 {/* More Options Dropdown */}
                 <div className="relative">
@@ -1561,15 +1562,19 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                       <h1 className="text-3xl font-extrabold tracking-tight app-text-main break-words [overflow-wrap:anywhere]">
                         {activeDoc.title || 'Dokumen Tanpa Judul'}
                       </h1>
-                      <p className="text-xs text-slate-400 font-mono">
-                        Terakhir diubah:{' '}
-                        {new Date(activeDoc.updatedAt).toLocaleString('id-ID', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                      <p className="text-xs text-slate-400 font-mono flex items-center gap-2">
+                        <span>
+                          Terakhir diubah:{' '}
+                          {new Date(activeDoc.updatedAt).toLocaleString('id-ID', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        <span>•</span>
+                        <span>{wordCount} kata</span>
                       </p>
                     </div>
 
@@ -1630,14 +1635,30 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 /* EDITING MODE: Interactive Google Docs Style ContentEditable Canvas */
                 <div className="flex-1 overflow-y-auto px-6 md:px-12 py-10 flex justify-center min-w-0">
                   <div className={`w-full ${canvasContainerWidthClass} flex flex-col space-y-6 relative transition-all duration-200 min-w-0`}>
-                    {/* Clean Title Input */}
-                    <input
-                      type="text"
-                      value={draftTitle}
-                      onChange={(e) => setDraftTitle(e.target.value)}
-                      placeholder="Judul naskah..."
-                      className="w-full text-3xl font-extrabold tracking-tight app-text-main bg-transparent border-0 focus:outline-none placeholder:text-slate-500 break-words [overflow-wrap:anywhere]"
-                    />
+                    {/* Clean Title Input & Subtitle Info */}
+                    <div className="space-y-2 border-b border-slate-800/80 pb-4">
+                      <input
+                        type="text"
+                        value={draftTitle}
+                        onChange={(e) => setDraftTitle(e.target.value)}
+                        placeholder="Judul naskah..."
+                        className="w-full text-3xl font-extrabold tracking-tight app-text-main bg-transparent border-0 focus:outline-none placeholder:text-slate-500 break-words [overflow-wrap:anywhere]"
+                      />
+                      <p className="text-xs text-slate-400 font-mono flex items-center gap-2">
+                        <span>
+                          Terakhir diubah:{' '}
+                          {new Date(activeDoc.updatedAt).toLocaleString('id-ID', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        <span>•</span>
+                        <span>{wordCount} kata</span>
+                      </p>
+                    </div>
 
                     {/* Live ContentEditable Canvas (Google Docs Style WYSIWYG) */}
                     <div className="relative flex-1 flex flex-col min-w-0">
