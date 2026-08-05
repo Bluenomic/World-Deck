@@ -1101,8 +1101,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
               {mode === 'viewing' ? (
                 /* VIEWING MODE: Clean Rendered Document */
-                <div className="flex-1 overflow-y-auto px-6 py-10 flex justify-center app-bg-main">
-                  <div className="w-full max-w-2xl flex flex-col space-y-6">
+                <div className="flex-1 overflow-y-auto px-6 md:px-12 py-10 flex justify-center app-bg-main">
+                  <div className="w-full max-w-4xl lg:max-w-5xl flex flex-col space-y-6">
                     <div className="border-b border-slate-800/80 pb-4 space-y-2">
                       <h1 className="text-3xl font-extrabold tracking-tight app-text-main">
                         {activeDoc.title || 'Dokumen Tanpa Judul'}
@@ -1181,8 +1181,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 </div>
               ) : (
                 /* EDITING MODE: Interactive Google Docs Style ContentEditable Canvas */
-                <div className="flex-1 overflow-y-auto px-6 py-10 flex justify-center">
-                  <div className="w-full max-w-2xl flex flex-col space-y-6 relative">
+                <div className="flex-1 overflow-y-auto px-6 md:px-12 py-10 flex justify-center">
+                  <div className="w-full max-w-4xl lg:max-w-5xl flex flex-col space-y-6 relative">
                     {/* Clean Title Input */}
                     <input
                       type="text"
