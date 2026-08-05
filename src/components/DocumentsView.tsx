@@ -54,11 +54,34 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   } | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Selected Image State for Google Docs style alignment popover
+  // Selected Image State for Google Docs style alignment popover & resize handles
   const [selectedImage, setSelectedImage] = useState<{
     wrapper: HTMLElement;
+    img: HTMLImageElement;
     mode: 'inline' | 'wrap-left' | 'wrap-right';
     rect: DOMRect;
+  } | null>(null);
+
+  // Context Menu State for Right-Clicking Image
+  const [imageContextMenu, setImageContextMenu] = useState<{
+    x: number;
+    y: number;
+    wrapper: HTMLElement;
+    img: HTMLImageElement;
+    mode: 'inline' | 'wrap-left' | 'wrap-right';
+  } | null>(null);
+
+  // Inline Google Docs-style Crop State
+  const [cropState, setCropState] = useState<{
+    isActive: boolean;
+    wrapper: HTMLElement;
+    img: HTMLImageElement;
+    rect: DOMRect;
+    originalSrc: string;
+    cropTop: number;
+    cropBottom: number;
+    cropLeft: number;
+    cropRight: number;
   } | null>(null);
 
   // Save Notification Toast State
@@ -355,7 +378,28 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     }
   };
 
-  // Handle Image Click & Placement Detection (Google Docs style)
+  // Clear selected image options when leaving editing mode
+  useEffect(() => {
+    if (mode === 'viewing') {
+      setSelectedImage(null);
+      setImageContextMenu(null);
+      setCropState(null);
+    }
+  }, [mode]);
+
+  // Close context menu on document click
+  useEffect(() => {
+    const handleCloseMenu = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.doc-image-context-menu')) {
+        setImageContextMenu(null);
+      }
+    };
+    window.addEventListener('click', handleCloseMenu);
+    return () => window.removeEventListener('click', handleCloseMenu);
+  }, []);
+
+  // Handle Image Click & Placement Detection (Google Docs style - Editing mode only)
   const handleDocumentClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
 
@@ -366,22 +410,232 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       if (found) onOpenCard(found);
     }
 
+    // Image placement options popover is only active in editing mode
+    if (mode !== 'editing') {
+      setSelectedImage(null);
+      return;
+    }
+
     // Check if clicked image or image wrapper
-    const imgEl = target.tagName === 'IMG' ? target : target.querySelector('img');
+    const imgEl = (target.tagName === 'IMG' ? target : target.querySelector('img')) as HTMLImageElement | null;
     const wrapper = target.closest('.doc-img-wrapper') as HTMLElement || (imgEl ? imgEl.closest('.doc-img-wrapper') as HTMLElement : null);
 
     if (wrapper && (imgEl || wrapper.querySelector('img'))) {
+      const activeImg = (imgEl || wrapper.querySelector('img')) as HTMLImageElement;
       const rect = wrapper.getBoundingClientRect();
-      let mode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
+      let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
       if (wrapper.classList.contains('img-mode-wrap-left') || wrapper.style.float === 'left') {
-        mode = 'wrap-left';
+        imgAlignMode = 'wrap-left';
       } else if (wrapper.classList.contains('img-mode-wrap-right') || wrapper.style.float === 'right') {
-        mode = 'wrap-right';
+        imgAlignMode = 'wrap-right';
       }
-      setSelectedImage({ wrapper, mode, rect });
-    } else if (!target.closest('.doc-image-toolbar-popover')) {
+      setSelectedImage({ wrapper, img: activeImg, mode: imgAlignMode, rect });
+    } else if (!target.closest('.doc-image-toolbar-popover') && !target.closest('.doc-image-resize-handle')) {
       setSelectedImage(null);
     }
+  };
+
+  // Image Resize Drag Handler
+  const handleImageResizeStart = (e: React.MouseEvent, handleType: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right') => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!selectedImage) return;
+
+    const { wrapper, img } = selectedImage;
+    const startX = e.clientX;
+    const startWidth = img.getBoundingClientRect().width;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault();
+      const deltaX = moveEvent.clientX - startX;
+      let newWidth = startWidth;
+
+      if (handleType === 'bottom-right' || handleType === 'top-right') {
+        newWidth = startWidth + deltaX;
+      } else {
+        newWidth = startWidth - deltaX;
+      }
+
+      newWidth = Math.max(120, Math.min(850, newWidth));
+
+      img.style.width = `${newWidth}px`;
+      img.style.maxWidth = '100%';
+      img.style.height = 'auto';
+      wrapper.style.width = selectedImage.mode === 'inline' ? 'auto' : `${newWidth}px`;
+
+      const newRect = wrapper.getBoundingClientRect();
+      setSelectedImage((prev) => (prev ? { ...prev, rect: newRect } : null));
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      updateToolbarState();
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // Handle Right-Click Context Menu on Image
+  const handleContextMenuDetect = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (mode !== 'editing') return;
+
+    const target = e.target as HTMLElement;
+    const imgEl = (target.tagName === 'IMG' ? target : target.querySelector('img')) as HTMLImageElement | null;
+    const wrapper = target.closest('.doc-img-wrapper') as HTMLElement || (imgEl ? imgEl.closest('.doc-img-wrapper') as HTMLElement : null);
+
+    if (wrapper && (imgEl || wrapper.querySelector('img'))) {
+      e.preventDefault();
+      e.stopPropagation();
+      const activeImg = (imgEl || wrapper.querySelector('img')) as HTMLImageElement;
+      const rect = wrapper.getBoundingClientRect();
+      let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
+      if (wrapper.classList.contains('img-mode-wrap-left') || wrapper.style.float === 'left') {
+        imgAlignMode = 'wrap-left';
+      } else if (wrapper.classList.contains('img-mode-wrap-right') || wrapper.style.float === 'right') {
+        imgAlignMode = 'wrap-right';
+      }
+
+      setSelectedImage({ wrapper, img: activeImg, mode: imgAlignMode, rect });
+      setImageContextMenu({
+        x: Math.min(window.innerWidth - 230, e.clientX),
+        y: Math.min(window.innerHeight - 250, e.clientY),
+        wrapper,
+        img: activeImg,
+        mode: imgAlignMode,
+      });
+    }
+  };
+
+  // Inline Crop Drag Handler (Google Docs style 8 handles)
+  const handleInlineCropDragStart = (
+    e: React.MouseEvent,
+    handleType: 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!cropState) return;
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const { rect, cropTop: initialTop, cropBottom: initialBottom, cropLeft: initialLeft, cropRight: initialRight } = cropState;
+
+    const imgW = rect.width;
+    const imgH = rect.height;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault();
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+
+      let newTop = initialTop;
+      let newBottom = initialBottom;
+      let newLeft = initialLeft;
+      let newRight = initialRight;
+
+      const deltaXPercent = (deltaX / (imgW || 1)) * 100;
+      const deltaYPercent = (deltaY / (imgH || 1)) * 100;
+
+      if (handleType.includes('top')) {
+        newTop = Math.max(0, Math.min(80 - initialBottom, initialTop + deltaYPercent));
+      }
+      if (handleType.includes('bottom')) {
+        newBottom = Math.max(0, Math.min(80 - initialTop, initialBottom - deltaYPercent));
+      }
+      if (handleType.includes('left')) {
+        newLeft = Math.max(0, Math.min(80 - initialRight, initialLeft + deltaXPercent));
+      }
+      if (handleType.includes('right')) {
+        newRight = Math.max(0, Math.min(80 - initialLeft, initialRight - deltaXPercent));
+      }
+
+      setCropState((prev) => (prev ? {
+        ...prev,
+        cropTop: newTop,
+        cropBottom: newBottom,
+        cropLeft: newLeft,
+        cropRight: newRight,
+      } : null));
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // Commit Cropping Non-Destructively & Update Display Image Bounds
+  const commitInlineCrop = () => {
+    if (!cropState) return;
+    const { img, wrapper, originalSrc, cropTop, cropBottom, cropLeft, cropRight } = cropState;
+
+    const topVal = Math.max(0, Math.round(cropTop * 100) / 100);
+    const bottomVal = Math.max(0, Math.round(cropBottom * 100) / 100);
+    const leftVal = Math.max(0, Math.round(cropLeft * 100) / 100);
+    const rightVal = Math.max(0, Math.round(cropRight * 100) / 100);
+
+    img.setAttribute('data-original-src', originalSrc);
+    img.setAttribute('data-crop-top', String(topVal));
+    img.setAttribute('data-crop-bottom', String(bottomVal));
+    img.setAttribute('data-crop-left', String(leftVal));
+    img.setAttribute('data-crop-right', String(rightVal));
+    img.style.clipPath = 'none';
+
+    if (topVal <= 0.1 && bottomVal <= 0.1 && leftVal <= 0.1 && rightVal <= 0.1) {
+      img.src = originalSrc;
+      img.style.width = 'auto';
+      if (wrapper) wrapper.style.width = 'auto';
+      updateToolbarState();
+      setCropState(null);
+      return;
+    }
+
+    const tempImg = new Image();
+    tempImg.crossOrigin = 'anonymous';
+    tempImg.onload = () => {
+      const naturalW = tempImg.naturalWidth || tempImg.width;
+      const naturalH = tempImg.naturalHeight || tempImg.height;
+
+      const cropX = Math.round((leftVal / 100) * naturalW);
+      const cropY = Math.round((topVal / 100) * naturalH);
+      const cropW = Math.max(10, Math.round(((100 - leftVal - rightVal) / 100) * naturalW));
+      const cropH = Math.max(10, Math.round(((100 - topVal - bottomVal) / 100) * naturalH));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = cropW;
+      canvas.height = cropH;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(tempImg, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        img.src = canvas.toDataURL('image/png');
+        updateToolbarState();
+      }
+      setCropState(null);
+    };
+    tempImg.src = originalSrc;
+  };
+
+  // Reset / Restore Crop Completely
+  const resetImageCrop = (img: HTMLImageElement) => {
+    const originalSrc = img.getAttribute('data-original-src');
+    if (originalSrc) {
+      img.src = originalSrc;
+    }
+    img.removeAttribute('data-crop-top');
+    img.removeAttribute('data-crop-bottom');
+    img.removeAttribute('data-crop-left');
+    img.removeAttribute('data-crop-right');
+    img.style.clipPath = 'none';
+    img.style.width = 'auto';
+    const wrapper = img.closest('.doc-img-wrapper') as HTMLElement;
+    if (wrapper) {
+      wrapper.style.width = 'auto';
+    }
+    updateToolbarState();
   };
 
   const applyImageMode = (mode: 'inline' | 'wrap-left' | 'wrap-right') => {
@@ -416,7 +670,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     }
 
     const rect = wrapper.getBoundingClientRect();
-    setSelectedImage({ wrapper, mode, rect });
+    setSelectedImage({ wrapper, img: selectedImage.img, mode, rect });
     updateToolbarState();
   };
 
@@ -1283,6 +1537,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                           updateToolbarState();
                           handleDocumentClick(e);
                         }}
+                        onContextMenu={handleContextMenuDetect}
                         className="w-full flex-1 bg-transparent text-base leading-relaxed app-text-main focus:outline-none resize-none font-sans space-y-3 p-1 min-h-[650px] border-0 break-words [overflow-wrap:anywhere] min-w-0 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:text-3xl [&_h1]:font-extrabold [&_h1]:my-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:my-3 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:my-2"
                       />
 
@@ -1517,74 +1772,340 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         )}
       </div>
 
-      {/* Floating Google Docs Style Image Options Toolbar */}
-      {selectedImage && (
+      {/* Selected Image Outline Box & 4 Corner Resize Handles Overlay (Left-Click Only) */}
+      {mode === 'editing' && selectedImage && !cropState && (
         <div
-          className="doc-image-toolbar-popover fixed z-[130] px-3 py-1.5 rounded-2xl app-bg-secondary border border-slate-700/80 shadow-2xl flex items-center gap-1.5 text-xs animate-in fade-in zoom-in-95 duration-150 select-none backdrop-blur-md"
+          className="fixed pointer-events-none z-[125] border-2 border-blue-500 rounded-2xl shadow-lg ring-4 ring-blue-500/20 transition-none"
           style={{
-            top: `${Math.max(10, selectedImage.rect.top - 48)}px`,
-            left: `${Math.min(window.innerWidth - 340, Math.max(10, selectedImage.rect.left + selectedImage.rect.width / 2 - 150))}px`,
+            top: `${selectedImage.rect.top}px`,
+            left: `${selectedImage.rect.left}px`,
+            width: `${selectedImage.rect.width}px`,
+            height: `${selectedImage.rect.height}px`,
           }}
         >
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pr-1 border-r border-slate-800">
-            Gambar
-          </span>
+          {/* Top-Left Corner Handle */}
+          <div
+            onMouseDown={(e) => handleImageResizeStart(e, 'top-left')}
+            className="doc-image-resize-handle absolute -top-2 -left-2 w-4 h-4 bg-white border-2 border-blue-600 rounded-full shadow-md cursor-nwse-resize pointer-events-auto hover:scale-125 transition-transform"
+            title="Tarik untuk mengubah ukuran gambar"
+          />
+          {/* Top-Right Corner Handle */}
+          <div
+            onMouseDown={(e) => handleImageResizeStart(e, 'top-right')}
+            className="doc-image-resize-handle absolute -top-2 -right-2 w-4 h-4 bg-white border-2 border-blue-600 rounded-full shadow-md cursor-nesw-resize pointer-events-auto hover:scale-125 transition-transform"
+            title="Tarik untuk mengubah ukuran gambar"
+          />
+          {/* Bottom-Left Corner Handle */}
+          <div
+            onMouseDown={(e) => handleImageResizeStart(e, 'bottom-left')}
+            className="doc-image-resize-handle absolute -bottom-2 -left-2 w-4 h-4 bg-white border-2 border-blue-600 rounded-full shadow-md cursor-nesw-resize pointer-events-auto hover:scale-125 transition-transform"
+            title="Tarik untuk mengubah ukuran gambar"
+          />
+          {/* Bottom-Right Corner Handle */}
+          <div
+            onMouseDown={(e) => handleImageResizeStart(e, 'bottom-right')}
+            className="doc-image-resize-handle absolute -bottom-2 -right-2 w-4 h-4 bg-white border-2 border-blue-600 rounded-full shadow-md cursor-nwse-resize pointer-events-auto hover:scale-125 transition-transform"
+            title="Tarik untuk mengubah ukuran gambar"
+          />
+        </div>
+      )}
 
+      {/* Right-Click Context Menu for Images */}
+      {imageContextMenu && (
+        <div
+          className="doc-image-context-menu fixed z-[150] w-56 app-bg-secondary border border-slate-700/80 shadow-2xl rounded-2xl py-1.5 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 select-none space-y-0.5"
+          style={{
+            top: `${imageContextMenu.y}px`,
+            left: `${imageContextMenu.x}px`,
+          }}
+        >
+          <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 flex items-center justify-between">
+            <span>Opsi Gambar</span>
+            <Icons.Image size={13} className="text-blue-400" />
+          </div>
+
+          <div className="px-1 py-1">
+            <button
+              type="button"
+              onClick={() => {
+                applyImageMode('inline');
+                setImageContextMenu(null);
+              }}
+              className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
+                imageContextMenu.mode === 'inline'
+                  ? 'bg-blue-600/20 text-blue-300 font-bold'
+                  : 'hover:bg-slate-800 text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Icons.AlignJustify size={14} />
+                <span>Sebaris dengan Teks</span>
+              </div>
+              {imageContextMenu.mode === 'inline' && <Icons.Check size={13} />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                applyImageMode('wrap-left');
+                setImageContextMenu(null);
+              }}
+              className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
+                imageContextMenu.mode === 'wrap-left'
+                  ? 'bg-blue-600/20 text-blue-300 font-bold'
+                  : 'hover:bg-slate-800 text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Icons.AlignLeft size={14} />
+                <span>Wrap Kiri (Penggabungan)</span>
+              </div>
+              {imageContextMenu.mode === 'wrap-left' && <Icons.Check size={13} />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                applyImageMode('wrap-right');
+                setImageContextMenu(null);
+              }}
+              className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
+                imageContextMenu.mode === 'wrap-right'
+                  ? 'bg-blue-600/20 text-blue-300 font-bold'
+                  : 'hover:bg-slate-800 text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Icons.AlignRight size={14} />
+                <span>Wrap Kanan (Penggabungan)</span>
+              </div>
+              {imageContextMenu.mode === 'wrap-right' && <Icons.Check size={13} />}
+            </button>
+          </div>
+
+          <div className="my-1 border-t border-slate-800" />
+
+          {/* Crop Action */}
           <button
             type="button"
-            onClick={() => applyImageMode('inline')}
-            className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-              selectedImage.mode === 'inline'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-            title="Sebaris dengan Teks (Tengah)"
+            onClick={() => {
+              const { img, wrapper } = imageContextMenu;
+              let originalSrc = img.getAttribute('data-original-src');
+              if (!originalSrc) {
+                originalSrc = img.src;
+                img.setAttribute('data-original-src', originalSrc);
+              }
+
+              const existingTop = Number(img.getAttribute('data-crop-top')) || 0;
+              const existingBottom = Number(img.getAttribute('data-crop-bottom')) || 0;
+              const existingLeft = Number(img.getAttribute('data-crop-left')) || 0;
+              const existingRight = Number(img.getAttribute('data-crop-right')) || 0;
+
+              const rect = wrapper.getBoundingClientRect();
+              setCropState({
+                isActive: true,
+                wrapper,
+                img,
+                rect,
+                originalSrc,
+                cropTop: existingTop,
+                cropBottom: existingBottom,
+                cropLeft: existingLeft,
+                cropRight: existingRight,
+              });
+              setImageContextMenu(null);
+              setSelectedImage(null);
+            }}
+            className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors font-medium text-amber-400 cursor-pointer"
           >
-            <Icons.AlignJustify size={13} />
-            <span>Sebaris</span>
+            <Icons.Crop size={14} />
+            <span>Potong / Crop Gambar</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => applyImageMode('wrap-left')}
-            className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-              selectedImage.mode === 'wrap-left'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-            title="Penggabungan Teks Kiri (Wrap Left)"
-          >
-            <Icons.AlignLeft size={13} />
-            <span>Wrap Kiri</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => applyImageMode('wrap-right')}
-            className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-              selectedImage.mode === 'wrap-right'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-            title="Penggabungan Teks Kanan (Wrap Right)"
-          >
-            <Icons.AlignRight size={13} />
-            <span>Wrap Kanan</span>
-          </button>
-
-          {mode === 'editing' && (
-            <>
-              <div className="h-4 w-px bg-slate-800 mx-0.5" />
-              <button
-                type="button"
-                onClick={deleteSelectedImage}
-                className="p-1 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                title="Hapus Gambar"
-              >
-                <Icons.Trash2 size={13} />
-              </button>
-            </>
+          {/* Reset Crop Action (If image is cropped) */}
+          {(Number(imageContextMenu.img.getAttribute('data-crop-top')) > 0 ||
+            Number(imageContextMenu.img.getAttribute('data-crop-bottom')) > 0 ||
+            Number(imageContextMenu.img.getAttribute('data-crop-left')) > 0 ||
+            Number(imageContextMenu.img.getAttribute('data-crop-right')) > 0 ||
+            (imageContextMenu.img.style.clipPath && imageContextMenu.img.style.clipPath !== 'none')) && (
+            <button
+              type="button"
+              onClick={() => {
+                resetImageCrop(imageContextMenu.img);
+                setImageContextMenu(null);
+              }}
+              className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors font-medium text-blue-400 cursor-pointer"
+            >
+              <Icons.RotateCcw size={14} />
+              <span>Reset Crop (Kembalikan Utuh)</span>
+            </button>
           )}
+
+          <div className="my-1 border-t border-slate-800" />
+
+          {/* Delete Action */}
+          <button
+            type="button"
+            onClick={() => {
+              deleteSelectedImage();
+              setImageContextMenu(null);
+            }}
+            className="w-full px-3 py-2 text-left hover:bg-slate-800 text-rose-400 flex items-center gap-2 transition-colors cursor-pointer font-medium"
+          >
+            <Icons.Trash2 size={14} />
+            <span>Hapus Gambar</span>
+          </button>
+        </div>
+      )}
+
+      {/* Google Docs Style Inline Image Cropping Overlay (8 Black Handles) */}
+      {mode === 'editing' && cropState && cropState.isActive && (
+        <div
+          className="fixed z-[160] pointer-events-auto select-none"
+          style={{
+            top: `${cropState.rect.top}px`,
+            left: `${cropState.rect.left}px`,
+            width: `${cropState.rect.width}px`,
+            height: `${cropState.rect.height}px`,
+          }}
+        >
+          {/* Dimmed Outside Region Overlay */}
+          <div className="absolute inset-0 bg-black/50 pointer-events-none rounded-xl" />
+
+          {/* Active Uncropped Region Viewport */}
+          <div
+            className="absolute border-2 border-black shadow-2xl overflow-hidden pointer-events-none"
+            style={{
+              top: `${cropState.cropTop}%`,
+              bottom: `${cropState.cropBottom}%`,
+              left: `${cropState.cropLeft}%`,
+              right: `${cropState.cropRight}%`,
+            }}
+          >
+            {/* Clear Un-dimmed Image Background Inside Viewport */}
+            <img
+              src={cropState.originalSrc}
+              alt="Crop area"
+              className="absolute max-w-none block object-contain pointer-events-none"
+              style={{
+                width: `${cropState.rect.width}px`,
+                height: `${cropState.rect.height}px`,
+                top: `-${(cropState.cropTop / 100) * cropState.rect.height}px`,
+                left: `-${(cropState.cropLeft / 100) * cropState.rect.width}px`,
+              }}
+            />
+          </div>
+
+          {/* 8 Google Docs Black Crop Handles */}
+          {/* Top-Left Corner Handle */}
+          <div
+            onMouseDown={(e) => handleInlineCropDragStart(e, 'top-left')}
+            className="doc-crop-handle absolute w-3.5 h-3.5 bg-black border-2 border-white cursor-nwse-resize z-20"
+            style={{
+              top: `calc(${cropState.cropTop}% - 3px)`,
+              left: `calc(${cropState.cropLeft}% - 3px)`,
+            }}
+            title="Tarik untuk memotong dari sudut kiri atas"
+          />
+
+          {/* Top-Right Corner Handle */}
+          <div
+            onMouseDown={(e) => handleInlineCropDragStart(e, 'top-right')}
+            className="doc-crop-handle absolute w-3.5 h-3.5 bg-black border-2 border-white cursor-nesw-resize z-20"
+            style={{
+              top: `calc(${cropState.cropTop}% - 3px)`,
+              left: `calc(${100 - cropState.cropRight}% - 11px)`,
+            }}
+            title="Tarik untuk memotong dari sudut kanan atas"
+          />
+
+          {/* Bottom-Left Corner Handle */}
+          <div
+            onMouseDown={(e) => handleInlineCropDragStart(e, 'bottom-left')}
+            className="doc-crop-handle absolute w-3.5 h-3.5 bg-black border-2 border-white cursor-nesw-resize z-20"
+            style={{
+              top: `calc(${100 - cropState.cropBottom}% - 11px)`,
+              left: `calc(${cropState.cropLeft}% - 3px)`,
+            }}
+            title="Tarik untuk memotong dari sudut kiri bawah"
+          />
+
+          {/* Bottom-Right Corner Handle */}
+          <div
+            onMouseDown={(e) => handleInlineCropDragStart(e, 'bottom-right')}
+            className="doc-crop-handle absolute w-3.5 h-3.5 bg-black border-2 border-white cursor-nwse-resize z-20"
+            style={{
+              top: `calc(${100 - cropState.cropBottom}% - 11px)`,
+              left: `calc(${100 - cropState.cropRight}% - 11px)`,
+            }}
+            title="Tarik untuk memotong dari sudut kanan bawah"
+          />
+
+          {/* Top Edge Handle */}
+          <div
+            onMouseDown={(e) => handleInlineCropDragStart(e, 'top')}
+            className="doc-crop-handle absolute w-6 h-2 bg-black border border-white cursor-ns-resize z-20 -translate-x-1/2 rounded-xs"
+            style={{
+              top: `calc(${cropState.cropTop}% - 4px)`,
+              left: `calc(${cropState.cropLeft + (100 - cropState.cropLeft - cropState.cropRight) / 2}%)`,
+            }}
+            title="Tarik ke bawah untuk memotong bagian atas"
+          />
+
+          {/* Bottom Edge Handle */}
+          <div
+            onMouseDown={(e) => handleInlineCropDragStart(e, 'bottom')}
+            className="doc-crop-handle absolute w-6 h-2 bg-black border border-white cursor-ns-resize z-20 -translate-x-1/2 rounded-xs"
+            style={{
+              top: `calc(${100 - cropState.cropBottom}% - 4px)`,
+              left: `calc(${cropState.cropLeft + (100 - cropState.cropLeft - cropState.cropRight) / 2}%)`,
+            }}
+            title="Tarik ke atas untuk memotong bagian bawah"
+          />
+
+          {/* Left Edge Handle */}
+          <div
+            onMouseDown={(e) => handleInlineCropDragStart(e, 'left')}
+            className="doc-crop-handle absolute w-2 h-6 bg-black border border-white cursor-ew-resize z-20 -translate-y-1/2 rounded-xs"
+            style={{
+              top: `calc(${cropState.cropTop + (100 - cropState.cropTop - cropState.cropBottom) / 2}%)`,
+              left: `calc(${cropState.cropLeft}% - 4px)`,
+            }}
+            title="Tarik ke kanan untuk memotong bagian kiri"
+          />
+
+          {/* Right Edge Handle */}
+          <div
+            onMouseDown={(e) => handleInlineCropDragStart(e, 'right')}
+            className="doc-crop-handle absolute w-2 h-6 bg-black border border-white cursor-ew-resize z-20 -translate-y-1/2 rounded-xs"
+            style={{
+              top: `calc(${cropState.cropTop + (100 - cropState.cropTop - cropState.cropBottom) / 2}%)`,
+              left: `calc(${100 - cropState.cropRight}% - 4px)`,
+            }}
+            title="Tarik ke kiri untuk memotong bagian kanan"
+          />
+
+          {/* Action Floating Pill below Crop Area */}
+          <div
+            className="absolute z-30 left-1/2 -translate-x-1/2 flex items-center gap-2"
+            style={{ top: `calc(${100 - cropState.cropBottom}% + 12px)` }}
+          >
+            <button
+              type="button"
+              onClick={commitInlineCrop}
+              className="px-3.5 py-1.5 rounded-full bg-slate-900 text-white font-bold text-xs shadow-2xl border border-slate-700 hover:bg-black hover:border-amber-400 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Icons.Check size={14} className="text-amber-400" />
+              <span>Selesai Crop (Enter)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCropState(null)}
+              className="px-3 py-1.5 rounded-full bg-slate-900/80 text-slate-400 hover:text-white font-semibold text-xs border border-slate-800 transition-all cursor-pointer"
+            >
+              Batal
+            </button>
+          </div>
         </div>
       )}
 
