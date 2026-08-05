@@ -123,13 +123,18 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
 
   return (
     <>
-      {/* Mobile Toggle Button */}
+      {/* Figma-style Sleek Floating Sidebar Toggle Button */}
       <button
         type="button"
         onClick={onToggle}
-        className="md:hidden fixed top-16 left-3 z-40 p-2 rounded-lg app-bg-secondary border app-border app-text-main shadow-lg cursor-pointer"
+        className={`absolute top-3 left-3 z-40 p-2 rounded-xl app-bg-secondary border app-border text-slate-300 hover:text-white hover:app-bg-hover shadow-xl cursor-pointer flex items-center justify-center transition-all duration-300 ease-out ${
+          isOpen
+            ? '-translate-x-12 opacity-0 pointer-events-none delay-0'
+            : 'translate-x-0 opacity-100 pointer-events-auto delay-150 hover:scale-105'
+        }`}
+        title="Tampilkan Sidebar (Ctrl + \)"
       >
-        <Icons.Menu size={18} />
+        <Icons.PanelLeftOpen size={18} className="app-accent-text" />
       </button>
 
       {/* Sidebar Panel */}
@@ -156,17 +161,17 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
             <span className="text-[10px] font-bold uppercase tracking-wider app-text-muted">
               Workspace Navigation
             </span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] px-1.5 py-0.2 rounded app-bg-main app-text-muted font-mono border app-border">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] px-1.5 py-0.5 rounded app-bg-main app-text-muted font-mono border app-border">
                 {filteredCards.length}
               </span>
               <button
                 type="button"
                 onClick={onToggle}
-                className="p-1 rounded hover:app-bg-hover app-text-muted hover:app-text-main transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg hover:app-bg-hover text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center justify-center"
                 title="Sembunyikan Sidebar (Ctrl + \)"
               >
-                <Icons.PanelLeftClose size={14} />
+                <Icons.PanelLeftClose size={18} className="app-accent-text" />
               </button>
             </div>
           </div>
