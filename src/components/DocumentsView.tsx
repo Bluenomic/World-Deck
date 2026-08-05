@@ -399,6 +399,116 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     return () => window.removeEventListener('click', handleCloseMenu);
   }, []);
 
+  // Auto-sync selectedImage rect position and dimensions with actual image DOM node
+  useEffect(() => {
+    if (!selectedImage) return;
+
+    const updateRect = () => {
+      if (!selectedImage.img || !document.body.contains(selectedImage.img)) {
+        setSelectedImage(null);
+        return;
+      }
+      const currentRect = selectedImage.img.getBoundingClientRect();
+      setSelectedImage((prev) => {
+        if (!prev) return null;
+        if (
+          Math.abs(prev.rect.top - currentRect.top) > 0.5 ||
+          Math.abs(prev.rect.left - currentRect.left) > 0.5 ||
+          Math.abs(prev.rect.width - currentRect.width) > 0.5 ||
+          Math.abs(prev.rect.height - currentRect.height) > 0.5
+        ) {
+          return { ...prev, rect: currentRect };
+        }
+        return prev;
+      });
+    };
+
+    window.addEventListener('scroll', updateRect, true);
+    window.addEventListener('resize', updateRect);
+
+    const editorEl = editorRef.current;
+    if (editorEl) {
+      editorEl.addEventListener('dragend', updateRect);
+      editorEl.addEventListener('drop', updateRect);
+      editorEl.addEventListener('input', updateRect);
+      editorEl.addEventListener('mouseup', updateRect);
+    }
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && selectedImage.img) {
+      resizeObserver = new ResizeObserver(() => {
+        updateRect();
+      });
+      resizeObserver.observe(selectedImage.img);
+      if (selectedImage.wrapper) {
+        resizeObserver.observe(selectedImage.wrapper);
+      }
+    }
+
+    let animationFrameId: number;
+    const pollUntilStable = () => {
+      updateRect();
+      animationFrameId = requestAnimationFrame(pollUntilStable);
+    };
+    animationFrameId = requestAnimationFrame(pollUntilStable);
+
+    return () => {
+      window.removeEventListener('scroll', updateRect, true);
+      window.removeEventListener('resize', updateRect);
+      if (editorEl) {
+        editorEl.removeEventListener('dragend', updateRect);
+        editorEl.removeEventListener('drop', updateRect);
+        editorEl.removeEventListener('input', updateRect);
+        editorEl.removeEventListener('mouseup', updateRect);
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [selectedImage?.img, selectedImage?.wrapper]);
+
+  // Auto-sync cropState rect position and dimensions with actual image DOM node
+  useEffect(() => {
+    if (!cropState) return;
+
+    const updateCropRect = () => {
+      if (!cropState.img || !document.body.contains(cropState.img)) {
+        setCropState(null);
+        return;
+      }
+      const currentRect = cropState.img.getBoundingClientRect();
+      setCropState((prev) => {
+        if (!prev) return null;
+        if (
+          Math.abs(prev.rect.top - currentRect.top) > 0.5 ||
+          Math.abs(prev.rect.left - currentRect.left) > 0.5 ||
+          Math.abs(prev.rect.width - currentRect.width) > 0.5 ||
+          Math.abs(prev.rect.height - currentRect.height) > 0.5
+        ) {
+          return { ...prev, rect: currentRect };
+        }
+        return prev;
+      });
+    };
+
+    window.addEventListener('scroll', updateCropRect, true);
+    window.addEventListener('resize', updateCropRect);
+
+    let animationFrameId: number;
+    const poll = () => {
+      updateCropRect();
+      animationFrameId = requestAnimationFrame(poll);
+    };
+    animationFrameId = requestAnimationFrame(poll);
+
+    return () => {
+      window.removeEventListener('scroll', updateCropRect, true);
+      window.removeEventListener('resize', updateCropRect);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [cropState?.img]);
+
   // Handle Image Click & Placement Detection (Google Docs style - Editing mode only)
   const handleDocumentClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
@@ -422,7 +532,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
     if (wrapper && (imgEl || wrapper.querySelector('img'))) {
       const activeImg = (imgEl || wrapper.querySelector('img')) as HTMLImageElement;
-      const rect = wrapper.getBoundingClientRect();
+      const rect = activeImg.getBoundingClientRect();
       let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
       if (wrapper.classList.contains('img-mode-wrap-left') || wrapper.style.float === 'left') {
         imgAlignMode = 'wrap-left';
@@ -463,13 +573,17 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       img.style.height = 'auto';
       wrapper.style.width = selectedImage.mode === 'inline' ? 'auto' : `${newWidth}px`;
 
-      const newRect = wrapper.getBoundingClientRect();
+      const newRect = img.getBoundingClientRect();
       setSelectedImage((prev) => (prev ? { ...prev, rect: newRect } : null));
     };
 
     const handleMouseUp = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      if (img && document.body.contains(img)) {
+        const finalRect = img.getBoundingClientRect();
+        setSelectedImage((prev) => (prev ? { ...prev, rect: finalRect } : null));
+      }
       updateToolbarState();
     };
 
@@ -489,7 +603,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       e.preventDefault();
       e.stopPropagation();
       const activeImg = (imgEl || wrapper.querySelector('img')) as HTMLImageElement;
-      const rect = wrapper.getBoundingClientRect();
+      const rect = activeImg.getBoundingClientRect();
       let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
       if (wrapper.classList.contains('img-mode-wrap-left') || wrapper.style.float === 'left') {
         imgAlignMode = 'wrap-left';
@@ -669,7 +783,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       wrapper.style.maxWidth = '45%';
     }
 
-    const rect = wrapper.getBoundingClientRect();
+    const rect = selectedImage.img.getBoundingClientRect();
     setSelectedImage({ wrapper, img: selectedImage.img, mode, rect });
     updateToolbarState();
   };
@@ -1775,12 +1889,13 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       {/* Selected Image Outline Box & 4 Corner Resize Handles Overlay (Left-Click Only) */}
       {mode === 'editing' && selectedImage && !cropState && (
         <div
-          className="fixed pointer-events-none z-[125] border-2 border-blue-500 rounded-2xl shadow-lg ring-4 ring-blue-500/20 transition-none"
+          className="fixed pointer-events-none z-[125] border-2 border-blue-500 shadow-lg ring-4 ring-blue-500/20 transition-none"
           style={{
             top: `${selectedImage.rect.top}px`,
             left: `${selectedImage.rect.left}px`,
             width: `${selectedImage.rect.width}px`,
             height: `${selectedImage.rect.height}px`,
+            borderRadius: selectedImage.img ? window.getComputedStyle(selectedImage.img).borderRadius : '1rem',
           }}
         >
           {/* Top-Left Corner Handle */}
@@ -1901,7 +2016,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               const existingLeft = Number(img.getAttribute('data-crop-left')) || 0;
               const existingRight = Number(img.getAttribute('data-crop-right')) || 0;
 
-              const rect = wrapper.getBoundingClientRect();
+              const rect = img.getBoundingClientRect();
               setCropState({
                 isActive: true,
                 wrapper,
