@@ -510,11 +510,11 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         <div className="w-72 border-r app-border/40 app-bg-secondary flex flex-col shrink-0">
           {/* Header & Quick Add */}
           <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Dokumen</h2>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">Dokumen</h2>
             <button
               type="button"
               onClick={handleCreateDocument}
-              className="p-1.5 rounded-lg hover:app-bg-hover text-slate-400 hover:text-white transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:app-bg-hover text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="Buat Dokumen Baru"
             >
               <Icons.Plus size={16} />
@@ -524,13 +524,13 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
           {/* Minimal Search Bar */}
           <div className="px-5 mb-4">
             <div className="relative">
-              <Icons.Search size={13} className="absolute left-2.5 top-2.5 text-slate-500" />
+              <Icons.Search size={13} className="absolute left-2.5 top-2.5 text-slate-400" />
               <input
                 type="text"
                 placeholder="Cari dokumen..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg app-bg-main/60 border border-slate-800/80 app-text-main placeholder:text-slate-600 focus:outline-none focus:border-slate-600 transition-colors"
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg app-bg-main/80 border border-slate-700/60 app-text-main placeholder:text-slate-400 focus:outline-none focus:border-slate-500 transition-colors"
               />
             </div>
           </div>
@@ -538,7 +538,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
           {/* Clean Document List */}
           <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-0.5">
             {filteredDocs.length === 0 ? (
-              <div className="text-center py-10 text-slate-500 space-y-2 text-xs">
+              <div className="text-center py-10 text-slate-400 space-y-2 text-xs">
                 <p>Belum ada dokumen.</p>
                 <button
                   type="button"
@@ -560,13 +560,13 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     onClick={() => setActiveDocId(doc.id)}
                     className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between group cursor-pointer ${
                       isActive
-                        ? 'bg-slate-800/80 text-white font-semibold shadow-xs'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                        ? 'bg-slate-800 text-white font-semibold shadow-xs'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                     }`}
                   >
                     <div className="truncate pr-2">
-                      <div className="text-xs truncate">{doc.title || 'Dokumen Tanpa Judul'}</div>
-                      <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                      <div className="text-xs font-medium text-slate-200 group-hover:text-white truncate">{doc.title || 'Dokumen Tanpa Judul'}</div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                         {words} kata
                       </div>
                     </div>
@@ -586,20 +586,20 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         {activeDoc ? (
           <>
             {/* Top Control Bar */}
-            <div className="px-8 py-3 flex items-center justify-between text-xs text-slate-400 border-b border-slate-800/20 shrink-0">
+            <div className="px-8 py-3 flex items-center justify-between text-xs text-slate-300 border-b border-slate-800/40 shrink-0">
               <div className="flex items-center gap-3">
                 {isZenMode && (
                   <button
                     type="button"
                     onClick={() => setIsZenMode(false)}
-                    className="p-1 rounded-md hover:text-white transition-colors cursor-pointer"
+                    className="p-1 rounded-md text-slate-300 hover:text-white transition-colors cursor-pointer"
                     title="Keluar Zen Mode"
                   >
                     <Icons.Minimize2 size={15} />
                   </button>
                 )}
 
-                <span className="font-mono text-[11px] text-slate-500">{wordCount} kata</span>
+                <span className="font-mono text-[11px] text-slate-400 font-medium">{wordCount} kata</span>
 
                 <div className="h-4 w-px bg-slate-800/60 mx-1" />
 
@@ -626,7 +626,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setMode('viewing')}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-all cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-all cursor-pointer"
                     >
                       Batal
                     </button>
@@ -642,7 +642,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
                     showOutline
                       ? 'bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/40'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-300 hover:text-white'
                   }`}
                   title="Daftar Isi / Outline Naskah"
                 >
@@ -661,7 +661,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
                     showRefDrawer
                       ? 'bg-blue-500/20 text-blue-300 font-semibold'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-300 hover:text-white'
                   }`}
                   title="Panel Referensi Kartu"
                 >
@@ -672,7 +672,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsZenMode(!isZenMode)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/40 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/40 transition-colors cursor-pointer"
                   title={isZenMode ? 'Keluar Zen Mode' : 'Zen Mode'}
                 >
                   {isZenMode ? <Icons.Minimize2 size={14} /> : <Icons.Maximize2 size={14} />}
@@ -683,7 +683,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowMoreMenu(!showMoreMenu)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/40 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/40 transition-colors cursor-pointer"
                   >
                     <Icons.MoreHorizontal size={14} />
                   </button>
@@ -693,7 +693,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                       <button
                         type="button"
                         onClick={handleExportDocument}
-                        className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer"
+                        className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-200 hover:text-white cursor-pointer"
                       >
                         <Icons.Download size={14} />
                         <span>Unduh Dokumen</span>
@@ -1103,11 +1103,11 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 /* VIEWING MODE: Clean Rendered Document */
                 <div className="flex-1 overflow-y-auto px-6 py-10 flex justify-center app-bg-main">
                   <div className="w-full max-w-2xl flex flex-col space-y-6">
-                    <div className="border-b border-slate-800 pb-4 space-y-2">
-                      <h1 className="text-3xl font-extrabold tracking-tight text-white">
+                    <div className="border-b border-slate-800/80 pb-4 space-y-2">
+                      <h1 className="text-3xl font-extrabold tracking-tight app-text-main">
                         {activeDoc.title || 'Dokumen Tanpa Judul'}
                       </h1>
-                      <p className="text-xs text-slate-500 font-mono">
+                      <p className="text-xs text-slate-400 font-mono">
                         Terakhir diubah:{' '}
                         {new Date(activeDoc.updatedAt).toLocaleString('id-ID', {
                           day: 'numeric',
@@ -1122,8 +1122,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     {/* Live Rendered Content */}
                     <div
                       id="doc-view-rendered-content"
-                      className="prose prose-invert max-w-none text-base leading-relaxed text-slate-200 space-y-4 font-sans [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1"
-                      dangerouslySetInnerHTML={{ __html: activeDoc.content || '<p class="text-slate-500 italic">Dokumen kosong...</p>' }}
+                      className="prose max-w-none text-base leading-relaxed app-text-main space-y-4 font-sans [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:app-text-main [&_h2]:app-text-main [&_h3]:app-text-main [&_strong]:app-text-main [&_p]:leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: activeDoc.content || '<p class="text-slate-400 italic">Dokumen kosong...</p>' }}
                       onClick={(e) => {
                         const target = e.target as HTMLElement;
                         const cardId = target.getAttribute('data-card-id');
@@ -1137,7 +1137,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     {/* Backlinks Section (Cards Mentioned in Document) */}
                     {mentionedCards.length > 0 && (
                       <div className="pt-8 mt-6 border-t border-slate-800/80 space-y-4">
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
                           <Icons.Link size={14} className="text-blue-400" />
                           <span>Kartu Terhubung dalam Dokumen ({mentionedCards.length})</span>
                         </div>
@@ -1164,11 +1164,11 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                                   <div className="text-xs font-bold text-white group-hover:text-blue-300 truncate transition-colors">
                                     {c.title}
                                   </div>
-                                  <div className="text-[10px] text-slate-500 truncate mt-0.5">
+                                  <div className="text-[10px] text-slate-400 truncate mt-0.5">
                                     {c.summary || c.subtitle || config.label}
                                   </div>
                                 </div>
-                                <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-mono bg-slate-800 text-slate-400 shrink-0">
+                                <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-mono bg-slate-800 text-slate-300 shrink-0">
                                   {c.category}
                                 </span>
                               </div>
@@ -1189,7 +1189,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                       value={draftTitle}
                       onChange={(e) => setDraftTitle(e.target.value)}
                       placeholder="Judul naskah..."
-                      className="w-full text-3xl font-extrabold tracking-tight app-text-main bg-transparent border-0 focus:outline-none placeholder:text-slate-700"
+                      className="w-full text-3xl font-extrabold tracking-tight app-text-main bg-transparent border-0 focus:outline-none placeholder:text-slate-500"
                     />
 
                     {/* Live ContentEditable Canvas (Google Docs Style WYSIWYG) */}
@@ -1207,13 +1207,13 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                       {/* Inline @ Mention Suggestion Overlay */}
                       {mentionState.isOpen && (
                         <div className="absolute top-12 left-0 w-72 app-bg-secondary border border-blue-500/40 rounded-2xl shadow-2xl p-2 z-50 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 space-y-1">
-                          <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-800 flex items-center justify-between">
+                          <div className="px-2 py-1 text-[10px] font-bold text-slate-300 uppercase border-b border-slate-800 flex items-center justify-between">
                             <span>Sisipkan Kartu (@)</span>
                             <span className="text-blue-400">{suggestedCards.length} ditemukan</span>
                           </div>
 
                           {suggestedCards.length === 0 ? (
-                            <div className="px-3 py-2 text-xs text-slate-500 text-center">
+                            <div className="px-3 py-2 text-xs text-slate-400 text-center">
                               Tidak ada kartu yang cocok...
                             </div>
                           ) : (
@@ -1225,11 +1225,11 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                                 className="w-full text-left px-3 py-2 rounded-xl hover:bg-blue-600/20 hover:border-blue-500/30 border border-transparent transition-all flex items-center justify-between group cursor-pointer"
                               >
                                 <div className="truncate pr-2">
-                                  <div className="text-xs font-bold text-slate-200 group-hover:text-blue-300 truncate">
+                                  <div className="text-xs font-bold text-slate-100 group-hover:text-blue-300 truncate">
                                     {card.title}
                                   </div>
                                   {card.subtitle && (
-                                    <div className="text-[10px] text-slate-500 truncate">
+                                    <div className="text-[10px] text-slate-400 truncate">
                                       {card.subtitle}
                                     </div>
                                   )}
@@ -1251,11 +1251,11 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               {showRefDrawer && (
                 <div className="w-72 border-l border-slate-800/40 app-bg-secondary p-5 flex flex-col shrink-0 space-y-4 animate-in slide-in-from-right duration-150 select-none">
                   <div className="flex items-center justify-between border-b border-slate-800/40 pb-3">
-                    <span className="text-xs font-bold text-slate-300">Referensi Kartu</span>
+                    <span className="text-xs font-bold text-slate-200">Referensi Kartu</span>
                     <button
                       type="button"
                       onClick={() => setShowRefDrawer(false)}
-                      className="text-slate-500 hover:text-white"
+                      className="text-slate-400 hover:text-white"
                     >
                       <Icons.X size={14} />
                     </button>
@@ -1264,7 +1264,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   {/* Mentioned Cards Quick Chips in Reference Drawer */}
                   {mentionedCards.length > 0 && (
                     <div className="space-y-2 pb-2 border-b border-slate-800/40">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                      <div className="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
                         <span>Kartu Terhubung ({mentionedCards.length})</span>
                       </div>
                       <div className="flex flex-wrap gap-1">
@@ -1292,7 +1292,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                       const found = cards.find((c) => c.id === e.target.value);
                       setSelectedRefCard(found || null);
                     }}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg app-bg-main border border-slate-800 app-text-main focus:outline-none cursor-pointer"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg app-bg-main border border-slate-700/60 text-slate-200 focus:outline-none cursor-pointer"
                   >
                     <option value="">-- Pilih Kartu --</option>
                     {cards.map((c) => (
@@ -1305,11 +1305,11 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   {selectedRefCard ? (
                     <div className="space-y-3 text-xs pt-2">
                       <div className="font-bold text-white text-sm">{selectedRefCard.title}</div>
-                      <p className="text-slate-400 leading-relaxed text-xs">
+                      <p className="text-slate-300 leading-relaxed text-xs">
                         {selectedRefCard.summary || 'Tidak ada ringkasan.'}
                       </p>
                       {selectedRefCard.content && (
-                        <div className="p-3 rounded-xl bg-slate-900/60 text-slate-300 text-xs leading-relaxed max-h-60 overflow-y-auto whitespace-pre-wrap">
+                        <div className="p-3 rounded-xl bg-slate-900/80 text-slate-200 text-xs leading-relaxed max-h-60 overflow-y-auto whitespace-pre-wrap">
                           {selectedRefCard.content}
                         </div>
                       )}
@@ -1324,7 +1324,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                       )}
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-500 text-center py-8">
+                    <p className="text-xs text-slate-400 text-center py-8">
                       Pilih kartu untuk dibaca sambil mengetik.
                     </p>
                   )}
