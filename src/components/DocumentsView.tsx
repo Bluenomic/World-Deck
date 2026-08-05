@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { WorldDocument, WorldCard } from '../types';
+import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import { generateId } from '../utils/helpers';
 import { isTauriAvailable, saveImageAsset } from '../utils/tauriStorage';
 import * as Icons from 'lucide-react';
@@ -44,6 +45,17 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
+  const [showOutline, setShowOutline] = useState(false);
+
+  // Hovered Card State for Popover Preview
+  const [hoveredCard, setHoveredCard] = useState<{
+    card: WorldCard;
+    rect: DOMRect;
+  } | null>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Save Notification Toast State
+  const [showSaveToast, setShowSaveToast] = useState(false);
 
   // Workflow Mode State: 'viewing' (default when opening) vs 'editing'
   const [mode, setMode] = useState<'viewing' | 'editing'>('viewing');
@@ -167,6 +179,92 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     );
   }, [cards, mentionState.isOpen, mentionState.query]);
 
+  // Calculate Backlinks (Cards mentioned in current active document)
+  const mentionedCards = useMemo(() => {
+    if (!activeDoc || !activeDoc.content) return [];
+    const content = activeDoc.content;
+    const foundIds = new Set<string>();
+
+    const regex = /data-card-id="([^"]+)"/g;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(content)) !== null) {
+      foundIds.add(match[1]);
+    }
+
+    cards.forEach((c) => {
+      if (c.title && content.toLowerCase().includes(`@${c.title.toLowerCase()}`)) {
+        foundIds.add(c.id);
+      }
+    });
+
+    return cards.filter((c) => foundIds.has(c.id));
+  }, [activeDoc, cards]);
+
+  // Extract Outline Headings (H1, H2, H3) for Table of Contents
+  const outlineItems = useMemo(() => {
+    if (!activeDoc || !activeDoc.content) return [];
+    const html = activeDoc.content;
+    const regex = /<h([1-3])[^>]*>(.*?)<\/h[1-3]>/gi;
+    const items: Array<{ id: string; text: string; level: number }> = [];
+    let match: RegExpExecArray | null;
+    let index = 0;
+
+    while ((match = regex.exec(html)) !== null) {
+      const level = parseInt(match[1], 10);
+      const text = match[2].replace(/<[^>]*>/g, '').trim();
+      if (text) {
+        items.push({
+          id: `heading-${index++}`,
+          text,
+          level,
+        });
+      }
+    }
+    return items;
+  }, [activeDoc, mode]);
+
+  // Smooth scroll to target heading in document
+  const scrollToHeading = (idx: number) => {
+    const editorEl = editorRef.current;
+    const viewContainer = document.getElementById('doc-view-rendered-content');
+    const targetContainer = mode === 'editing' ? editorEl : viewContainer;
+
+    if (!targetContainer) return;
+    const headings = targetContainer.querySelectorAll('h1, h2, h3');
+    if (headings[idx]) {
+      headings[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Hover Handlers for Card Mention Badges
+  const handleBadgeMouseOver = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const badge = target.closest('[data-card-id]') || target.closest('.card-mention-badge');
+    if (badge) {
+      const cardId = badge.getAttribute('data-card-id');
+      if (cardId) {
+        const found = cards.find((c) => c.id === cardId);
+        if (found) {
+          if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+          const rect = badge.getBoundingClientRect();
+          setHoveredCard({ card: found, rect });
+          return;
+        }
+      }
+    }
+  };
+
+  const handleBadgeMouseOut = (e: React.MouseEvent<HTMLDivElement>) => {
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    if (relatedTarget && (relatedTarget.closest('.card-hover-popover') || relatedTarget.closest('.card-mention-badge'))) {
+      return;
+    }
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredCard(null);
+    }, 300);
+  };
+
   // Execute Rich Text Command (Google Docs Style)
   const execCmd = (command: string, value: string | undefined = undefined) => {
     if (!editorRef.current) return;
@@ -243,6 +341,9 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       } else if (key === 'u') {
         e.preventDefault();
         execCmd('underline');
+      } else if (key === 's') {
+        e.preventDefault();
+        handleSaveDocument();
       }
     }
   };
@@ -348,8 +449,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
   // Save Document and switch to Viewing Mode
   const handleSaveDocument = () => {
-    if (!activeDoc || !editorRef.current) return;
-    const finalContent = editorRef.current.innerHTML;
+    if (!activeDoc) return;
+    const finalContent = editorRef.current ? editorRef.current.innerHTML : activeDoc.content;
 
     const updatedDoc: WorldDocument = {
       ...activeDoc,
@@ -359,7 +460,23 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     };
     onSaveDocument(updatedDoc);
     setMode('viewing');
+    setShowSaveToast(true);
+    setTimeout(() => setShowSaveToast(false), 2200);
   };
+
+  // Global Keyboard Shortcut: Ctrl + S / Cmd + S to save document
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (mode === 'editing') {
+          handleSaveDocument();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [mode, activeDoc, draftTitle]);
 
   // Export Markdown / HTML File
   const handleExportDocument = () => {
@@ -519,6 +636,25 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowOutline(!showOutline)}
+                  className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    showOutline
+                      ? 'bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/40'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Daftar Isi / Outline Naskah"
+                >
+                  <Icons.ListTree size={14} />
+                  <span>Outline</span>
+                  {outlineItems.length > 0 && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300">
+                      {outlineItems.length}
+                    </span>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setShowRefDrawer(!showRefDrawer)}
@@ -911,7 +1047,58 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
             )}
 
             {/* LIVE GOOGLE DOCS STYLE CANVAS: VIEWING MODE VS EDITING MODE */}
-            <div className="flex-1 flex overflow-hidden relative">
+            <div
+              className="flex-1 flex overflow-hidden relative"
+              onMouseOver={handleBadgeMouseOver}
+              onMouseOut={handleBadgeMouseOut}
+            >
+              {/* Table of Contents / Outline Panel */}
+              {showOutline && (
+                <div className="w-64 border-r border-slate-800/40 app-bg-secondary p-4 flex flex-col shrink-0 space-y-3 animate-in slide-in-from-left duration-150 select-none">
+                  <div className="flex items-center justify-between border-b border-slate-800/40 pb-2.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300 uppercase tracking-wider">
+                      <Icons.ListTree size={14} className="text-amber-400" />
+                      <span>Outline ({outlineItems.length})</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowOutline(false)}
+                      className="text-slate-500 hover:text-white cursor-pointer"
+                    >
+                      <Icons.X size={14} />
+                    </button>
+                  </div>
+
+                  {outlineItems.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-8 italic">
+                      Belum ada judul (H1, H2, H3) dalam dokumen ini.
+                    </p>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+                      {outlineItems.map((item, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => scrollToHeading(idx)}
+                          className={`w-full text-left py-1.5 px-2 rounded-lg text-xs hover:bg-slate-800/70 transition-colors truncate cursor-pointer text-slate-300 hover:text-white flex items-center gap-1.5 ${
+                            item.level === 1
+                              ? 'font-bold text-slate-100'
+                              : item.level === 2
+                              ? 'pl-4 font-semibold text-slate-300'
+                              : 'pl-7 text-slate-400'
+                          }`}
+                        >
+                          <span className="text-[10px] font-mono font-bold text-amber-400/80 shrink-0">
+                            H{item.level}
+                          </span>
+                          <span className="truncate">{item.text}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {mode === 'viewing' ? (
                 /* VIEWING MODE: Clean Rendered Document */
                 <div className="flex-1 overflow-y-auto px-6 py-10 flex justify-center app-bg-main">
@@ -934,6 +1121,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
                     {/* Live Rendered Content */}
                     <div
+                      id="doc-view-rendered-content"
                       className="prose prose-invert max-w-none text-base leading-relaxed text-slate-200 space-y-4 font-sans [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1"
                       dangerouslySetInnerHTML={{ __html: activeDoc.content || '<p class="text-slate-500 italic">Dokumen kosong...</p>' }}
                       onClick={(e) => {
@@ -945,6 +1133,50 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                         }
                       }}
                     />
+
+                    {/* Backlinks Section (Cards Mentioned in Document) */}
+                    {mentionedCards.length > 0 && (
+                      <div className="pt-8 mt-6 border-t border-slate-800/80 space-y-4">
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                          <Icons.Link size={14} className="text-blue-400" />
+                          <span>Kartu Terhubung dalam Dokumen ({mentionedCards.length})</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {mentionedCards.map((c) => {
+                            const config = CATEGORY_CONFIGS[c.category] || CATEGORY_CONFIGS.character;
+                            const IconComp = (Icons as any)[config.iconName] || Icons.HelpCircle;
+                            return (
+                              <div
+                                key={c.id}
+                                onClick={() => {
+                                  if (onOpenCard) onOpenCard(c);
+                                }}
+                                className="p-3 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-blue-500/40 transition-all cursor-pointer flex items-center gap-3 group"
+                              >
+                                {c.imageUrl ? (
+                                  <img src={c.imageUrl} alt={c.title} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-700/60" />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 text-blue-400 group-hover:scale-105 transition-transform">
+                                    <IconComp size={18} />
+                                  </div>
+                                )}
+                                <div className="truncate flex-1">
+                                  <div className="text-xs font-bold text-white group-hover:text-blue-300 truncate transition-colors">
+                                    {c.title}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 truncate mt-0.5">
+                                    {c.summary || c.subtitle || config.label}
+                                  </div>
+                                </div>
+                                <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-mono bg-slate-800 text-slate-400 shrink-0">
+                                  {c.category}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -1029,6 +1261,31 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     </button>
                   </div>
 
+                  {/* Mentioned Cards Quick Chips in Reference Drawer */}
+                  {mentionedCards.length > 0 && (
+                    <div className="space-y-2 pb-2 border-b border-slate-800/40">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                        <span>Kartu Terhubung ({mentionedCards.length})</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {mentionedCards.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => setSelectedRefCard(c)}
+                            className={`px-2 py-0.5 rounded-lg text-xs font-medium border transition-all cursor-pointer flex items-center gap-1 ${
+                              selectedRefCard?.id === c.id
+                                ? 'bg-blue-600 text-white border-blue-400 shadow-xs'
+                                : 'bg-slate-900/80 hover:bg-slate-800 text-blue-300 border-slate-800'
+                            }`}
+                          >
+                            <span>@{c.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <select
                     value={selectedRefCard?.id || ''}
                     onChange={(e) => {
@@ -1074,6 +1331,93 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Floating Hover Card Preview Popover */}
+            {hoveredCard && (
+              <div
+                className="card-hover-popover fixed z-[120] w-72 rounded-2xl bg-slate-900/95 border border-slate-700/80 shadow-2xl p-4 text-xs animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md"
+                style={{
+                  top: `${Math.min(window.innerHeight - 250, Math.max(10, hoveredCard.rect.bottom + 8))}px`,
+                  left: `${Math.min(window.innerWidth - 300, Math.max(10, hoveredCard.rect.left))}px`,
+                }}
+                onMouseEnter={() => {
+                  if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+                }}
+                onMouseLeave={() => {
+                  if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+                  hoverTimeoutRef.current = setTimeout(() => setHoveredCard(null), 300);
+                }}
+              >
+                {(() => {
+                  const card = hoveredCard.card;
+                  const config = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
+                  const IconComp = (Icons as any)[config.iconName] || Icons.HelpCircle;
+
+                  return (
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-400 uppercase tracking-wider">
+                          <IconComp size={13} />
+                          <span>{config.label}</span>
+                        </div>
+                        <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
+                          @{card.category}
+                        </span>
+                      </div>
+
+                      {card.imageUrl && (
+                        <img
+                          src={card.imageUrl}
+                          alt={card.title}
+                          className="w-full h-28 object-cover rounded-xl border border-slate-800 shadow-xs"
+                        />
+                      )}
+
+                      <div>
+                        <h4 className="text-sm font-extrabold text-white">{card.title}</h4>
+                        {card.subtitle && (
+                          <p className="text-[11px] text-slate-400 font-medium">{card.subtitle}</p>
+                        )}
+                      </div>
+
+                      {card.summary && (
+                        <p className="text-xs text-slate-300 leading-relaxed line-clamp-3 bg-slate-950/60 p-2 rounded-lg border border-slate-800/60">
+                          {card.summary}
+                        </p>
+                      )}
+
+                      <div className="pt-1 flex items-center gap-2">
+                        {onOpenCard && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onOpenCard(card);
+                              setHoveredCard(null);
+                            }}
+                            className="flex-1 py-1.5 rounded-lg app-accent-bg hover:brightness-110 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <Icons.ExternalLink size={12} />
+                            <span>Buka Kartu</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedRefCard(card);
+                            setShowRefDrawer(true);
+                            setHoveredCard(null);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+                          title="Buka di Panel Referensi"
+                        >
+                          <Icons.Layers size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </>
         ) : (
           /* Clean Minimal Empty State */
@@ -1090,6 +1434,14 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Save Notification Toast */}
+      {showSaveToast && (
+        <div className="fixed bottom-6 right-6 z-[150] px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <Icons.CheckCircle2 size={16} />
+          <span>Dokumen berhasil disimpan (Ctrl + S)</span>
+        </div>
+      )}
     </div>
   );
 };
