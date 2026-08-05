@@ -500,7 +500,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const deckCards = cards.filter(
       (c) => c.deckId === deck.id || (deck.cardIds || []).includes(c.id)
     );
-    const deckColor = deck.color || '#3b82f6';
+    const deckColor = (!deck.color || deck.color === '#3b82f6') ? 'var(--accent)' : deck.color;
     const isHovered = hoveredDeckId === deck.id;
     const isSuccess = successDeckId === deck.id;
 
@@ -513,13 +513,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         onDragLeave={(e) => handleDragLeave(e, deck.id)}
         onDrop={(e) => handleDrop(e, deck.id)}
         style={{
-          boxShadow: `inset 0 3px 0 0 ${isHovered ? '#60a5fa' : deckColor}`,
+          boxShadow: `inset 0 3px 0 0 ${isHovered ? 'var(--accent)' : deckColor}`,
         }}
         className={`deck-grid-item group relative flex flex-col space-y-2 p-3.5 pt-4 cursor-pointer transition-all duration-300 rounded-2xl select-none app-bg-secondary border border-slate-700/60 hover:border-blue-500/70 ${
           isSuccess
             ? 'scale-105 border-emerald-400 ring-4 ring-emerald-500/40'
             : isHovered
-            ? '-translate-y-1 scale-105 border-blue-400 shadow-xl'
+            ? '-translate-y-1 scale-105 border-[var(--accent)] shadow-xl'
             : ''
         }`}
       >
@@ -774,10 +774,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             : isCardDimmed
             ? 'opacity-25 grayscale-[30%] pointer-events-none border-dashed app-border'
             : selectedCardIds.has(card.id)
-            ? 'border-blue-400 ring-2 ring-blue-500/40 shadow-md bg-blue-500/5'
+            ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/40 shadow-md bg-[var(--accent)]/10'
             : isCardHighlighted
-            ? 'border-blue-400 ring-2 ring-blue-500/50 shadow-md scale-[1.01]'
-            : 'app-border hover:border-slate-500/60 hover:-translate-y-0.5'
+            ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/50 shadow-md scale-[1.01]'
+            : 'app-border hover:border-[var(--accent)]/60 hover:-translate-y-0.5'
         }`}
       >
         {isBeingDragged ? (

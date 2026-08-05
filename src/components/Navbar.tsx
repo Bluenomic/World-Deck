@@ -96,8 +96,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onViewModeChange(tab.id)}
               className={`px-3 py-1.5 rounded-xl text-xs md:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer ${
                 isActive
-                  ? 'bg-slate-800/90 text-white font-bold shadow-xs'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+                  ? 'app-accent-bg text-white font-bold shadow-xs'
+                  : 'app-text-muted hover:app-text-main app-bg-hover'
               }`}
             >
               <Icon size={15} />

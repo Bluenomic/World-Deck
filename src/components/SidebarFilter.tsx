@@ -144,10 +144,10 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
         {/* Right Edge Resizer Handle for Sidebar Width */}
         <div
           onMouseDown={handleMouseDownWidthResize}
-          className="hidden md:block absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-blue-500/40 transition-colors z-40 group -mr-1"
+          className="hidden md:block absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-[var(--accent)]/40 transition-colors z-40 group -mr-1"
           title="Drag untuk mengubah lebar Sidebar"
         >
-          <div className="w-[2px] h-full bg-transparent group-hover:bg-blue-400 mx-auto" />
+          <div className="w-[2px] h-full bg-transparent group-hover:bg-[var(--accent)] mx-auto" />
         </div>
 
         {/* Sidebar Header / Search */}
@@ -250,10 +250,10 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
           {/* Divider 1 */}
           <div 
             onMouseDown={handleMouseDownResize('first')}
-            className="h-[5px] min-h-[5px] w-full bg-slate-800/60 hover:bg-blue-600 cursor-ns-resize transition-all flex items-center justify-center group relative z-10"
+            className="h-[5px] min-h-[5px] w-full app-bg-secondary hover:bg-[var(--accent)] cursor-ns-resize transition-all flex items-center justify-center group relative z-10"
             title="Seret untuk mengubah ukuran panel"
           >
-            <div className="w-8 h-[1px] bg-slate-700 group-hover:bg-blue-400 opacity-50" />
+            <div className="w-8 h-[1px] app-border group-hover:bg-[var(--accent)] opacity-50" />
           </div>
 
           {/* Canvases Section */}
@@ -326,10 +326,10 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
           {/* Divider 2 */}
           <div 
             onMouseDown={handleMouseDownResize('second')}
-            className="h-[5px] min-h-[5px] w-full bg-slate-800/60 hover:bg-blue-600 cursor-ns-resize transition-all flex items-center justify-center group relative z-10"
+            className="h-[5px] min-h-[5px] w-full app-bg-secondary hover:bg-[var(--accent)] cursor-ns-resize transition-all flex items-center justify-center group relative z-10"
             title="Seret untuk mengubah ukuran panel"
           >
-            <div className="w-8 h-[1px] bg-slate-700 group-hover:bg-blue-400 opacity-50" />
+            <div className="w-8 h-[1px] app-border group-hover:bg-[var(--accent)] opacity-50" />
           </div>
 
           {/* Cards Section */}

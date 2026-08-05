@@ -760,8 +760,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   >
                     {/* Upper thin parallel accent line */}
                     <div className="absolute left-0 right-0 -top-1.5 h-0.5 bg-[var(--line-stroke)]/40" />
-                    {/* Main center line: Solid Deep Blue */}
-                    <div className="h-2 bg-blue-600" />
+                    {/* Main center line: Theme Accent */}
+                    <div className="h-2 app-accent-bg" />
                     {/* Lower thin parallel accent line */}
                     <div className="absolute left-0 right-0 -bottom-1.5 h-0.5 bg-[var(--line-stroke)]/40" />
                   </div>
