@@ -22,11 +22,6 @@ const FONT_SIZES = [
   { label: 'Sangat Besar (32px)', size: '32px', cmdSize: '6' },
 ];
 
-const EMOJI_LIST = [
-  '📖', '📜', '⚔️', '🏰', '🔮', '👑', '🛡️', '✍️', '🌟', '📍',
-  '🐉', '🌿', '💡', '⚡', '🗝️', '🗺️', '🧭', '🎭', '💎', '⏳', '📜', '✒️'
-];
-
 export const DocumentsView: React.FC<DocumentsViewProps> = ({
   documents,
   cards,
@@ -44,8 +39,6 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const [showRefDrawer, setShowRefDrawer] = useState(false);
   const [selectedRefCard, setSelectedRefCard] = useState<WorldCard | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showLayoutMenu, setShowLayoutMenu] = useState(false);
   const [showOutline, setShowOutline] = useState(false);
 
   // Hovered Card State for Popover Preview
@@ -861,24 +854,6 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     setMentionState({ isOpen: false, query: '' });
   };
 
-  // Layout Templates
-  const insertLayoutTemplate = (type: '2col' | 'sidebar' | 'callout' | 'divider') => {
-    setShowLayoutMenu(false);
-    if (type === '2col') {
-      const html = `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0;" class="my-6"><div style="padding: 0.75rem; border: 1px solid rgba(255,255,255,0.1); rounded-xl bg-slate-900/40"><h3 class="text-lg font-bold text-white mb-2">Kolom Kiri</h3><p>Tulis naskah kolom kiri di sini...</p></div><div style="padding: 0.75rem; border: 1px solid rgba(255,255,255,0.1); rounded-xl bg-slate-900/40"><h3 class="text-lg font-bold text-white mb-2">Kolom Kanan</h3><p>Tulis naskah kolom kanan di sini...</p></div></div><p><br/></p>`;
-      insertHtmlAtCursor(html);
-    } else if (type === 'sidebar') {
-      const html = `<div style="display: grid; grid-template-columns: 1fr 2.5fr; gap: 1.5rem; margin: 1.5rem 0;" class="my-6"><div style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.1);"><h4 class="text-xs font-bold uppercase text-slate-400 mb-1">Catatan Samping</h4><p class="text-xs text-slate-300">Ringkasan info atau lore tambahan...</p></div><div><h3 class="text-xl font-bold text-white mb-2">Naskah Utama</h3><p>Tulis narasi utama di sini...</p></div></div><p><br/></p>`;
-      insertHtmlAtCursor(html);
-    } else if (type === 'callout') {
-      const html = `<div style="background: rgba(59, 130, 246, 0.08); border-left: 4px solid #3b82f6; padding: 1rem 1.25rem; border-radius: 0.75rem; margin: 1.5rem 0;" class="my-6"><strong class="text-blue-300 font-bold block mb-1">💡 Catatan Penting Worldbuilding:</strong><p class="text-slate-300">Tulis info rahasia atau pesan penting lore di dalam kotak ini...</p></div><p><br/></p>`;
-      insertHtmlAtCursor(html);
-    } else if (type === 'divider') {
-      const html = `<hr style="border: 0; height: 1px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.2), transparent); margin: 2rem 0;" /><p><br/></p>`;
-      insertHtmlAtCursor(html);
-    }
-  };
-
   // Create New Document
   const handleCreateDocument = () => {
     const newDoc: WorldDocument = {
@@ -1410,94 +1385,6 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   <Icons.Image size={14} />
                   <span>Gambar</span>
                 </button>
-
-                {/* Layout Dropdown Button */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowLayoutMenu(!showLayoutMenu);
-                      setShowEmojiPicker(false);
-                    }}
-                    className="p-1.5 rounded-lg hover:bg-slate-800 text-amber-400 transition-colors cursor-pointer flex items-center gap-1 font-medium"
-                    title="Sisipkan Tata Letak / Layout"
-                  >
-                    <Icons.Columns size={14} />
-                    <span>Layout</span>
-                  </button>
-
-                  {showLayoutMenu && (
-                    <div className="absolute top-full left-0 mt-2 w-52 app-bg-secondary border border-slate-700/60 rounded-2xl shadow-2xl py-1.5 z-[100] text-xs animate-in fade-in zoom-in-95 duration-100">
-                      <button
-                        type="button"
-                        onClick={() => insertLayoutTemplate('2col')}
-                        className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer"
-                      >
-                        <Icons.Columns size={14} />
-                        <span>2 Kolom Seimbang (50 / 50)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => insertLayoutTemplate('sidebar')}
-                        className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer"
-                      >
-                        <Icons.Sidebar size={14} />
-                        <span>Sidebar + Naskah (30 / 70)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => insertLayoutTemplate('callout')}
-                        className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer"
-                      >
-                        <Icons.AlertCircle size={14} />
-                        <span>Kotak Sorotan / Callout Box</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => insertLayoutTemplate('divider')}
-                        className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer"
-                      >
-                        <Icons.Minus size={14} />
-                        <span>Pembatas Garis Bergaya</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="h-4 w-px bg-slate-800 mx-1" />
-
-                {/* Emoji Picker Popover */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEmojiPicker(!showEmojiPicker);
-                      setShowLayoutMenu(false);
-                    }}
-                    className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-                    title="Sisipkan Emoji"
-                  >
-                    <Icons.Smile size={14} />
-                  </button>
-
-                  {showEmojiPicker && (
-                    <div className="absolute top-full left-0 mt-2 w-56 app-bg-secondary border border-slate-700/60 rounded-2xl shadow-2xl p-2 z-[100] grid grid-cols-6 gap-1 animate-in fade-in zoom-in-95 duration-100">
-                      {EMOJI_LIST.map((emoji, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            insertHtmlAtCursor(emoji);
-                            setShowEmojiPicker(false);
-                          }}
-                          className="p-1.5 rounded-lg hover:bg-slate-800 text-base text-center cursor-pointer transition-transform hover:scale-110"
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
