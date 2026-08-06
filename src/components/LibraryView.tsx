@@ -1432,7 +1432,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   onChange={(e) => setSortBy(e.target.value as any)}
                   className="px-2.5 py-1.5 rounded-xl bg-[#1e1e1e] border border-[#383838] text-slate-200 text-xs font-semibold cursor-pointer outline-none"
                 >
-                  <option value="custom">Urutan Manual (Drag & Drop)</option>
+                  <option value="custom">Urutan Manual</option>
                   <option value="updated">Terakhir Diubah</option>
                   <option value="created">Tanggal Dibuat</option>
                   <option value="title">Judul (A-Z)</option>

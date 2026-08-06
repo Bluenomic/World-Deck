@@ -82,11 +82,6 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     setAttributes(attributes.filter((attr) => attr.id !== id));
   };
 
-  const handleInsertMention = (targetCard: WorldCard) => {
-    const mentionText = ` @${targetCard.title} `;
-    setContent((prev) => prev + mentionText);
-  };
-
   const handleCoverFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -109,11 +104,11 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
     onSave({
       ...card,
-      title: title.trim() || 'Halaman Tanpa Judul',
+      title: title.trim() || 'Kartu Tanpa Judul',
       subtitle: subtitle.trim(),
       category,
       summary: summary.trim(),
@@ -133,7 +128,6 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   };
 
   const handleCloseRequest = () => {
-    // Check if the card was originally empty (newly created blank card)
     const isOriginalEmpty =
       !card.title &&
       !card.subtitle &&
@@ -143,7 +137,6 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
       (!card.tags || card.tags.length === 0) &&
       (!card.attributes || card.attributes.length === 0);
 
-    // Check if the current form inputs are also completely empty
     const isCurrentEmpty =
       !title.trim() &&
       !subtitle.trim() &&
@@ -164,81 +157,97 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     (c) => c.sourceId === card.id || c.targetId === card.id
   );
 
-  const categoryConfig = CATEGORY_CONFIGS[category];
-  const IconComponent = (Icons as any)[categoryConfig.iconName] || Icons.FileText;
-
   return (
-    <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 z-50 backdrop-animate-appear cursor-pointer"
-      onClick={() => {
-        if (!showExitConfirm) {
-          handleCloseRequest();
-        }
-      }}
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-6 backdrop-animate-appear select-none"
+      onClick={handleCloseRequest}
     >
-      <div 
-        className="app-bg-secondary border app-border w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden app-text-main transition-colors modal-animate-appear cursor-default relative"
+      <div
+        className="bg-[#2c2c2c] border border-[#383838] w-full max-w-3xl max-h-[92vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white transition-colors modal-animate-appear cursor-default relative"
         onClick={(e) => e.stopPropagation()}
       >
-        
-        {/* Action Bar */}
-        <div className="px-4 py-2.5 app-bg-main border-b app-border flex items-center justify-between text-xs app-text-muted">
+        {/* Header Action Strip */}
+        <div className="px-5 py-3 bg-[#1e1e1e] border-b border-[#383838] flex items-center justify-between text-xs text-slate-300">
           <div className="flex items-center gap-2">
-            <Icons.FileText size={14} className="app-accent-text" />
-            <span>Halaman Kartu</span>
-            <span>/</span>
-            <span className="app-text-main font-medium truncate max-w-[200px]">{title}</span>
+            {/* Category Select Dropdown */}
+            <div className="relative group">
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as CardCategory)}
+                className="appearance-none bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1 pr-7 text-xs font-bold text-white cursor-pointer outline-none hover:border-[#0d99ff]"
+              >
+                {(Object.keys(CATEGORY_CONFIGS) as CardCategory[]).map((cat) => (
+                  <option key={cat} value={cat}>
+                    {CATEGORY_CONFIGS[cat].label}
+                  </option>
+                ))}
+              </select>
+              <Icons.ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            <span className="text-slate-600">/</span>
+            <span className="text-white font-bold truncate max-w-[200px]">{title || 'Kartu Tanpa Judul'}</span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => onDelete(card.id)}
-              className="px-2.5 py-1 rounded-md text-rose-500 hover:bg-rose-950/40 transition-colors font-medium"
+              className="px-2.5 py-1 rounded-lg text-rose-400 hover:bg-rose-500/10 font-semibold transition-colors cursor-pointer"
             >
               Hapus
             </button>
+            <div className="h-4 w-px bg-[#383838]" />
             <button
               type="button"
               onClick={handleCloseRequest}
-              className="p-1 rounded-md app-bg-hover app-text-muted hover:app-text-main"
+              className="p-1 rounded-lg hover:bg-[#383838] text-slate-400 hover:text-white transition-colors cursor-pointer"
             >
               <Icons.X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Cover Photo Bar */}
+        {/* Cover Photo Header */}
         {imageUrl ? (
-          <div className="h-44 w-full relative overflow-hidden group border-b app-border">
+          <div className="h-40 w-full relative overflow-hidden group border-b border-[#383838] bg-[#1e1e1e]">
             <img src={imageUrl} alt="Cover" className="w-full h-full object-cover pointer-events-none select-none" draggable={false} />
-            <button
-              type="button"
-              onClick={() => setImageUrl('')}
-              className="absolute right-3 bottom-3 px-3 py-1 app-bg-main backdrop-blur-md rounded-lg text-xs text-rose-400 hover:text-rose-300 opacity-0 group-hover:opacity-100 transition-opacity border app-border font-medium shadow-md"
-            >
-              Hapus Cover
-            </button>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCoverInput(true)}
+                className="px-3 py-1 bg-[#2c2c2c]/90 backdrop-blur-md rounded-lg text-xs text-white border border-[#383838] font-semibold hover:bg-[#383838]"
+              >
+                Ubah Cover
+              </button>
+              <button
+                type="button"
+                onClick={() => setImageUrl('')}
+                className="px-3 py-1 bg-rose-950/80 backdrop-blur-md rounded-lg text-xs text-rose-300 border border-rose-500/30 font-semibold hover:bg-rose-900"
+              >
+                Hapus Cover
+              </button>
+            </div>
           </div>
         ) : (
-          <div className="px-6 pt-4">
+          <div className="px-6 pt-3">
             {!showCoverInput ? (
               <button
                 type="button"
                 onClick={() => setShowCoverInput(true)}
-                className="text-xs app-text-muted hover:app-text-main flex items-center gap-1.5 px-3 py-1.5 rounded-lg app-bg-main border app-border hover:app-bg-hover transition-colors font-medium"
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e1e1e] border border-[#383838] hover:border-[#0d99ff] transition-all font-semibold cursor-pointer"
               >
-                <Icons.Image size={14} className="app-accent-text" />
+                <Icons.Image size={14} className="text-[#0d99ff]" />
                 <span>+ Tambah Cover Gambar</span>
               </button>
             ) : (
-              <div className="p-3.5 rounded-xl app-bg-main border app-border space-y-2.5 animate-in fade-in duration-100">
+              <div className="p-3 rounded-xl bg-[#1e1e1e] border border-[#383838] space-y-2 animate-in fade-in duration-100">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold app-text-main">Atur Cover Gambar Halaman</span>
+                  <span className="text-xs font-bold text-white">Atur Cover Gambar Halaman</span>
                   <button
                     type="button"
                     onClick={() => setShowCoverInput(false)}
-                    className="text-xs app-text-muted hover:app-text-main"
+                    className="text-xs text-slate-400 hover:text-white"
                   >
                     Tutup
                   </button>
@@ -250,14 +259,12 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                     value={imageUrl}
                     onChange={(e) => setImageUrl(e.target.value)}
                     placeholder="Tempel URL gambar (https://...)"
-                    className="flex-1 w-full app-bg-secondary border app-border rounded-lg px-3 py-1.5 text-xs app-text-main focus:outline-none focus:border-blue-500 font-mono"
+                    className="flex-1 w-full bg-[#2c2c2c] border border-[#383838] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff] font-mono"
                   />
-                  
-                  <span className="text-xs app-text-muted">atau</span>
-
-                  <label className="px-3 py-1.5 rounded-lg app-accent-bg text-white text-xs font-medium cursor-pointer flex items-center gap-1.5 shrink-0">
+                  <span className="text-xs text-slate-500">atau</span>
+                  <label className="px-3 py-1.5 rounded-lg bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold cursor-pointer flex items-center gap-1.5 shrink-0">
                     <Icons.Upload size={13} />
-                    <span>Unggah Berkas Gambar</span>
+                    <span>Unggah Berkas</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -271,156 +278,115 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
           </div>
         )}
 
-        {/* Category Tabs */}
-        <div className="flex border-b app-border app-bg-main px-6 gap-4 text-xs font-medium app-text-muted mt-2">
+        {/* Title & Metadata Strip */}
+        <div className="px-6 pt-4 pb-2 space-y-2">
+          <input
+            type="text"
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Judul Kartu / Halaman..."
+            className="w-full bg-transparent border-none text-2xl sm:text-3xl font-extrabold text-white placeholder:text-slate-600 focus:outline-none tracking-tight"
+          />
+          <input
+            type="text"
+            value={subtitle}
+            onChange={(e) => setSubtitle(e.target.value)}
+            placeholder="Sub-judul / Gelar Singkat (opsional)..."
+            className="w-full bg-transparent border-none text-xs text-slate-400 placeholder:text-slate-600 focus:outline-none font-medium"
+          />
+        </div>
+
+        {/* Segmented Mode Tabs */}
+        <div className="flex border-b border-[#383838] bg-[#1e1e1e] px-6 gap-6 text-xs font-semibold text-slate-400">
           <button
             type="button"
             onClick={() => setActiveTab('content')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'content'
-                ? 'border-blue-500 app-text-main font-semibold'
-                : 'border-transparent hover:app-text-main'
+                ? 'border-[#0d99ff] text-white font-bold'
+                : 'border-transparent hover:text-white'
             }`}
           >
-            <Icons.FileText size={14} />
-            <span>Konten Halaman</span>
+            <Icons.FileText size={14} className={activeTab === 'content' ? 'text-[#0d99ff]' : ''} />
+            <span>Catatan Lore</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('properties')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'properties'
-                ? 'border-blue-500 app-text-main font-semibold'
-                : 'border-transparent hover:app-text-main'
+                ? 'border-[#0d99ff] text-white font-bold'
+                : 'border-transparent hover:text-white'
             }`}
           >
-            <Icons.Sliders size={14} />
-            <span>Database Properties ({attributes.length})</span>
+            <Icons.Sliders size={14} className={activeTab === 'properties' ? 'text-amber-400' : ''} />
+            <span>Properti Infobox ({attributes.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('relations')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'relations'
-                ? 'border-blue-500 app-text-main font-semibold'
-                : 'border-transparent hover:app-text-main'
+                ? 'border-[#0d99ff] text-white font-bold'
+                : 'border-transparent hover:text-white'
             }`}
           >
-            <Icons.GitCommit size={14} />
+            <Icons.GitCommit size={14} className={activeTab === 'relations' ? 'text-purple-400' : ''} />
             <span>Relasi Hubungan ({cardConnections.length})</span>
           </button>
         </div>
 
-        {/* Editor Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+        {/* Editor Form Body */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
           
+          {/* TAB 1: CATATAN LORE */}
           {activeTab === 'content' && (
             <div className="space-y-4">
-              
-              {/* Category Selector */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                <span className="text-xs app-text-muted whitespace-nowrap">Kategori:</span>
-                {(Object.keys(CATEGORY_CONFIGS) as CardCategory[]).map((cat) => {
-                  const cfg = CATEGORY_CONFIGS[cat];
-                  const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle;
-                  const isSel = category === cat;
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setCategory(cat)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 border transition-all ${
-                        isSel
-                          ? `${cfg.bgGradient} ${cfg.borderColor} app-text-main font-semibold shadow-xs`
-                          : 'app-bg-main border app-border app-text-muted hover:app-text-main'
-                      }`}
-                    >
-                      <IconComp size={13} style={{ color: cfg.color }} />
-                      <span>{cfg.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Title & Subtitle */}
+              {/* Summary Input */}
               <div className="space-y-1">
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Judul Halaman..."
-                  className="w-full bg-transparent border-none text-2xl md:text-3xl font-bold app-text-main placeholder:text-slate-500 focus:outline-none tracking-tight"
-                />
-                <input
-                  type="text"
-                  value={subtitle}
-                  onChange={(e) => setSubtitle(e.target.value)}
-                  placeholder="Gelar / Sub-judul singkat..."
-                  className="w-full bg-transparent border-none text-xs app-text-muted placeholder:text-slate-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Summary Callout Box */}
-              <div className="notion-callout flex items-start gap-3">
-                <IconComponent size={18} className="app-accent-text shrink-0 mt-0.5" />
+                <label className="text-xs font-semibold text-slate-400 block">Ringkasan Singkat (Summary)</label>
                 <textarea
                   rows={2}
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
-                  placeholder="Ringkasan..."
-                  className="w-full bg-transparent border-none text-xs app-text-main placeholder:text-slate-500 focus:outline-none leading-relaxed resize-none"
+                  placeholder="Ringkasan singkat 1-2 kalimat..."
+                  className="w-full bg-[#1e1e1e] border border-[#383838] rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0d99ff] leading-relaxed resize-none"
                 />
               </div>
 
-              {/* Main Content Markdown & @Mention */}
-              <div className="space-y-2">
+              {/* Main Content Markdown */}
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold app-text-muted">
+                  <label className="text-xs font-semibold text-slate-400 block">
                     Catatan Lore & Penjelasan Lengkap
                   </label>
-                  <span className="text-[11px] app-text-muted font-mono">Gunakan @NamaKartu</span>
-                </div>
-
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                  <span className="text-[11px] app-text-muted whitespace-nowrap">Sisipkan:</span>
-                  {allCards
-                    .filter((c) => c.id !== card.id)
-                    .slice(0, 5)
-                    .map((otherCard) => (
-                      <button
-                        key={otherCard.id}
-                        type="button"
-                        onClick={() => handleInsertMention(otherCard)}
-                        className="text-[11px] px-2 py-0.5 rounded app-bg-main border app-border app-accent-text hover:border-blue-400 whitespace-nowrap flex items-center gap-1"
-                      >
-                        <span>📄 {otherCard.title}</span>
-                      </button>
-                    ))}
+                  <span className="text-[11px] text-slate-400 font-mono">Mentions: Ketik @JudulKartu</span>
                 </div>
 
                 <textarea
-                  rows={6}
+                  rows={8}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder="Tuliskan isi catatan, lore, sejarah, atau mitologi... Gunakan @NamaKartu untuk merujuk kartu lain."
-                  className="w-full app-bg-main border app-border rounded-xl p-3.5 text-xs app-text-main placeholder-slate-500 focus:outline-none focus:border-blue-500 leading-relaxed"
+                  placeholder="Tuliskan catatan lore, mitologi, sejarah, atau deskripsi lengkap di sini. Gunakan @JudulKartu untuk merujuk kartu lain..."
+                  className="w-full bg-[#1e1e1e] border border-[#383838] rounded-xl p-3.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0d99ff] leading-relaxed custom-scrollbar"
                 />
 
+                {/* Live Mention Segment Preview */}
                 {content && (
-                  <div className="p-3 rounded-lg app-bg-main border app-border space-y-1">
-                    <span className="text-[10px] font-bold app-text-muted block uppercase">
-                      Preview Link Halaman:
+                  <div className="p-3 rounded-xl bg-[#1e1e1e] border border-[#383838] space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Preview Link Kartu:
                     </span>
-                    <div className="text-xs app-text-main leading-relaxed">
+                    <div className="text-xs text-slate-200 leading-relaxed">
                       {parseMentions(content, allCards).map((seg, idx) =>
                         seg.isMention && seg.cardId ? (
                           <span
                             key={idx}
                             onClick={() => onNavigateToCard && onNavigateToCard(seg.cardId!)}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.2 mx-0.5 rounded app-bg-secondary app-accent-text border app-border font-medium cursor-pointer hover:underline"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded bg-[#0d99ff]/15 text-[#0d99ff] border border-[#0d99ff]/30 font-semibold cursor-pointer hover:underline"
                           >
                             📄 {seg.text.substring(1)}
                           </span>
@@ -433,142 +399,9 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 )}
               </div>
 
-              {/* Atribut Kustom / Wiki Infobox Properties */}
-              <div className="space-y-2 pt-2 border-t app-border">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold app-text-muted flex items-center gap-1.5">
-                    <Icons.Sliders size={13} className="app-accent-text" />
-                    <span>Atribut Kustom / Infobox (Nama & Nilai)</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => handleAddAttribute('', '')}
-                    className="text-xs font-semibold app-accent-text hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Icons.Plus size={13} />
-                    <span>+ Atribut Baru</span>
-                  </button>
-                </div>
-
-                {attributes.length === 0 ? (
-                  <div className="p-3.5 rounded-xl app-bg-secondary border border-dashed app-border space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs app-text-muted">
-                        Belum ada atribut kustom (mis. Spesies: Manusia, Status: Aktif, Elemen: Api).
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleAddAttribute('', '')}
-                        className="px-2.5 py-1 rounded-lg app-accent-bg text-white text-[11px] font-bold cursor-pointer shrink-0"
-                      >
-                        + Tambah Atribut
-                      </button>
-                    </div>
-
-                    {/* Quick Attribute Suggestions in empty state */}
-                    <div className="pt-1 flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] app-text-muted font-bold uppercase tracking-wider flex items-center gap-1">
-                        <Icons.Sparkles size={11} className="text-amber-400" />
-                        <span>Saran Cepat:</span>
-                      </span>
-                      {(SUGGESTED_ATTRIBUTES_BY_CATEGORY[category] || []).slice(0, 6).map((suggKey) => (
-                        <button
-                          key={suggKey}
-                          type="button"
-                          onClick={() => handleAddAttribute(suggKey, '')}
-                          className="text-[11px] px-2.5 py-1 rounded-lg app-bg-main border app-border app-text-main font-semibold hover:border-blue-400 hover:text-blue-400 hover:scale-105 active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                        >
-                          <Icons.Plus size={11} className="text-blue-400" />
-                          <span>{suggKey}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2.5">
-                    {attributes.map((attr) => {
-                      const usedKeys = attributes.map((a) => a.key.toLowerCase());
-                      const categoryDefaults = SUGGESTED_ATTRIBUTES_BY_CATEGORY[category] || [];
-                      const existingKeys = Array.from(
-                        new Set(allCards.flatMap((c) => (c.attributes || []).map((a) => a.key)))
-                      );
-                      const combined = Array.from(new Set([...categoryDefaults, ...existingKeys]));
-                      const filterTerm = attr.key.trim().toLowerCase();
-
-                      const filteredSuggestions = combined.filter((k) => {
-                        if (!k.trim()) return false;
-                        const countUsed = usedKeys.filter((uk) => uk === k.toLowerCase()).length;
-                        if (countUsed > 1) return false;
-                        if (countUsed === 1 && attr.key.toLowerCase() === k.toLowerCase()) return false;
-                        if (!filterTerm) return true;
-                        return k.toLowerCase().includes(filterTerm) && k.toLowerCase() !== filterTerm;
-                      });
-
-                      return (
-                        <div key={attr.id} className="space-y-1.5 app-bg-secondary p-2.5 rounded-xl border app-border">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={attr.key}
-                              onChange={(e) => handleUpdateAttribute(attr.id, e.target.value, attr.value)}
-                              placeholder="Nama Atribut (mis. Spesies)"
-                              className="w-1/3 app-bg-main border app-border rounded-lg px-2.5 py-1.5 text-xs app-text-main focus:outline-none focus:border-blue-500 font-medium"
-                            />
-                            <span className="app-text-muted font-bold">:</span>
-                            <input
-                              id={`attr-val-${attr.id}`}
-                              type="text"
-                              value={attr.value}
-                              onChange={(e) => handleUpdateAttribute(attr.id, attr.key, e.target.value)}
-                              placeholder="Nilai Atribut (mis. Manusia)"
-                              className="flex-1 app-bg-main border app-border rounded-lg px-2.5 py-1.5 text-xs app-text-main focus:outline-none focus:border-blue-500 font-medium"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveAttribute(attr.id)}
-                              className="p-1.5 app-text-muted hover:text-rose-400 rounded-lg hover:app-bg-hover transition-colors cursor-pointer"
-                              title="Hapus Atribut"
-                            >
-                              <Icons.Trash2 size={14} />
-                            </button>
-                          </div>
-
-                          {/* Interactive Suggestion Pills below attribute row */}
-                          {filteredSuggestions.length > 0 && (
-                            <div className="pt-0.5 flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] app-text-muted font-bold uppercase tracking-wider flex items-center gap-1">
-                                <Icons.Sparkles size={10} className="text-amber-400" />
-                                <span>Saran:</span>
-                              </span>
-                              {filteredSuggestions.slice(0, 6).map((suggKey) => (
-                                <button
-                                  key={suggKey}
-                                  type="button"
-                                  onClick={() => {
-                                    handleUpdateAttribute(attr.id, suggKey, attr.value);
-                                    setTimeout(() => {
-                                      const valInput = document.getElementById(`attr-val-${attr.id}`);
-                                      if (valInput) valInput.focus();
-                                    }, 50);
-                                  }}
-                                  className="text-[10px] px-2 py-0.5 rounded-md app-bg-main border app-border app-text-main font-semibold hover:border-blue-400 hover:text-blue-400 hover:scale-105 active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                                >
-                                  <Icons.Plus size={10} className="text-blue-400" />
-                                  <span>{suggKey}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Tags */}
-              <div className="space-y-1.5 pt-2 border-t app-border">
-                <label className="text-xs font-semibold app-text-muted block">Tags Halaman (#tag)</label>
+              {/* Tags Section */}
+              <div className="space-y-2 pt-2 border-t border-[#383838]">
+                <label className="text-xs font-semibold text-slate-400 block">Tag (#tag)</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -580,29 +413,29 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                         handleAddTag();
                       }
                     }}
-                    placeholder="Tambah tag..."
-                    className="flex-1 app-bg-main border app-border rounded-lg px-3 py-1.5 text-xs app-text-main focus:outline-none focus:border-blue-500"
+                    placeholder="Ketik tag lalu tekan Enter..."
+                    className="flex-1 bg-[#1e1e1e] border border-[#383838] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                   />
                   <button
                     type="button"
                     onClick={handleAddTag}
-                    className="px-3 py-1.5 app-bg-main hover:app-bg-hover app-text-main border app-border rounded-lg text-xs font-semibold"
+                    className="px-3.5 py-1.5 bg-[#1e1e1e] hover:bg-[#383838] text-white border border-[#383838] rounded-lg text-xs font-bold cursor-pointer"
                   >
                     + Tag
                   </button>
                 </div>
 
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1.5 pt-1">
                   {tags.map((tag) => (
                     <span
                       key={tag}
-                      className="px-2 py-0.5 rounded app-bg-main app-text-muted border app-border text-xs flex items-center gap-1"
+                      className="px-2.5 py-1 rounded-full bg-[#1e1e1e] text-slate-300 border border-[#383838] text-xs font-semibold flex items-center gap-1.5"
                     >
                       #{tag}
                       <button
                         type="button"
                         onClick={() => handleRemoveTag(tag)}
-                        className="hover:text-rose-400"
+                        className="text-slate-400 hover:text-rose-400"
                       >
                         ×
                       </button>
@@ -610,21 +443,21 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                   ))}
                 </div>
               </div>
-
             </div>
           )}
 
+          {/* TAB 2: PROPERTI INFOBOX */}
           {activeTab === 'properties' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-sm font-bold app-text-main">Database Properties</h4>
-                  <p className="text-xs app-text-muted">Daftar atribut pasangan Nama & Nilai untuk kartu ini.</p>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Atribut Kustom (Infobox)</h4>
+                  <p className="text-xs text-slate-400">Daftar properti spesifik kategori (mis. Spesies, Afiliasi, Senjata).</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleAddAttribute('', '')}
-                  className="px-3 py-1.5 rounded-lg app-accent-bg text-white text-xs font-semibold flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
                 >
                   <Icons.Plus size={14} />
                   <span>+ Properti Baru</span>
@@ -632,34 +465,49 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
               </div>
 
               {attributes.length === 0 ? (
-                <div className="text-center py-8 app-bg-main rounded-xl border border-dashed app-border app-text-muted text-xs">
-                  Belum ada atribut kustom. Klik "+ Properti Baru" untuk menambahkan.
+                <div className="p-6 rounded-2xl bg-[#1e1e1e] border border-dashed border-[#383838] text-center space-y-3">
+                  <p className="text-xs text-slate-400">Belum ada atribut kustom ditambahkan.</p>
+                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Saran:</span>
+                    {(SUGGESTED_ATTRIBUTES_BY_CATEGORY[category] || []).map((suggKey) => (
+                      <button
+                        key={suggKey}
+                        type="button"
+                        onClick={() => handleAddAttribute(suggKey, '')}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-[#2c2c2c] border border-[#383838] text-slate-200 font-semibold hover:border-[#0d99ff] hover:text-[#0d99ff] transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <Icons.Plus size={11} className="text-[#0d99ff]" />
+                        <span>{suggKey}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {attributes.map((attr) => (
-                    <div key={attr.id} className="flex items-center gap-2 app-bg-main p-2 rounded-lg border app-border">
+                    <div key={attr.id} className="flex items-center gap-2 bg-[#1e1e1e] p-2.5 rounded-xl border border-[#383838]">
                       <input
                         type="text"
                         value={attr.key}
                         onChange={(e) => handleUpdateAttribute(attr.id, e.target.value, attr.value)}
-                        placeholder="Nama Properti (mis. Ras)"
-                        className="w-1/3 app-bg-secondary border app-border rounded px-2.5 py-1 text-xs app-text-main focus:outline-none"
+                        placeholder="Nama Properti (mis. Spesies)"
+                        className="w-1/3 bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff] font-semibold"
                       />
-                      <span className="app-text-muted">:</span>
+                      <span className="text-slate-500 font-bold">:</span>
                       <input
                         type="text"
                         value={attr.value}
                         onChange={(e) => handleUpdateAttribute(attr.id, attr.key, e.target.value)}
-                        placeholder="Nilai (mis. Elven)"
-                        className="flex-1 app-bg-secondary border app-border rounded px-2.5 py-1 text-xs app-text-main focus:outline-none"
+                        placeholder="Nilai (mis. Manusia)"
+                        className="flex-1 bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff] font-medium"
                       />
                       <button
                         type="button"
                         onClick={() => handleRemoveAttribute(attr.id)}
-                        className="p-1 app-text-muted hover:text-rose-400 rounded hover:app-bg-hover"
+                        className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-[#383838] transition-colors cursor-pointer"
+                        title="Hapus Properti"
                       >
-                        <Icons.Trash2 size={15} />
+                        <Icons.Trash2 size={14} />
                       </button>
                     </div>
                   ))}
@@ -668,19 +516,20 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             </div>
           )}
 
+          {/* TAB 3: RELASI HUBUNGAN */}
           {activeTab === 'relations' && (
             <div className="space-y-5">
-              <div className="p-3.5 rounded-xl app-bg-main border app-border space-y-3">
-                <h4 className="text-xs font-bold uppercase app-accent-text">
+              <div className="p-4 rounded-xl bg-[#1e1e1e] border border-[#383838] space-y-3">
+                <h4 className="text-xs font-bold uppercase text-[#0d99ff]">
                   Hubungkan dengan Halaman Kartu Lain
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] app-text-muted mb-1">Pilih Kartu Target:</label>
+                    <label className="block text-[11px] text-slate-400 mb-1">Pilih Kartu Target:</label>
                     <select
                       value={targetCardId}
                       onChange={(e) => setTargetCardId(e.target.value)}
-                      className="w-full app-bg-secondary border app-border rounded-lg px-2.5 py-1.5 text-xs app-text-main focus:outline-none"
+                      className="w-full bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                     >
                       <option value="">-- Pilih Kartu --</option>
                       {allCards
@@ -694,13 +543,13 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] app-text-muted mb-1">Label Hubungan:</label>
+                    <label className="block text-[11px] text-slate-400 mb-1">Label Hubungan:</label>
                     <input
                       type="text"
                       value={relationLabel}
                       onChange={(e) => setRelationLabel(e.target.value)}
                       placeholder="mis. Musuh Bebentukan"
-                      className="w-full app-bg-secondary border app-border rounded-lg px-2.5 py-1.5 text-xs app-text-main focus:outline-none"
+                      className="w-full bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                     />
                   </div>
 
@@ -709,7 +558,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                       type="button"
                       disabled={!targetCardId}
                       onClick={handleCreateConnection}
-                      className="w-full py-1.5 app-accent-bg disabled:opacity-40 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
+                      className="w-full py-1.5 bg-[#0d99ff] hover:bg-[#0b85de] disabled:opacity-40 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <Icons.Link size={14} />
                       <span>Buat Hubungan</span>
@@ -719,11 +568,11 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
               </div>
 
               <div>
-                <h4 className="text-xs font-bold uppercase app-text-muted mb-2">
+                <h4 className="text-xs font-bold uppercase text-slate-400 mb-2">
                   Daftar Hubungan Aktif
                 </h4>
                 {cardConnections.length === 0 ? (
-                  <div className="text-center py-6 app-bg-main rounded-xl border app-border app-text-muted text-xs">
+                  <div className="text-center py-6 bg-[#1e1e1e] rounded-xl border border-[#383838] text-slate-400 text-xs">
                     Kartu ini belum terhubung dengan kartu manapun.
                   </div>
                 ) : (
@@ -736,13 +585,13 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                       return (
                         <div
                           key={conn.id}
-                          className="flex items-center justify-between p-2.5 rounded-lg app-bg-main border app-border"
+                          className="flex items-center justify-between p-3 rounded-xl bg-[#1e1e1e] border border-[#383838]"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded app-bg-secondary app-accent-text text-[10px] border app-border">
+                            <span className="px-2 py-0.5 rounded bg-[#2c2c2c] text-[#0d99ff] text-[10px] font-bold border border-[#383838]">
                               {conn.label}
                             </span>
-                            <span className="text-xs app-text-main font-medium">
+                            <span className="text-xs text-white font-semibold">
                               → {otherCard.title}
                             </span>
                           </div>
@@ -750,7 +599,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                           <button
                             type="button"
                             onClick={() => onNavigateToCard && onNavigateToCard(otherCard.id)}
-                            className="px-2.5 py-1 rounded app-bg-secondary hover:app-bg-hover app-accent-text text-xs border app-border"
+                            className="px-2.5 py-1 rounded-lg bg-[#2c2c2c] hover:bg-[#383838] text-[#0d99ff] text-xs font-bold border border-[#383838] transition-colors cursor-pointer"
                           >
                             Lihat di Canvas
                           </button>
@@ -763,18 +612,18 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             </div>
           )}
 
-          {/* Footer */}
-          <div className="pt-4 border-t app-border flex items-center justify-end gap-2">
+          {/* Footer Buttons */}
+          <div className="pt-4 border-t border-[#383838] flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={handleCloseRequest}
-              className="px-4 py-2 rounded-lg border app-border app-text-muted hover:app-text-main text-xs font-semibold"
+              className="px-4 py-2 rounded-xl border border-[#383838] bg-[#1e1e1e] hover:bg-[#383838] text-slate-300 text-xs font-bold transition-colors cursor-pointer"
             >
               Batal
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-lg app-accent-bg text-white text-xs font-semibold shadow-md flex items-center gap-1.5"
+              className="px-5 py-2 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
             >
               <Icons.Save size={15} />
               <span>Simpan Perubahan</span>
@@ -788,13 +637,13 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
           className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-[60] cursor-default backdrop-animate-appear"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="app-bg-secondary border app-border rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-5 modal-animate-appear text-center">
+          <div className="bg-[#2c2c2c] border border-[#383838] rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-5 modal-animate-appear text-center">
             <div className="mx-auto w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center">
               <Icons.AlertTriangle size={24} />
             </div>
             <div className="space-y-1.5">
-              <h4 className="text-base font-bold app-text-main">Simpan atau Buang Kartu?</h4>
-              <p className="text-xs app-text-muted leading-relaxed">
+              <h4 className="text-base font-bold text-white">Simpan atau Buang Kartu?</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
                 Kartu baru ini masih kosong. Apakah Anda ingin membuang kartu ini atau tetap menyimpannya di canvas?
               </p>
             </div>
@@ -808,7 +657,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                     onDelete(card.id);
                   }
                 }}
-                className="w-full py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-md transition-colors"
+                className="w-full py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md transition-colors"
               >
                 Hapus Kartu
               </button>
@@ -821,14 +670,14 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                     updatedAt: Date.now(),
                   });
                 }}
-                className="w-full py-2 rounded-lg app-bg-main border app-border hover:app-bg-hover app-text-main text-xs font-semibold transition-colors"
+                className="w-full py-2 rounded-xl bg-[#1e1e1e] border border-[#383838] hover:bg-[#383838] text-white text-xs font-bold transition-colors"
               >
                 Simpan Kartu Kosong
               </button>
               <button
                 type="button"
                 onClick={() => setShowExitConfirm(false)}
-                className="w-full py-2 rounded-lg text-xs app-text-muted hover:app-text-main font-semibold transition-colors"
+                className="w-full py-2 rounded-xl text-xs text-slate-400 hover:text-white font-bold transition-colors"
               >
                 Batal (Kembali Edit)
               </button>

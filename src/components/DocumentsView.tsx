@@ -2753,7 +2753,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 className="w-full px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-blue-600/20 text-blue-300 font-medium transition-colors cursor-pointer"
               >
                 <Icons.Plus size={14} className="text-blue-400" />
-                <span>+ Buat Dokumen Baru</span>
+                <span>Buat Dokumen Baru</span>
               </button>
 
               <div className="my-1 border-t border-slate-800" />
