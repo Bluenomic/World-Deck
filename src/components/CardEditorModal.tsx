@@ -45,7 +45,14 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [summary, setSummary] = useState(card.summary || '');
   const [content, setContent] = useState(card.content || '');
-  const [imageUrl, setImageUrl] = useState(card.imageUrl || '');
+  const [images, setImages] = useState<string[]>(() => {
+    const existing = card.images ? [...card.images] : [];
+    if (card.imageUrl && !existing.includes(card.imageUrl)) {
+      existing.unshift(card.imageUrl);
+    }
+    return existing;
+  });
+  const [imageUrl, setImageUrl] = useState<string>(card.imageUrl || (card.images?.[0] || ''));
   const [showCoverInput, setShowCoverInput] = useState(false);
   const [tags, setTags] = useState<string[]>(card.tags || []);
   const [newTagInput, setNewTagInput] = useState('');
@@ -90,19 +97,30 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     reader.onload = async (event) => {
       if (event.target?.result) {
         const base64Data = event.target.result as string;
+        let finalUrl = base64Data;
         if (isTauriAvailable()) {
-          const assetUrl = await saveImageAsset(base64Data, title || 'cover');
-          if (assetUrl) {
-            setImageUrl(assetUrl);
-            setShowCoverInput(false);
-            return;
-          }
+          const assetUrl = await saveImageAsset(base64Data, title || 'card-image');
+          if (assetUrl) finalUrl = assetUrl;
         }
-        setImageUrl(base64Data);
+        setImages((prev) => Array.from(new Set([...prev, finalUrl])));
+        if (!imageUrl) setImageUrl(finalUrl);
         setShowCoverInput(false);
       }
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleSetThumbnail = (imgSrc: string) => {
+    setImageUrl(imgSrc);
+  };
+
+  const handleRemoveImage = (imgSrc: string) => {
+    const nextImages = images.filter((img) => img !== imgSrc);
+    setImages(nextImages);
+    if (imageUrl === imgSrc) {
+      setImageUrl(nextImages[0] || '');
+    }
   };
 
   const handleSubmit = (e?: React.FormEvent) => {
@@ -115,6 +133,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
       summary: summary.trim(),
       content: content.trim(),
       imageUrl: imageUrl.trim(),
+      images,
       tags,
       attributes,
       updatedAt: Date.now(),
@@ -298,7 +317,13 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                   <input
                     type="url"
                     value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setImageUrl(val);
+                      if (val && !images.includes(val)) {
+                        setImages((prev) => [...prev, val]);
+                      }
+                    }}
                     placeholder="Tempel URL gambar (https://...)"
                     className="flex-1 w-full bg-[#2c2c2c] border border-[#383838] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff] font-mono"
                   />
@@ -318,6 +343,79 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             )}
           </div>
         )}
+
+        {/* Galeri Gambar Kartu & Picker */}
+        <div className="px-6 pt-3 pb-1">
+          <div className="p-3 rounded-xl bg-[#1e1e1e] border border-[#383838] space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
+                <Icons.Image size={14} className="text-[#0d99ff]" />
+                <span>Galeri Gambar Kartu ({images.length})</span>
+              </div>
+              <label className="px-2.5 py-1 rounded-lg bg-[#0d99ff]/20 text-[#0d99ff] border border-[#0d99ff]/30 text-xs font-bold hover:bg-[#0d99ff]/30 transition-all cursor-pointer flex items-center gap-1">
+                <Icons.Plus size={12} />
+                <span>+ Tambah Gambar</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCoverFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {images.length === 0 ? (
+              <p className="text-xs text-slate-500 text-center py-3 italic">
+                Belum ada gambar di galeri. Klik &quot;+ Tambah Gambar&quot; untuk mengunggah.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                {images.map((imgSrc, idx) => {
+                  const isThumbnail = imageUrl === imgSrc;
+                  return (
+                    <div
+                      key={idx}
+                      className={`relative rounded-xl overflow-hidden border group bg-[#2c2c2c] aspect-video transition-all ${
+                        isThumbnail ? 'border-[#0d99ff] ring-2 ring-[#0d99ff]/40 shadow-md' : 'border-[#383838] hover:border-slate-500'
+                      }`}
+                    >
+                      <img src={imgSrc} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
+
+                      {isThumbnail && (
+                        <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-[#0d99ff] text-white text-[9px] font-bold shadow-md flex items-center gap-1">
+                          <Icons.Star size={10} className="fill-white" />
+                          <span>Thumbnail</span>
+                        </span>
+                      )}
+
+                      <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
+                        {!isThumbnail && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetThumbnail(imgSrc)}
+                            className="px-2 py-1 rounded-lg bg-[#0d99ff] text-white text-[10px] font-bold hover:bg-[#0b85de] shadow-md flex items-center gap-1 cursor-pointer"
+                            title="Jadikan Thumbnail Utama"
+                          >
+                            <Icons.Star size={11} />
+                            <span>Set Cover</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(imgSrc)}
+                          className="p-1.5 rounded-lg bg-rose-600/80 text-white hover:bg-rose-600 shadow-md cursor-pointer"
+                          title="Hapus dari galeri"
+                        >
+                          <Icons.Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Title & Metadata Strip */}
         <div className="px-6 pt-4 pb-2 space-y-2">
