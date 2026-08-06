@@ -75,6 +75,16 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     showMentionSubmenu?: boolean;
   } | null>(null);
 
+  // Context Menu State for Document Sidebar
+  const [sidebarContextMenu, setSidebarContextMenu] = useState<{
+    x: number;
+    y: number;
+    targetDoc?: WorldDocument;
+  } | null>(null);
+
+  // Sorting Mode State for Document List in Sidebar
+  const [sortBy, setSortBy] = useState<'updated' | 'title'>('updated');
+
   // Inline Google Docs-style Crop State
   const [cropState, setCropState] = useState<{
     isActive: boolean;
@@ -188,17 +198,22 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
   }, [mode]);
 
-  // Filtered documents list
+  // Filtered & Sorted documents list
   const filteredDocs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return documents.filter((doc) => {
+    const list = documents.filter((doc) => {
       return (
         !q ||
         doc.title.toLowerCase().includes(q) ||
         (doc.content && doc.content.toLowerCase().includes(q))
       );
     });
-  }, [documents, searchQuery]);
+
+    if (sortBy === 'title') {
+      return [...list].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    }
+    return [...list].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  }, [documents, searchQuery, sortBy]);
 
   // Calculate Word Count
   const wordCount = useMemo(() => {
@@ -427,6 +442,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     setSelectedImage(null);
     setImageContextMenu(null);
     setEditorContextMenu(null);
+    setSidebarContextMenu(null);
     setCropState(null);
     setMentionState({ isOpen: false, query: '', x: 0, y: 0, selectedIndex: 0 });
   }, [activeDocId, mode]);
@@ -542,15 +558,21 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   useEffect(() => {
     const handleCloseMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('.doc-image-context-menu') && !target.closest('.doc-text-context-menu')) {
+      if (
+        !target.closest('.doc-image-context-menu') &&
+        !target.closest('.doc-text-context-menu') &&
+        !target.closest('.doc-sidebar-context-menu')
+      ) {
         setImageContextMenu(null);
         setEditorContextMenu(null);
+        setSidebarContextMenu(null);
       }
     };
 
     const handleScrollClose = () => {
       setImageContextMenu(null);
       setEditorContextMenu(null);
+      setSidebarContextMenu(null);
     };
 
     window.addEventListener('click', handleCloseMenu);
@@ -1214,18 +1236,29 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [mode, activeDoc, draftTitle]);
 
-  // Export Markdown / HTML File
-  const handleExportDocument = () => {
-    if (!activeDoc) return;
-    const content = mode === 'editing' && editorRef.current ? editorRef.current.innerHTML : activeDoc.content;
+  // Export Specific Markdown / HTML File
+  const handleExportDocumentFor = (doc: WorldDocument) => {
+    const content = doc.content || '';
     const blob = new Blob([content], { type: 'text/html;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${(activeDoc.title || 'dokumen').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.html`;
+    link.download = `${(doc.title || 'dokumen').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.html`;
     link.click();
     URL.revokeObjectURL(url);
-    setShowMoreMenu(false);
+  };
+
+  // Duplicate Document
+  const handleDuplicateDocument = (doc: WorldDocument) => {
+    const newDoc: WorldDocument = {
+      ...doc,
+      id: generateId('doc'),
+      title: `${doc.title || 'Dokumen'} (Salinan)`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    onCreateDocument(newDoc);
+    handleSelectDoc(newDoc.id);
   };
 
   const canvasContainerWidthClass =
@@ -1264,6 +1297,16 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       {/* MINIMALIST LEFT SIDEBAR */}
       {/* ========================================================= */}
       <aside
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setImageContextMenu(null);
+          setEditorContextMenu(null);
+          setSidebarContextMenu({
+            x: Math.min(window.innerWidth - 230, e.clientX),
+            y: Math.min(window.innerHeight - 200, e.clientY),
+          });
+        }}
         className={`sidebar-panel-transition w-72 border-r app-border/40 app-bg-secondary flex flex-col shrink-0 z-30 transition-all duration-300 ease-out ${
           isSidebarOpen
             ? 'translate-x-0 ml-0 opacity-100'
@@ -1333,6 +1376,17 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     key={doc.id}
                     type="button"
                     onClick={() => handleSelectDoc(doc.id)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setImageContextMenu(null);
+                      setEditorContextMenu(null);
+                      setSidebarContextMenu({
+                        x: Math.min(window.innerWidth - 230, e.clientX),
+                        y: Math.min(window.innerHeight - 260, e.clientY),
+                        targetDoc: doc,
+                      });
+                    }}
                     className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between group cursor-pointer relative overflow-hidden ${
                       isActive
                         ? 'bg-blue-500/10 border border-blue-500/30 text-white shadow-xs'
@@ -1441,7 +1495,10 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     <div className="absolute right-0 mt-2 w-44 app-bg-secondary border border-slate-700/60 rounded-xl shadow-2xl py-1 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
                       <button
                         type="button"
-                        onClick={handleExportDocument}
+                        onClick={() => {
+                          if (activeDoc) handleExportDocumentFor(activeDoc);
+                          setShowMoreMenu(false);
+                        }}
                         className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-200 hover:text-white cursor-pointer"
                       >
                         <Icons.Download size={14} />
@@ -2591,6 +2648,151 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               <span>Kotak Catatan (Callout)</span>
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Right-Click Context Menu for Document Sidebar */}
+      {sidebarContextMenu && (
+        <div
+          className="doc-sidebar-context-menu fixed z-[150] w-56 app-bg-secondary border border-slate-700/80 shadow-2xl rounded-2xl py-1 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 select-none space-y-0.5"
+          style={{
+            top: `${sidebarContextMenu.y}px`,
+            left: `${sidebarContextMenu.x}px`,
+          }}
+        >
+          {sidebarContextMenu.targetDoc ? (
+            /* Context Menu for Specific Document Item */
+            <div className="p-1 space-y-0.5">
+              <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 truncate">
+                {sidebarContextMenu.targetDoc.title || 'Dokumen'}
+              </div>
+
+              {/* Open Document */}
+              <button
+                type="button"
+                onClick={() => {
+                  handleSelectDoc(sidebarContextMenu.targetDoc!.id);
+                  setSidebarContextMenu(null);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-slate-800 text-slate-200 transition-colors cursor-pointer"
+              >
+                <Icons.FileText size={14} className="text-blue-400" />
+                <span>Buka Dokumen</span>
+              </button>
+
+              {/* Edit Document */}
+              <button
+                type="button"
+                onClick={() => {
+                  handleSelectDoc(sidebarContextMenu.targetDoc!.id);
+                  setMode('editing');
+                  setSidebarContextMenu(null);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-slate-800 text-slate-200 transition-colors cursor-pointer"
+              >
+                <Icons.Edit3 size={14} className="text-amber-400" />
+                <span>Edit Dokumen</span>
+              </button>
+
+              {/* Duplicate Document */}
+              <button
+                type="button"
+                onClick={() => {
+                  handleDuplicateDocument(sidebarContextMenu.targetDoc!);
+                  setSidebarContextMenu(null);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-slate-800 text-slate-200 transition-colors cursor-pointer"
+              >
+                <Icons.Copy size={14} className="text-emerald-400" />
+                <span>Duplikasi Dokumen</span>
+              </button>
+
+              {/* Download / Export */}
+              <button
+                type="button"
+                onClick={() => {
+                  handleExportDocumentFor(sidebarContextMenu.targetDoc!);
+                  setSidebarContextMenu(null);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-slate-800 text-slate-200 transition-colors cursor-pointer"
+              >
+                <Icons.Download size={14} className="text-purple-400" />
+                <span>Unduh Dokumen (HTML)</span>
+              </button>
+
+              <div className="my-1 border-t border-slate-800" />
+
+              {/* Delete Document */}
+              <button
+                type="button"
+                onClick={() => {
+                  const targetId = sidebarContextMenu.targetDoc!.id;
+                  onDeleteDocument(targetId);
+                  if (activeDocId === targetId) {
+                    const remaining = documents.filter((d) => d.id !== targetId);
+                    setActiveDocId(remaining.length > 0 ? remaining[0].id : null);
+                  }
+                  setSidebarContextMenu(null);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-rose-500/10 text-rose-400 transition-colors cursor-pointer font-medium"
+              >
+                <Icons.Trash2 size={14} />
+                <span>Hapus Dokumen</span>
+              </button>
+            </div>
+          ) : (
+            /* Context Menu for Empty Sidebar Area */
+            <div className="p-1 space-y-0.5">
+              {/* Create New Document */}
+              <button
+                type="button"
+                onClick={() => {
+                  handleCreateDocument();
+                  setSidebarContextMenu(null);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-blue-600/20 text-blue-300 font-medium transition-colors cursor-pointer"
+              >
+                <Icons.Plus size={14} className="text-blue-400" />
+                <span>+ Buat Dokumen Baru</span>
+              </button>
+
+              <div className="my-1 border-t border-slate-800" />
+
+              <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Urutkan Dokumen
+              </div>
+
+              {/* Sort by Updated Date */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSortBy('updated');
+                  setSidebarContextMenu(null);
+                }}
+                className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                  sortBy === 'updated' ? 'bg-slate-800 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'
+                }`}
+              >
+                <span>Terakhir Diubah</span>
+                {sortBy === 'updated' && <Icons.Check size={13} className="text-blue-400" />}
+              </button>
+
+              {/* Sort by Title */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSortBy('title');
+                  setSidebarContextMenu(null);
+                }}
+                className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                  sortBy === 'title' ? 'bg-slate-800 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'
+                }`}
+              >
+                <span>Judul (A-Z)</span>
+                {sortBy === 'title' && <Icons.Check size={13} className="text-blue-400" />}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
