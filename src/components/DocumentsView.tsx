@@ -1445,12 +1445,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     handleSelectDoc(newDoc.id);
   };
 
-  const canvasContainerWidthClass =
-    showOutline && showRefDrawer
-      ? 'max-w-2xl xl:max-w-3xl'
-      : showOutline || showRefDrawer
-      ? 'max-w-3xl xl:max-w-4xl'
-      : 'max-w-4xl lg:max-w-5xl';
+  const canvasContainerWidthClass = 'max-w-4xl lg:max-w-5xl';
 
   return (
     <div className="flex-1 flex app-bg-main overflow-hidden app-text-main h-full font-sans select-none relative">
@@ -1632,11 +1627,9 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         {activeDoc ? (
           <>
             {/* Top Control Bar */}
-            <div className="px-6 py-3 flex items-center justify-between text-xs text-white bg-[#1e1e1e] border-b border-[#383838] shrink-0">
+            <div className={`px-6 py-3 flex items-center justify-between text-xs text-white bg-[#1e1e1e] border-b border-[#383838] shrink-0 ${!isSidebarOpen ? 'pl-14' : ''}`}>
               <div className="flex items-center gap-3">
-                <span className="text-xs font-extrabold text-white truncate max-w-md">
-                  📄 {activeDoc.title || 'Dokumen Tanpa Judul'}
-                </span>
+                {/* Title removed per user request (larger title exists in document body below) */}
               </div>
 
               {/* Action Buttons */}
@@ -1668,7 +1661,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-[#0d99ff] hover:bg-[#0b85de] transition-colors flex items-center gap-1.5 cursor-pointer shadow-md"
                   >
                     <Icons.Edit3 size={14} />
-                    <span>Mode Edit</span>
+                    <span>Edit</span>
                   </button>
                 ) : (
                   <div className="flex items-center gap-1.5">
@@ -1678,7 +1671,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                       className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors flex items-center gap-1.5 cursor-pointer shadow-md"
                     >
                       <Icons.Save size={14} />
-                      <span>Simpan Naskah</span>
+                      <span>Simpan</span>
                     </button>
                     <button
                       type="button"
@@ -1936,58 +1929,62 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               onMouseOver={handleBadgeMouseOver}
               onMouseOut={handleBadgeMouseOut}
             >
-              {/* Table of Contents / Outline Panel */}
-              {showOutline && (
-                <div className="w-64 border-r border-slate-800/40 app-bg-secondary p-4 flex flex-col shrink-0 space-y-3 animate-in slide-in-from-left duration-150 select-none">
-                  <div className="flex items-center justify-between border-b border-slate-800/40 pb-2.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300 uppercase tracking-wider">
-                      <Icons.ListTree size={14} className="text-amber-400" />
-                      <span>Outline ({outlineItems.length})</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowOutline(false)}
-                      className="text-slate-500 hover:text-white cursor-pointer"
-                    >
-                      <Icons.X size={14} />
-                    </button>
+              {/* Table of Contents / Outline Panel with Smooth Slide Animation */}
+              <div
+                style={{ width: showOutline ? '256px' : '0px' }}
+                className={`h-full border-r border-[#383838] bg-[#1e1e1e] flex flex-col shrink-0 transition-all duration-200 ease-in-out relative z-10 overflow-hidden select-none ${
+                  !showOutline ? 'border-none p-0' : 'p-4 space-y-3'
+                }`}
+              >
+                <div className="flex items-center justify-between border-b border-[#383838] pb-2.5 shrink-0">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    <Icons.ListTree size={14} className="text-amber-400" />
+                    <span>Outline ({outlineItems.length})</span>
                   </div>
-
-                  {outlineItems.length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-8 italic">
-                      Belum ada judul (H1, H2, H3) dalam dokumen ini.
-                    </p>
-                  ) : (
-                    <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                      {outlineItems.map((item, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => scrollToHeading(idx)}
-                          className={`w-full text-left py-1.5 px-2 rounded-lg text-xs hover:bg-slate-800/70 transition-colors truncate cursor-pointer text-slate-300 hover:text-white flex items-center gap-1.5 ${
-                            item.level === 1
-                              ? 'font-bold text-slate-100'
-                              : item.level === 2
-                              ? 'pl-4 font-semibold text-slate-300'
-                              : 'pl-7 text-slate-400'
-                          }`}
-                        >
-                          <span className="text-[10px] font-mono font-bold text-amber-400/80 shrink-0">
-                            H{item.level}
-                          </span>
-                          <span className="truncate">{item.text}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowOutline(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
+                    title="Tutup Outline"
+                  >
+                    <Icons.X size={14} />
+                  </button>
                 </div>
-              )}
+
+                {outlineItems.length === 0 ? (
+                  <p className="text-xs text-slate-500 text-center py-8 italic">
+                    Belum ada judul (H1, H2, H3) dalam dokumen ini.
+                  </p>
+                ) : (
+                  <div className="flex-1 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                    {outlineItems.map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => scrollToHeading(idx)}
+                        className={`w-full text-left py-1.5 px-2 rounded-lg text-xs hover:bg-[#2c2c2c] transition-colors truncate cursor-pointer text-slate-300 hover:text-white flex items-center gap-1.5 ${
+                          item.level === 1
+                            ? 'font-bold text-slate-100'
+                            : item.level === 2
+                            ? 'pl-4 font-semibold text-slate-300'
+                            : 'pl-7 text-slate-400'
+                        }`}
+                      >
+                        <span className="text-[10px] font-mono font-bold text-amber-400/80 shrink-0">
+                          H{item.level}
+                        </span>
+                        <span className="truncate">{item.text}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {mode === 'viewing' ? (
                 /* VIEWING MODE: Figma Dark Sheet Document */
-                <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-8 flex justify-center items-start bg-[#2c2c2c] min-w-0 custom-scrollbar">
-                  <div className={`w-full ${canvasContainerWidthClass} bg-[#1e1e1e] border border-[#383838] rounded-2xl p-6 sm:p-10 shadow-2xl flex flex-col space-y-6 transition-all duration-200 min-w-0 my-2 h-fit flow-root overflow-visible`}>
-                    <div className="border-b border-[#383838] pb-5 space-y-2">
+                <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 flex justify-center items-start bg-[#2c2c2c] min-w-0 custom-scrollbar transition-all duration-200">
+                  <div className={`w-full ${canvasContainerWidthClass} bg-[#1e1e1e] border border-[#383838] rounded-2xl p-5 sm:p-8 shadow-2xl flex flex-col space-y-5 transition-all duration-200 min-w-0 my-1 h-fit flow-root overflow-visible`}>
+                    <div className="border-b border-[#383838] pb-4 space-y-1.5">
                       <h1 className="text-3xl font-extrabold tracking-tight text-white break-words [overflow-wrap:anywhere]">
                         {activeDoc.title || 'Dokumen Tanpa Judul'}
                       </h1>
@@ -2062,8 +2059,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 </div>
               ) : (
                 /* EDITING MODE: Interactive Google Docs Style ContentEditable Canvas */
-                <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-8 flex justify-center items-start bg-[#2c2c2c] min-w-0 custom-scrollbar">
-                  <div className={`w-full ${canvasContainerWidthClass} bg-[#1e1e1e] border border-[#383838] rounded-2xl p-6 sm:p-10 shadow-2xl flex flex-col space-y-6 relative transition-all duration-200 min-w-0 my-2 h-fit flow-root overflow-visible`}>
+                <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 flex justify-center items-start bg-[#2c2c2c] min-w-0 custom-scrollbar transition-all duration-200">
+                  <div className={`w-full ${canvasContainerWidthClass} bg-[#1e1e1e] border border-[#383838] rounded-2xl p-5 sm:p-8 shadow-2xl flex flex-col space-y-5 relative transition-all duration-200 min-w-0 my-1 h-fit flow-root overflow-visible`}>
                     {/* Clean Title Input & Subtitle Info */}
                     <div className="space-y-2 border-b border-[#383838] pb-4">
                       <input
