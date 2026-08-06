@@ -1279,22 +1279,20 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         className="hidden"
       />
 
-      {/* Figma-style Sleek Floating Sidebar Toggle Button (When sidebar is hidden) */}
-      <button
-        type="button"
-        onClick={() => setIsSidebarOpen(true)}
-        className={`absolute top-3 left-3 z-40 p-2 rounded-xl app-bg-secondary border app-border text-slate-300 hover:text-white hover:app-bg-hover shadow-xl cursor-pointer flex items-center justify-center transition-all duration-300 ease-out ${
-          isSidebarOpen
-            ? '-translate-x-12 opacity-0 pointer-events-none delay-0'
-            : 'translate-x-0 opacity-100 pointer-events-auto delay-150 hover:scale-105'
-        }`}
-        title="Tampilkan Sidebar (Ctrl + \)"
-      >
-        <Icons.PanelLeftOpen size={18} className="app-accent-text" />
-      </button>
+      {/* Sidebar Toggle Floating Button when Closed */}
+      {!isSidebarOpen && (
+        <button
+          type="button"
+          onClick={() => setIsSidebarOpen(true)}
+          className="fixed top-14 left-3 z-30 p-2 rounded-xl bg-[#1e1e1e] border border-[#383838] text-slate-300 hover:text-white shadow-xl hover:scale-105 transition-all cursor-pointer"
+          title="Buka Sidebar Dokumen"
+        >
+          <Icons.PanelLeftOpen size={16} />
+        </button>
+      )}
 
       {/* ========================================================= */}
-      {/* MINIMALIST LEFT SIDEBAR */}
+      {/* FIGMA-STYLE DARK LEFT SIDEBAR FOR DOCUMENTS */}
       {/* ========================================================= */}
       <aside
         onContextMenu={(e) => {
@@ -1307,126 +1305,136 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
             y: Math.min(window.innerHeight - 200, e.clientY),
           });
         }}
-        className={`sidebar-panel-transition w-72 border-r app-border/40 app-bg-secondary flex flex-col shrink-0 z-30 transition-all duration-300 ease-out ${
-          isSidebarOpen
-            ? 'translate-x-0 ml-0 opacity-100'
-            : '-ml-72 opacity-0 pointer-events-none'
+        style={{ width: isSidebarOpen ? '280px' : '0px' }}
+        className={`h-full bg-[#1e1e1e] border-r border-[#383838] flex flex-col shrink-0 z-20 transition-all duration-200 ease-in-out relative select-none overflow-hidden ${
+          !isSidebarOpen ? 'border-none' : ''
         }`}
       >
         {/* Header & Hide Sidebar Toggle Button */}
-        <div className="px-5 pt-4 pb-3 flex items-center justify-between">
+        <div className="p-3.5 border-b border-[#383838] flex items-center justify-between bg-[#1e1e1e] shrink-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">Dokumen</h2>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded app-bg-main text-slate-400 border border-slate-800">
+            <Icons.FileText size={16} className="text-[#0d99ff]" />
+            <span className="text-xs font-bold text-white tracking-tight">Naskah Dokumen</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-[#2c2c2c] text-slate-400 border border-[#383838]">
               {filteredDocs.length}
             </span>
           </div>
           <button
             type="button"
             onClick={() => setIsSidebarOpen(false)}
-            className="p-1.5 rounded-lg hover:app-bg-hover text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center justify-center"
-            title="Sembunyikan Sidebar (Ctrl + \)"
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
+            title="Tutup Sidebar"
           >
-            <Icons.PanelLeftClose size={18} className="app-accent-text" />
+            <Icons.PanelLeftClose size={15} />
           </button>
         </div>
 
-        {/* Search Bar & Add Document Button Aligned Side-by-Side */}
-        <div className="px-4 mb-4 flex items-center gap-2">
-          <div className="relative flex-1">
-            <Icons.Search size={13} className="absolute left-2.5 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Cari dokumen..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg app-bg-main/80 border border-slate-700/60 app-text-main placeholder:text-slate-400 focus:outline-none focus:border-slate-500 transition-colors"
-            />
-          </div>
+        {/* Primary Create Button & Search Input */}
+        <div className="p-3 border-b border-[#383838] bg-[#1e1e1e] space-y-2.5 shrink-0">
           <button
             type="button"
             onClick={handleCreateDocument}
-            className="p-1.5 rounded-lg app-bg-main/80 border border-slate-700/60 text-slate-300 hover:text-white hover:app-bg-hover transition-colors cursor-pointer shrink-0 flex items-center justify-center"
-            title="Buat Dokumen Baru"
+            className="w-full py-2 px-3 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
           >
-            <Icons.Plus size={16} />
+            <Icons.Plus size={15} strokeWidth={2.5} />
+            <span>Buat Dokumen Baru</span>
           </button>
-        </div>
 
-          {/* Clean Document List */}
-          <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-0.5">
-            {filteredDocs.length === 0 ? (
-              <div className="text-center py-10 text-slate-400 space-y-2 text-xs">
-                <p>Belum ada dokumen.</p>
-                <button
-                  type="button"
-                  onClick={handleCreateDocument}
-                  className="text-blue-400 hover:underline font-semibold"
-                >
-                  + Tulis Sekarang
-                </button>
-              </div>
-            ) : (
-              filteredDocs.map((doc) => {
-                const isActive = doc.id === activeDocId;
-                const textSnippet = (doc.content || '').replace(/<[^>]*>/g, '').trim();
-                const words = textSnippet.split(/\s+/).filter(Boolean).length;
-                return (
-                  <button
-                    key={doc.id}
-                    type="button"
-                    onClick={() => handleSelectDoc(doc.id)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setImageContextMenu(null);
-                      setEditorContextMenu(null);
-                      setSidebarContextMenu({
-                        x: Math.min(window.innerWidth - 230, e.clientX),
-                        y: Math.min(window.innerHeight - 260, e.clientY),
-                        targetDoc: doc,
-                      });
-                    }}
-                    className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between group cursor-pointer relative overflow-hidden ${
-                      isActive
-                        ? 'bg-blue-500/10 border border-blue-500/30 text-white shadow-xs'
-                        : 'border border-transparent text-slate-300 hover:text-white hover:bg-slate-800/50'
-                    }`}
-                  >
-                    {isActive && (
-                      <div className="absolute left-0 top-2 bottom-2 w-1 bg-blue-500 rounded-r-full" />
-                    )}
-                    <div className="truncate pr-2 pl-1">
-                      <div className={`text-xs font-semibold truncate ${isActive ? 'text-blue-200' : 'text-slate-200 group-hover:text-white'}`}>
-                        {doc.title || 'Dokumen Tanpa Judul'}
-                      </div>
-                      <div className={`text-[10px] font-mono mt-0.5 ${isActive ? 'text-blue-300/70' : 'text-slate-400'}`}>
-                        {words} kata
-                      </div>
-                    </div>
-                    {isActive ? (
-                      <Icons.FileText size={14} className="text-blue-400 shrink-0" />
-                    ) : (
-                      <Icons.ChevronRight size={13} className="text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                    )}
-                  </button>
-                );
-              })
+          <div className="relative">
+            <Icons.Search size={13} className="absolute left-2.5 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari naskah / dokumen..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl bg-[#2c2c2c] border border-[#383838] text-white placeholder:text-slate-500 focus:outline-none focus:border-[#0d99ff] transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-2 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <Icons.X size={12} />
+              </button>
             )}
           </div>
+        </div>
+
+        {/* Clean Document List Grid */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar">
+          {filteredDocs.length === 0 ? (
+            <div className="text-center py-10 text-slate-400 space-y-2 text-xs">
+              <p>Belum ada dokumen naskah.</p>
+              <button
+                type="button"
+                onClick={handleCreateDocument}
+                className="text-[#0d99ff] hover:underline font-semibold"
+              >
+                + Tulis Naskah Baru
+              </button>
+            </div>
+          ) : (
+            filteredDocs.map((doc) => {
+              const isActive = doc.id === activeDocId;
+              const textSnippet = (doc.content || '').replace(/<[^>]*>/g, '').trim();
+              const words = textSnippet.split(/\s+/).filter(Boolean).length;
+              return (
+                <button
+                  key={doc.id}
+                  type="button"
+                  onClick={() => handleSelectDoc(doc.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setImageContextMenu(null);
+                    setEditorContextMenu(null);
+                    setSidebarContextMenu({
+                      x: Math.min(window.innerWidth - 230, e.clientX),
+                      y: Math.min(window.innerHeight - 260, e.clientY),
+                      targetDoc: doc,
+                    });
+                  }}
+                  className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between group cursor-pointer relative ${
+                    isActive
+                      ? 'bg-[#2c2c2c] border border-[#0d99ff] text-white ring-1 ring-[#0d99ff]/30 shadow-lg'
+                      : 'bg-[#1e1e1e] border border-[#383838] text-slate-300 hover:text-white hover:bg-[#2c2c2c]/60'
+                  }`}
+                >
+                  {isActive && (
+                    <div className="absolute left-0 top-2 bottom-2 w-1 bg-[#0d99ff] rounded-r-full" />
+                  )}
+                  <div className="truncate pr-2 pl-1">
+                    <div className={`text-xs font-bold truncate ${isActive ? 'text-[#0d99ff]' : 'text-white group-hover:text-[#0d99ff] transition-colors'}`}>
+                      {doc.title || 'Dokumen Tanpa Judul'}
+                    </div>
+                    <div className="text-[10px] font-mono mt-1 text-slate-400 flex items-center gap-2">
+                      <span>{words} kata</span>
+                    </div>
+                  </div>
+                  {isActive ? (
+                    <Icons.FileText size={15} className="text-[#0d99ff] shrink-0" />
+                  ) : (
+                    <Icons.ChevronRight size={14} className="text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
       </aside>
 
       {/* ========================================================= */}
-      {/* GOOGLE DOCS STYLE LIVE RICH EDITOR WORKSPACE */}
+      {/* FIGMA-STYLE RICH EDITOR WORKSPACE CONTAINER */}
       {/* ========================================================= */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
+      <div className="flex-1 flex flex-col overflow-hidden relative bg-[#2c2c2c]">
         {activeDoc ? (
           <>
             {/* Top Control Bar */}
-            <div className="px-8 py-3 flex items-center justify-between text-xs text-slate-300 border-b border-slate-800/40 shrink-0">
+            <div className="px-6 py-3 flex items-center justify-between text-xs text-white bg-[#1e1e1e] border-b border-[#383838] shrink-0">
               <div className="flex items-center gap-3">
-                <span className={`text-xs font-semibold text-slate-400 truncate transition-all ${!isSidebarOpen ? 'ml-9' : ''}`}>
-                  {activeDoc.title || 'Dokumen Tanpa Judul'}
+                <span className="text-xs font-extrabold text-white truncate max-w-md">
+                  📄 {activeDoc.title || 'Dokumen Tanpa Judul'}
                 </span>
               </div>
 
@@ -1435,17 +1443,17 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowOutline(!showOutline)}
-                  className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
                     showOutline
-                      ? 'bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/40'
-                      : 'text-slate-300 hover:text-white'
+                      ? 'bg-[#0d99ff]/15 text-[#0d99ff] font-bold border border-[#0d99ff]/40'
+                      : 'bg-[#2c2c2c] text-slate-300 hover:text-white border border-[#383838]'
                   }`}
                   title="Daftar Isi / Outline Naskah"
                 >
                   <Icons.ListTree size={14} />
                   <span>Outline</span>
                   {outlineItems.length > 0 && (
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300">
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[#0d99ff] text-white font-bold">
                       {outlineItems.length}
                     </span>
                   )}
@@ -1456,25 +1464,25 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setMode('editing')}
-                    className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800/70 hover:bg-slate-700/70 border border-slate-700/60 transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-[#0d99ff] hover:bg-[#0b85de] transition-colors flex items-center gap-1.5 cursor-pointer shadow-md"
                   >
                     <Icons.Edit3 size={14} />
-                    <span>Edit</span>
+                    <span>Mode Edit</span>
                   </button>
                 ) : (
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={handleSaveDocument}
-                      className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800/70 hover:bg-slate-700/70 border border-slate-700/60 transition-colors flex items-center gap-1.5 cursor-pointer"
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors flex items-center gap-1.5 cursor-pointer shadow-md"
                     >
                       <Icons.Save size={14} />
-                      <span>Simpan</span>
+                      <span>Simpan Naskah</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setMode('viewing')}
-                      className="px-2.5 py-1 rounded-lg text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl text-xs text-slate-300 hover:text-white bg-[#2c2c2c] border border-[#383838] transition-colors cursor-pointer"
                     >
                       Batal
                     </button>
@@ -1486,23 +1494,23 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowMoreMenu(!showMoreMenu)}
-                    className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/40 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-xl text-slate-300 hover:text-white bg-[#2c2c2c] border border-[#383838] transition-colors cursor-pointer"
                   >
-                    <Icons.MoreHorizontal size={14} />
+                    <Icons.MoreHorizontal size={15} />
                   </button>
 
                   {showMoreMenu && (
-                    <div className="absolute right-0 mt-2 w-44 app-bg-secondary border border-slate-700/60 rounded-xl shadow-2xl py-1 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute right-0 mt-2 w-48 bg-[#1e1e1e] border border-[#383838] rounded-2xl shadow-2xl py-1.5 z-50 text-xs text-white animate-in fade-in zoom-in-95 duration-100">
                       <button
                         type="button"
                         onClick={() => {
                           if (activeDoc) handleExportDocumentFor(activeDoc);
                           setShowMoreMenu(false);
                         }}
-                        className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 text-slate-200 hover:text-white cursor-pointer"
+                        className="w-full px-3 py-2 text-left hover:bg-[#2c2c2c] flex items-center gap-2 text-slate-200 hover:text-white cursor-pointer font-medium"
                       >
-                        <Icons.Download size={14} />
-                        <span>Unduh Dokumen</span>
+                        <Icons.Download size={14} className="text-[#0d99ff]" />
+                        <span>Unduh Dokumen (HTML)</span>
                       </button>
                       <button
                         type="button"
@@ -1511,7 +1519,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                           setActiveDocId(documents.find((d) => d.id !== activeDoc.id)?.id || null);
                           setShowMoreMenu(false);
                         }}
-                        className="w-full px-3 py-2 text-left hover:bg-rose-500/10 text-rose-400 flex items-center gap-2 cursor-pointer"
+                        className="w-full px-3 py-2 text-left hover:bg-rose-500/10 text-rose-400 flex items-center gap-2 cursor-pointer font-medium"
                       >
                         <Icons.Trash2 size={14} />
                         <span>Hapus Dokumen</span>
@@ -1522,15 +1530,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               </div>
             </div>
 
-            {/* Google Docs Style Rich WYSIWYG Format Toolbar with Undo & Redo */}
+            {/* FIGMA WYSIWYG TOOLBAR STRIP */}
             {mode === 'editing' && (
-              <div className="relative z-40 px-6 py-2 app-bg-secondary/90 border-b border-slate-800/40 backdrop-blur-md flex items-center gap-1.5 text-xs text-slate-300 shrink-0 select-none">
+              <div className="relative z-40 px-6 py-2 bg-[#1e1e1e] border-b border-[#383838] flex items-center gap-1.5 text-xs text-slate-300 shrink-0 select-none overflow-x-auto custom-scrollbar">
                 {/* Undo & Redo Buttons */}
                 <div className="flex items-center gap-0.5">
                   <button
                     type="button"
                     onClick={() => execCmd('undo')}
-                    className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg hover:bg-[#383838] text-slate-300 transition-colors cursor-pointer"
                     title="Batal / Undo (Ctrl + Z)"
                   >
                     <Icons.Undo2 size={14} />
@@ -1539,22 +1547,22 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => execCmd('redo')}
-                    className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg hover:bg-[#383838] text-slate-300 transition-colors cursor-pointer"
                     title="Ulangi / Redo (Ctrl + Y)"
                   >
                     <Icons.Redo2 size={14} />
                   </button>
                 </div>
 
-                <div className="h-4 w-px bg-slate-800 mx-1" />
+                <div className="h-4 w-px bg-[#383838] mx-1" />
 
-                {/* Header Style Direct Action Buttons (H1, H2, H3, P) without container */}
-                <div className="flex items-center gap-0.5 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+                {/* Heading Action Buttons */}
+                <div className="flex items-center gap-0.5 bg-[#2c2c2c] border border-[#383838] rounded-xl p-0.5">
                   <button
                     type="button"
                     onClick={() => toggleHeader('h1')}
-                    className={`px-2 py-1 rounded text-xs font-extrabold transition-all cursor-pointer ${
-                      activeFormats.h1 ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    className={`px-2 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                      activeFormats.h1 ? 'bg-[#0d99ff] text-white shadow-xs' : 'hover:bg-[#383838] text-slate-300'
                     }`}
                     title="Judul Utama (H1)"
                   >
@@ -1564,8 +1572,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => toggleHeader('h2')}
-                    className={`px-2 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                      activeFormats.h2 ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      activeFormats.h2 ? 'bg-[#0d99ff] text-white shadow-xs' : 'hover:bg-[#383838] text-slate-300'
                     }`}
                     title="Sub Judul (H2)"
                   >
@@ -1575,8 +1583,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => toggleHeader('h3')}
-                    className={`px-2 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
-                      activeFormats.h3 ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      activeFormats.h3 ? 'bg-[#0d99ff] text-white shadow-xs' : 'hover:bg-[#383838] text-slate-300'
                     }`}
                     title="Bagian (H3)"
                   >
@@ -1586,14 +1594,14 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => toggleHeader('p')}
-                    className="px-2 py-1 rounded text-xs font-medium hover:bg-slate-800 text-slate-400 transition-colors cursor-pointer"
+                    className="px-2 py-1 rounded-lg text-xs font-medium hover:bg-[#383838] text-slate-400 transition-colors cursor-pointer"
                     title="Paragraf Normal"
                   >
                     P
                   </button>
                 </div>
 
-                <div className="h-4 w-px bg-slate-800 mx-1" />
+                <div className="h-4 w-px bg-[#383838] mx-1" />
 
                 {/* Font Size Dropdown Control */}
                 <select
@@ -1602,7 +1610,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     if (found) handleFontSizeChange(found);
                     e.target.value = '';
                   }}
-                  className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 font-semibold focus:outline-none cursor-pointer"
+                  className="px-2.5 py-1 rounded-xl bg-[#2c2c2c] border border-[#383838] text-xs text-white font-semibold focus:outline-none cursor-pointer"
                 >
                   <option value="">Ukuran Font...</option>
                   {FONT_SIZES.map((f) => (
@@ -1612,14 +1620,14 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   ))}
                 </select>
 
-                <div className="h-4 w-px bg-slate-800 mx-1" />
+                <div className="h-4 w-px bg-[#383838] mx-1" />
 
-                {/* Text Formatting Controls with Live Active Indicators */}
+                {/* Text Formatting Controls */}
                 <button
                   type="button"
                   onClick={() => execCmd('bold')}
                   className={`p-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                    activeFormats.bold ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    activeFormats.bold ? 'bg-[#0d99ff] text-white shadow-xs' : 'hover:bg-[#383838] text-slate-300'
                   }`}
                   title="Cetak Tebal (Ctrl + B)"
                 >
@@ -1630,7 +1638,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   type="button"
                   onClick={() => execCmd('italic')}
                   className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    activeFormats.italic ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    activeFormats.italic ? 'bg-[#0d99ff] text-white shadow-xs' : 'hover:bg-[#383838] text-slate-300'
                   }`}
                   title="Cetak Miring (Ctrl + I)"
                 >
@@ -1641,32 +1649,21 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   type="button"
                   onClick={() => execCmd('underline')}
                   className={`p-1.5 rounded-lg underline transition-all cursor-pointer ${
-                    activeFormats.underline ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    activeFormats.underline ? 'bg-[#0d99ff] text-white shadow-xs' : 'hover:bg-[#383838] text-slate-300'
                   }`}
                   title="Garis Bawah (Ctrl + U)"
                 >
                   <Icons.Underline size={14} />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => execCmd('strikeThrough')}
-                  className={`p-1.5 rounded-lg line-through transition-all cursor-pointer ${
-                    activeFormats.strikethrough ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
-                  }`}
-                  title="Coret (Strikethrough)"
-                >
-                  <Icons.Strikethrough size={14} />
-                </button>
+                <div className="h-4 w-px bg-[#383838] mx-1" />
 
-                <div className="h-4 w-px bg-slate-800 mx-1" />
-
-                {/* Alignment Controls (Justify, Left, Center, Right) */}
+                {/* Alignment */}
                 <button
                   type="button"
                   onClick={() => execCmd('justifyLeft')}
                   className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    activeFormats.alignLeft ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    activeFormats.alignLeft ? 'bg-[#0d99ff] text-white shadow-xs' : 'hover:bg-[#383838] text-slate-300'
                   }`}
                   title="Rata Kiri"
                 >
@@ -1677,7 +1674,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   type="button"
                   onClick={() => execCmd('justifyCenter')}
                   className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    activeFormats.alignCenter ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    activeFormats.alignCenter ? 'bg-[#0d99ff] text-white shadow-xs' : 'hover:bg-[#383838] text-slate-300'
                   }`}
                   title="Rata Tengah"
                 >
@@ -1688,32 +1685,21 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   type="button"
                   onClick={() => execCmd('justifyRight')}
                   className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    activeFormats.alignRight ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    activeFormats.alignRight ? 'bg-[#0d99ff] text-white shadow-xs' : 'hover:bg-[#383838] text-slate-300'
                   }`}
                   title="Rata Kanan"
                 >
                   <Icons.AlignRight size={14} />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => execCmd('justifyFull')}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    activeFormats.alignJustify ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
-                  }`}
-                  title="Rata Kanan-Kiri (Justify)"
-                >
-                  <Icons.AlignJustify size={14} />
-                </button>
+                <div className="h-4 w-px bg-[#383838] mx-1" />
 
-                <div className="h-4 w-px bg-slate-800 mx-1" />
-
-                {/* Lists & Indentation */}
+                {/* Lists & Insert Image */}
                 <button
                   type="button"
                   onClick={() => execCmd('insertUnorderedList')}
                   className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    activeFormats.bulletList ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    activeFormats.bulletList ? 'bg-[#0d99ff] text-white shadow-xs' : 'hover:bg-[#383838] text-slate-300'
                   }`}
                   title="Daftar Poin (Bullet List)"
                 >
@@ -1724,7 +1710,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   type="button"
                   onClick={() => execCmd('insertOrderedList')}
                   className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    activeFormats.numberedList ? 'bg-blue-600 text-white shadow-xs' : 'hover:bg-slate-800 text-slate-300'
+                    activeFormats.numberedList ? 'bg-[#0d99ff] text-white shadow-xs' : 'hover:bg-[#383838] text-slate-300'
                   }`}
                   title="Daftar Angka (Numbered List)"
                 >
@@ -1733,30 +1719,9 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => execCmd('indent')}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
-                  title="Tambah Indentasi (Tab)"
-                >
-                  <Icons.Indent size={14} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => execCmd('outdent')}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
-                  title="Kurangi Indentasi (Shift + Tab / Backspace)"
-                >
-                  <Icons.Outdent size={14} />
-                </button>
-
-                <div className="h-4 w-px bg-slate-800 mx-1" />
-
-                {/* Insert Image Button */}
-                <button
-                  type="button"
                   onClick={() => imageInputRef.current?.click()}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 text-blue-400 transition-colors cursor-pointer flex items-center gap-1 font-medium"
-                  title="Tambah Gambar Fisik ke Dokumen"
+                  className="p-1.5 rounded-xl hover:bg-[#383838] text-[#0d99ff] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                  title="Tambah Gambar Ke Naskah"
                 >
                   <Icons.Image size={14} />
                   <span>Gambar</span>
@@ -1818,11 +1783,11 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               )}
 
               {mode === 'viewing' ? (
-                /* VIEWING MODE: Clean Rendered Document */
-                <div className="flex-1 overflow-y-auto px-6 md:px-12 py-10 flex justify-center app-bg-main min-w-0">
-                  <div className={`w-full ${canvasContainerWidthClass} flex flex-col space-y-6 transition-all duration-200 min-w-0`}>
-                    <div className="border-b border-slate-800/80 pb-4 space-y-2">
-                      <h1 className="text-3xl font-extrabold tracking-tight app-text-main break-words [overflow-wrap:anywhere]">
+                /* VIEWING MODE: Figma Dark Sheet Document */
+                <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-8 flex justify-center items-start bg-[#2c2c2c] min-w-0 custom-scrollbar">
+                  <div className={`w-full ${canvasContainerWidthClass} bg-[#1e1e1e] border border-[#383838] rounded-2xl p-6 sm:p-10 shadow-2xl flex flex-col space-y-6 transition-all duration-200 min-w-0 my-2 h-fit flow-root overflow-visible`}>
+                    <div className="border-b border-[#383838] pb-5 space-y-2">
+                      <h1 className="text-3xl font-extrabold tracking-tight text-white break-words [overflow-wrap:anywhere]">
                         {activeDoc.title || 'Dokumen Tanpa Judul'}
                       </h1>
                       <p className="text-xs text-slate-400 font-mono flex items-center gap-2">
@@ -1844,14 +1809,14 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     {/* Live Rendered Content */}
                     <div
                       id="doc-view-rendered-content"
-                      className="prose max-w-none text-base leading-relaxed app-text-main space-y-4 font-sans break-words [overflow-wrap:anywhere] min-w-0 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:app-text-main [&_h2]:app-text-main [&_h3]:app-text-main [&_strong]:app-text-main [&_p]:leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: activeDoc.content || '<p class="text-slate-400 italic">Dokumen kosong...</p>' }}
+                      className="prose max-w-none text-base leading-relaxed text-slate-200 space-y-4 font-sans break-words [overflow-wrap:anywhere] min-w-0 flow-root after:content-[''] after:block after:clear-both [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:text-white [&_h2]:text-white [&_h3]:text-white [&_strong]:text-white [&_p]:leading-relaxed [&_img]:max-w-full [&_img]:h-auto [&_.doc-img-wrapper]:max-w-full [&_.doc-img-wrapper]:flow-root"
+                      dangerouslySetInnerHTML={{ __html: activeDoc.content || '<p class="text-slate-500 italic">Dokumen naskah ini masih kosong...</p>' }}
                       onClick={handleDocumentClick}
                     />
 
                     {/* Backlinks Section (Cards Mentioned in Document) */}
                     {mentionedCards.length > 0 && (
-                      <div className="pt-8 mt-6 border-t border-slate-800/80 space-y-4">
+                      <div className="pt-8 mt-6 border-t border-slate-800/80 space-y-4 clear-both">
                         <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
                           <Icons.Link size={14} className="text-blue-400" />
                           <span>Kartu Terhubung dalam Dokumen ({mentionedCards.length})</span>
@@ -1896,16 +1861,16 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 </div>
               ) : (
                 /* EDITING MODE: Interactive Google Docs Style ContentEditable Canvas */
-                <div className="flex-1 overflow-y-auto px-6 md:px-12 py-10 flex justify-center min-w-0">
-                  <div className={`w-full ${canvasContainerWidthClass} flex flex-col space-y-6 relative transition-all duration-200 min-w-0`}>
+                <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-8 flex justify-center items-start bg-[#2c2c2c] min-w-0 custom-scrollbar">
+                  <div className={`w-full ${canvasContainerWidthClass} bg-[#1e1e1e] border border-[#383838] rounded-2xl p-6 sm:p-10 shadow-2xl flex flex-col space-y-6 relative transition-all duration-200 min-w-0 my-2 h-fit flow-root overflow-visible`}>
                     {/* Clean Title Input & Subtitle Info */}
-                    <div className="space-y-2 border-b border-slate-800/80 pb-4">
+                    <div className="space-y-2 border-b border-[#383838] pb-4">
                       <input
                         type="text"
                         value={draftTitle}
                         onChange={(e) => setDraftTitle(e.target.value)}
                         placeholder="Judul naskah..."
-                        className="w-full text-3xl font-extrabold tracking-tight app-text-main bg-transparent border-0 focus:outline-none placeholder:text-slate-500 break-words [overflow-wrap:anywhere]"
+                        className="w-full text-3xl font-extrabold tracking-tight text-white bg-transparent border-0 focus:outline-none placeholder:text-slate-600 break-words [overflow-wrap:anywhere]"
                       />
                       <p className="text-xs text-slate-400 font-mono flex items-center gap-2">
                         <span>
@@ -1924,7 +1889,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     </div>
 
                     {/* Live ContentEditable Canvas (Google Docs Style WYSIWYG) */}
-                    <div className="relative flex-1 flex flex-col min-w-0">
+                    <div className="relative flex-1 flex flex-col min-w-0 flow-root after:content-[''] after:block after:clear-both">
                       <div
                         id="doc-editor-textarea"
                         ref={editorRef}
@@ -1936,7 +1901,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                           handleDocumentClick(e);
                         }}
                         onContextMenu={handleContextMenuDetect}
-                        className="w-full flex-1 bg-transparent text-base leading-relaxed app-text-main focus:outline-none resize-none font-sans space-y-3 p-1 min-h-[650px] border-0 break-words [overflow-wrap:anywhere] min-w-0 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:text-3xl [&_h1]:font-extrabold [&_h1]:my-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:my-3 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:my-2"
+                        className="w-full flex-1 bg-transparent text-base leading-relaxed text-slate-200 focus:outline-none resize-none font-sans space-y-3 p-1 min-h-[650px] border-0 break-words [overflow-wrap:anywhere] min-w-0 flow-root after:content-[''] after:block after:clear-both [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:text-3xl [&_h1]:font-extrabold [&_h1]:my-4 [&_h1]:text-white [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:my-3 [&_h2]:text-white [&_h3]:text-xl [&_h3]:font-bold [&_h3]:my-2 [&_h3]:text-white [&_img]:max-w-full [&_img]:h-auto [&_.doc-img-wrapper]:max-w-full [&_.doc-img-wrapper]:flow-root"
                       />
 
                       {/* Inline @ Mention Suggestion Overlay (Positioned precisely at text cursor) */}
