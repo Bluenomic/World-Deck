@@ -1026,125 +1026,114 @@ export const Canvas: React.FC<CanvasProps> = ({
         </div>
       )}
 
-      {/* Canvas Floating Controls */}
-      <div className="absolute bottom-5 right-5 flex items-center gap-1 app-bg-secondary p-1.5 rounded-xl border app-border shadow-2xl z-50 text-xs">
+      {/* Consolidated Figma-Style Floating Tool Capsule Bar (Bottom-Center) */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-[#2c2c2c] p-1.5 rounded-2xl border border-[#383838] shadow-2xl z-50 text-xs text-white backdrop-blur-md select-none">
+        {/* Undo & Redo */}
         {onUndo && onRedo && (
           <>
             <button
               type="button"
               onClick={onUndo}
               disabled={!canUndo}
-              className={`p-1.5 rounded-lg transition-colors ${
+              className={`p-2 rounded-xl transition-all ${
                 canUndo
-                  ? 'app-text-muted hover:app-text-main app-bg-hover cursor-pointer active:scale-95'
-                  : 'app-text-muted opacity-30 cursor-not-allowed'
+                  ? 'text-slate-300 hover:text-white hover:bg-[#383838] cursor-pointer active:scale-95'
+                  : 'text-slate-600 opacity-40 cursor-not-allowed'
               }`}
               title="Undo / Batal Perubahan (Ctrl + Z)"
             >
-              <Icons.Undo2 size={16} />
+              <Icons.Undo2 size={15} />
             </button>
             <button
               type="button"
               onClick={onRedo}
               disabled={!canRedo}
-              className={`p-1.5 rounded-lg transition-colors ${
+              className={`p-2 rounded-xl transition-all ${
                 canRedo
-                  ? 'app-text-muted hover:app-text-main app-bg-hover cursor-pointer active:scale-95'
-                  : 'app-text-muted opacity-30 cursor-not-allowed'
+                  ? 'text-slate-300 hover:text-white hover:bg-[#383838] cursor-pointer active:scale-95'
+                  : 'text-slate-600 opacity-40 cursor-not-allowed'
               }`}
               title="Redo / Ulangi Perubahan (Ctrl + Y)"
             >
-              <Icons.Redo2 size={16} />
+              <Icons.Redo2 size={15} />
             </button>
 
-            <div className="w-[1px] h-4 bg-[#444] opacity-30 my-auto mx-1" />
+            <div className="w-[1px] h-4 bg-[#383838] mx-0.5" />
           </>
         )}
 
+        {/* Pointer Select Tool */}
         <button
           type="button"
-          onClick={() => handleZoom(0.15)}
-          className="p-1.5 rounded-lg app-text-muted hover:app-text-main app-bg-hover transition-colors"
-          title="Zoom In (+)"
+          onClick={() => setIsSpacePressed(false)}
+          className={`p-2 rounded-xl transition-all cursor-pointer ${
+            !isSpacePressed && !connectingSourceId
+              ? 'bg-[#0d99ff] text-white shadow-sm font-bold'
+              : 'text-slate-400 hover:text-white hover:bg-[#383838]'
+          }`}
+          title="Pointer Select (V)"
         >
-          <Icons.ZoomIn size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={() => handleZoom(-0.15)}
-          className="p-1.5 rounded-lg app-text-muted hover:app-text-main app-bg-hover transition-colors"
-          title="Zoom Out (-)"
-        >
-          <Icons.ZoomOut size={16} />
-        </button>
-        <span className="text-[11px] font-mono app-accent-text px-1.5 min-w-[44px] text-center font-medium">
-          {Math.round(zoom * 100)}%
-        </span>
-        <button
-          type="button"
-          onClick={handleCenterViewport}
-          className="p-1.5 rounded-lg app-text-muted hover:app-text-main app-bg-hover transition-colors flex items-center gap-1 text-xs font-medium px-2"
-          title={
-            selectedCardIds.length > 0 || selectedCardId
-              ? 'Tengahkan Viewport ke Kartu Terpilih'
-              : 'Tengahkan Viewport ke Seluruh Kartu Workspace'
-          }
-        >
-          <Icons.Focus size={15} className="app-accent-text" />
-          <span className="hidden sm:inline">Tengahkan</span>
+          <Icons.MousePointer size={15} />
         </button>
 
-        {/* Hand Pan Navigasi Button */}
+        {/* Hand Pan Tool */}
         <button
           type="button"
           onClick={() => setIsSpacePressed(!isSpacePressed)}
-          className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-xs font-medium px-2 ${
+          className={`p-2 rounded-xl transition-all cursor-pointer ${
             isSpacePressed
-              ? 'app-accent-bg text-white shadow-md scale-105 ring-2 ring-blue-400/40 font-semibold'
-              : 'app-text-muted hover:app-text-main app-bg-hover'
+              ? 'bg-[#0d99ff] text-white shadow-sm font-bold'
+              : 'text-slate-400 hover:text-white hover:bg-[#383838]'
           }`}
-          title="Mode Navigasi Pan (Tahan Spasi + Drag Mouse)"
+          title="Pan Hand Tool (Spasi + Drag)"
         >
-          <Icons.Hand size={15} className={isSpacePressed ? 'animate-pulse' : ''} />
-          <span className="hidden sm:inline">Navigasi</span>
+          <Icons.Hand size={15} />
         </button>
 
-        <div className="w-[1px] h-4 bg-[#444] opacity-30 my-auto mx-1" />
+        <div className="w-[1px] h-4 bg-[#383838] mx-0.5" />
 
-        {/* Layout Options Dropdown Menu (Disabled if <= 1 card selected) */}
+        {/* Add Card Button */}
+        <button
+          type="button"
+          onClick={() => onAddCardAtPosition(400, 300)}
+          className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-[#383838] transition-all cursor-pointer flex items-center gap-1.5"
+          title="Tambah Kartu Baru"
+        >
+          <Icons.Plus size={15} className="text-[#0d99ff]" />
+          <span className="hidden sm:inline text-xs font-semibold">Kartu</span>
+        </button>
+
+        {/* Layout Options Dropdown Menu */}
         <div className="relative" ref={layoutMenuRef}>
           <button
             type="button"
             disabled={selectedCardIds.length <= 1}
             onClick={() => selectedCardIds.length > 1 && setShowLayoutMenu(!showLayoutMenu)}
-            className={`p-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium px-2 ${
+            className={`p-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-semibold ${
               selectedCardIds.length > 1
-                ? 'app-accent-text app-bg-hover cursor-pointer'
-                : 'app-text-muted opacity-40 cursor-not-allowed'
+                ? 'text-amber-400 hover:bg-[#383838] cursor-pointer'
+                : 'text-slate-600 opacity-40 cursor-not-allowed'
             }`}
             title={
               selectedCardIds.length > 1
                 ? `Rapikan ${selectedCardIds.length} Kartu Terpilih`
-                : 'Pilih minimal 2 kartu (menggunakan Box Selection) untuk mengaktifkan fitur Rapikan'
+                : 'Pilih minimal 2 kartu untuk mengaktifkan fitur Rapikan'
             }
           >
             <Icons.LayoutGrid size={15} />
             <span className="hidden sm:inline">Rapikan</span>
             {selectedCardIds.length > 1 && (
-              <span className="bg-blue-500/20 text-blue-400 text-[10px] font-mono px-1 rounded font-bold">
+              <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold">
                 {selectedCardIds.length}
               </span>
             )}
-            <Icons.ChevronDown size={12} className={`transition-transform ${showLayoutMenu ? 'rotate-180' : ''}`} />
           </button>
 
           {showLayoutMenu && selectedCardIds.length > 1 && (
-            <div className="absolute right-0 bottom-full mb-2 w-52 app-bg-secondary border app-border rounded-xl shadow-2xl p-1.5 z-50 text-xs app-text-main space-y-1 animate-in fade-in zoom-in-95 duration-100">
-              <div className="px-2.5 py-1 text-[10px] app-text-muted font-medium border-b app-border flex items-center justify-between">
-                <span>Target Rapikan:</span>
-                <span className="app-accent-text font-bold">
-                  {selectedCardIds.length} Kartu Terpilih
-                </span>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-[#2c2c2c] border border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 text-xs text-white space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+              <div className="px-2.5 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider border-b border-[#383838] flex items-center justify-between">
+                <span>Rapikan Kartu</span>
+                <span className="text-[#0d99ff] font-mono">{selectedCardIds.length} Kartu</span>
               </div>
 
               <button
@@ -1153,10 +1142,10 @@ export const Canvas: React.FC<CanvasProps> = ({
                   handleAutoLayout('grid');
                   setShowLayoutMenu(false);
                 }}
-                className="w-full px-2.5 py-1.5 text-left hover:app-bg-hover rounded-lg flex items-center gap-2 transition-colors font-medium"
+                className="w-full px-2.5 py-1.5 rounded-lg text-left hover:bg-[#383838] flex items-center gap-2 text-slate-200 transition-colors font-medium cursor-pointer"
               >
-                <Icons.Grid size={14} className="app-accent-text" />
-                <span>🔲 Matriks Grid (2D)</span>
+                <Icons.LayoutGrid size={14} className="text-[#0d99ff]" />
+                <span>Matriks Grid (2D)</span>
               </button>
 
               <button
@@ -1165,10 +1154,10 @@ export const Canvas: React.FC<CanvasProps> = ({
                   handleAutoLayout('horizontal');
                   setShowLayoutMenu(false);
                 }}
-                className="w-full px-2.5 py-1.5 text-left hover:app-bg-hover rounded-lg flex items-center gap-2 transition-colors font-medium"
+                className="w-full px-2.5 py-1.5 rounded-lg text-left hover:bg-[#383838] flex items-center gap-2 text-slate-200 transition-colors font-medium cursor-pointer"
               >
-                <Icons.ArrowRight size={14} className="app-accent-text" />
-                <span>➡️ Baris Horisontal</span>
+                <Icons.MoveRight size={14} className="text-emerald-400" />
+                <span>Baris Horisontal</span>
               </button>
 
               <button
@@ -1177,10 +1166,10 @@ export const Canvas: React.FC<CanvasProps> = ({
                   handleAutoLayout('vertical');
                   setShowLayoutMenu(false);
                 }}
-                className="w-full px-2.5 py-1.5 text-left hover:app-bg-hover rounded-lg flex items-center gap-2 transition-colors font-medium"
+                className="w-full px-2.5 py-1.5 rounded-lg text-left hover:bg-[#383838] flex items-center gap-2 text-slate-200 transition-colors font-medium cursor-pointer"
               >
-                <Icons.ArrowDown size={14} className="app-accent-text" />
-                <span>⬇️ Kolom Vertikal</span>
+                <Icons.MoveDown size={14} className="text-amber-400" />
+                <span>Kolom Vertikal</span>
               </button>
 
               <button
@@ -1189,13 +1178,55 @@ export const Canvas: React.FC<CanvasProps> = ({
                   handleAutoLayout('circle');
                   setShowLayoutMenu(false);
                 }}
-                className="w-full px-2.5 py-1.5 text-left hover:app-bg-hover rounded-lg flex items-center gap-2 transition-colors font-medium"
+                className="w-full px-2.5 py-1.5 rounded-lg text-left hover:bg-[#383838] flex items-center gap-2 text-slate-200 transition-colors font-medium cursor-pointer"
               >
-                <Icons.Circle size={14} className="app-accent-text" />
-                <span>⭕ Lingkaran (Radial)</span>
+                <Icons.Circle size={14} className="text-purple-400" />
+                <span>Lingkaran (Radial)</span>
               </button>
             </div>
           )}
+        </div>
+
+        <div className="w-[1px] h-4 bg-[#383838] mx-0.5" />
+
+        {/* Center Viewport Focus */}
+        <button
+          type="button"
+          onClick={handleCenterViewport}
+          className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-[#383838] transition-all cursor-pointer flex items-center gap-1.5"
+          title={
+            selectedCardIds.length > 0 || selectedCardId
+              ? 'Tengahkan Viewport ke Kartu Terpilih'
+              : 'Tengahkan Viewport ke Seluruh Kartu Workspace'
+          }
+        >
+          <Icons.Focus size={15} className="text-purple-400" />
+          <span className="hidden sm:inline text-xs font-semibold">Focus</span>
+        </button>
+
+        <div className="w-[1px] h-4 bg-[#383838] mx-0.5" />
+
+        {/* Zoom Controls */}
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => handleZoom(-0.15)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
+            title="Zoom Out (-)"
+          >
+            <Icons.ZoomOut size={14} />
+          </button>
+          <span className="text-[11px] font-mono text-[#0d99ff] px-1 min-w-[40px] text-center font-bold">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => handleZoom(0.15)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
+            title="Zoom In (+)"
+          >
+            <Icons.ZoomIn size={14} />
+          </button>
         </div>
       </div>
 

@@ -95,16 +95,16 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
         width: `${width}px`,
         height: height ? `${height}px` : undefined,
       }}
-      className={`absolute rounded-xl app-bg-secondary border transition-all cursor-grab active:cursor-grabbing group select-none flex flex-col overflow-hidden ${
+      className={`absolute rounded-xl bg-[#2c2c2c] border transition-[border-color,box-shadow,opacity] cursor-grab active:cursor-grabbing group select-none flex flex-col overflow-hidden ${
         isDimmed ? 'opacity-20 pointer-events-none grayscale-[40%]' : 'opacity-100 pointer-events-auto'
       } ${
         isSelected
-          ? 'border-blue-500 ring-2 ring-blue-500/40 shadow-xl z-30 scale-[1.01]'
+          ? 'border-[#0d99ff] ring-2 ring-[#0d99ff]/60 shadow-2xl z-30'
           : isConnectingSource
           ? 'border-emerald-400 ring-2 ring-emerald-400/40 shadow-xl z-30'
           : isCategoryHighlighted
-          ? 'border-blue-400/80 ring-2 ring-blue-400/30 shadow-md z-20'
-          : 'app-border hover:border-slate-500/60 z-10'
+          ? 'border-[#0d99ff]/80 ring-2 ring-[#0d99ff]/30 shadow-md z-20'
+          : 'border-[#383838] hover:border-[#0d99ff]/60 z-10'
       }`}
       onMouseDown={(e) => !isDimmed && onSelect(card, e)}
       onTouchStart={(e) => !isDimmed && onSelect(card, e)}

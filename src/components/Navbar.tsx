@@ -54,30 +54,34 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   return (
-    <header className="h-12 app-bg-main px-4 md:px-6 flex items-center justify-between z-40 relative select-none transition-colors">
+    <header className="h-11 bg-[#2c2c2c] border-b border-[#383838] px-3 flex items-center justify-between z-40 relative select-none text-white transition-colors shadow-xs">
       
-      {/* LEFT: Project Name & Workspace Switcher Trigger */}
-      <div className="flex items-center gap-3">
+      {/* LEFT: Figma Icon Menu & Project Switcher */}
+      <div className="flex items-center gap-2.5">
         <button
           type="button"
           onClick={onOpenWorldManager}
-          className="flex items-center gap-2 px-2 py-1 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/40 transition-all font-bold group cursor-pointer"
+          className="w-7 h-7 rounded-lg bg-[#383838] hover:bg-[#444444] text-[#0d99ff] font-extrabold flex items-center justify-center text-xs shadow-xs transition-colors cursor-pointer"
+          title="Buka Pengelola Dunia & Workspace"
+        >
+          <img src="/wd-logo-circle.png" alt="WD Logo" className="w-4 h-4 object-contain rounded-full" />
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenWorldManager}
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-slate-200 hover:text-white hover:bg-[#383838] transition-all text-xs font-semibold group cursor-pointer"
           title="Buka Pengelola Workspace & Dunia"
         >
-          <img
-            src="/wd-logo-circle.png"
-            alt="World Deck Logo"
-            className="w-6 h-6 object-contain rounded-full shadow-md group-hover:scale-105 transition-transform"
-          />
-          <span className="text-xs md:text-sm font-extrabold tracking-tight truncate max-w-[140px] sm:max-w-[200px]">
+          <span className="truncate max-w-[140px] sm:max-w-[200px]">
             {projectName}
           </span>
-          <Icons.ChevronDown size={13} className="text-slate-500 group-hover:text-slate-300 transition-colors" />
+          <Icons.ChevronDown size={12} className="text-slate-400 group-hover:text-white transition-colors" />
         </button>
       </div>
 
-      {/* CENTER: Minimalist Navigation Controls */}
-      <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-1">
+      {/* CENTER: Figma Segmented View Mode Switcher Pills */}
+      <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-0.5 bg-[#1e1e1e] p-1 rounded-xl border border-[#383838] shadow-inner">
         {VIEW_TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = viewMode === tab.id;
@@ -85,116 +89,135 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               key={tab.id}
               type="button"
-              onClick={() => onViewModeChange(tab.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs md:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+              onClick={(e) => {
+                (e.currentTarget as HTMLElement).blur();
+                onViewModeChange(tab.id);
+              }}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none select-none border ${
                 isActive
-                  ? 'app-accent-bg text-white font-bold shadow-xs'
-                  : 'app-text-muted hover:app-text-main app-bg-hover'
+                  ? 'bg-[#2c2c2c] text-white font-bold shadow-xs border-[#383838]'
+                  : 'border-transparent text-slate-200 hover:text-white hover:bg-[#2c2c2c]/50'
               }`}
             >
-              <Icon size={15} />
+              <Icon size={14} className={isActive ? 'text-[#0d99ff]' : 'text-slate-300'} />
               <span>{tab.label}</span>
             </button>
           );
         })}
       </div>
 
-      {/* RIGHT: Action Controls (Menu) */}
+      {/* RIGHT: Figma Menu Dropdown */}
       <div className="flex items-center gap-2">
-        {/* Consolidated Actions Dropdown Menu */}
         <div className="relative" ref={menuRef}>
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="px-3 py-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/40 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="px-3 py-1 rounded-lg text-slate-200 hover:text-white hover:bg-[#383838] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-[#383838] outline-none focus:outline-none select-none"
             title="Opsi & Menu Proyek"
           >
-            <Icons.SlidersHorizontal size={15} className="text-slate-400" />
-            <span className="hidden sm:inline">Menu</span>
-            <Icons.ChevronDown size={13} className={`text-slate-400 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
+            <Icons.SlidersHorizontal size={13} className="text-[#0d99ff]" />
+            <span>Menu</span>
+            <Icons.ChevronDown size={12} className={`text-slate-400 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {isMenuOpen && (
-            <div className="absolute right-0 top-full mt-2 w-56 app-bg-secondary border border-slate-700/60 rounded-2xl shadow-2xl py-1.5 z-50 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 space-y-0.5 overflow-hidden">
-              <div className="px-3 py-2 border-b border-slate-800 app-bg-main flex items-center gap-2.5">
-                <img src="/wd-logo-circle.png" alt="World Deck" className="w-6 h-6 object-contain rounded-full" />
+            <div className="absolute right-0 top-full mt-2 w-64 bg-[#2c2c2c] border border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 text-xs text-[#f8fafc] animate-in fade-in zoom-in-95 duration-100 space-y-1.5 select-none overflow-hidden">
+              {/* Header Brand Badge */}
+              <div className="px-3 py-2.5 rounded-xl bg-[#1e1e1e] border border-[#383838] flex items-center gap-2.5">
+                <img src="/wd-logo-circle.png" alt="World Deck" className="w-6 h-6 object-contain rounded-full shadow-sm" />
                 <div>
-                  <div className="font-bold text-xs app-text-main leading-tight">World Deck</div>
+                  <div className="font-bold text-xs text-white leading-tight">World Deck</div>
                   <div className="text-[10px] text-slate-400">Cards Worldbuilding</div>
                 </div>
               </div>
 
-              {localDirectoryName && (
-                <div className="px-3 py-2 bg-emerald-950/30 text-emerald-400 font-semibold border-b border-slate-800 flex items-center gap-1.5 select-none" title={`Folder Workspace: ${localDirectoryName}`}>
-                  <Icons.FolderClosed size={13} className="text-emerald-400 min-w-[13px]" />
-                  <span className="truncate">WS: {localDirectoryName}</span>
+              {/* Workspace Folder Row */}
+              {localDirectoryName ? (
+                <div className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Icons.FolderClosed size={13} className="shrink-0" />
+                    <span className="truncate">{localDirectoryName}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onChangeDirectory();
+                    }}
+                    className="text-[10px] underline hover:text-white cursor-pointer shrink-0"
+                  >
+                    Ubah
+                  </button>
                 </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    onChangeDirectory();
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-xl hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-amber-400 cursor-pointer"
+                >
+                  <Icons.FolderOpen size={14} />
+                  <span>Pilih Folder Workspace</span>
+                </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  onChangeDirectory();
-                }}
-                className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors font-medium text-amber-500 cursor-pointer"
-              >
-                <Icons.FolderOpen size={14} />
-                <span>Ganti Folder Workspace</span>
-              </button>
+              <div className="border-t border-[#383838]" />
 
-              <div className="my-1 border-t border-slate-800" />
+              {/* Import & Export Menu Items */}
+              <div className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    onExport();
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-xl hover:bg-[#383838] flex items-center gap-2 text-slate-200 hover:text-white transition-colors cursor-pointer font-medium"
+                >
+                  <Icons.Download size={14} className="text-[#0d99ff]" />
+                  <span>Ekspor Proyek (JSON)</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  onExport();
-                }}
-                className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
-              >
-                <Icons.Download size={14} className="text-blue-400" />
-                <span>Ekspor Proyek (JSON)</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    fileInputRef.current?.click();
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-xl hover:bg-[#383838] flex items-center gap-2 text-slate-200 hover:text-white transition-colors cursor-pointer font-medium"
+                >
+                  <Icons.Upload size={14} className="text-[#0d99ff]" />
+                  <span>Impor Proyek (JSON)</span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={(e) => {
+                    onImport(e);
+                    setIsMenuOpen(false);
+                  }}
+                  className="hidden"
+                />
+              </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  fileInputRef.current?.click();
-                }}
-                className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
-              >
-                <Icons.Upload size={14} className="text-blue-400" />
-                <span>Impor Proyek (JSON)</span>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={(e) => {
-                  onImport(e);
-                  setIsMenuOpen(false);
-                }}
-                className="hidden"
-              />
+              <div className="border-t border-[#383838]" />
 
-              <div className="my-1 border-t border-slate-800" />
-
-              {/* Theme Sub-Menu / Selector inside Dropdown */}
-              <div className="px-2.5 py-1.5 space-y-1.5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              {/* Theme Segmented Switcher */}
+              <div className="p-1 space-y-1">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 flex items-center justify-between">
                   <span>Tema Aplikasi</span>
                   <Icons.Palette size={12} className="text-slate-400" />
                 </div>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-2 gap-1 bg-[#1e1e1e] p-1 rounded-xl border border-[#383838]">
                   <button
                     type="button"
                     onClick={() => onThemeChange('light')}
-                    className={`px-2.5 py-1.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2 py-1 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
                       currentTheme === 'light'
-                        ? 'bg-blue-600 text-white shadow-xs font-bold scale-[1.02]'
-                        : 'bg-slate-900/60 hover:bg-slate-800 text-slate-300'
+                        ? 'bg-[#0d99ff] text-white shadow-xs font-bold'
+                        : 'text-slate-300 hover:text-white hover:bg-[#383838]'
                     }`}
                   >
                     <Icons.Sun size={13} className={currentTheme === 'light' ? 'text-amber-300' : 'text-slate-400'} />
@@ -204,10 +227,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <button
                     type="button"
                     onClick={() => onThemeChange('dark')}
-                    className={`px-2.5 py-1.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2 py-1 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
                       currentTheme === 'dark'
-                        ? 'bg-blue-600 text-white shadow-xs font-bold scale-[1.02]'
-                        : 'bg-slate-900/60 hover:bg-slate-800 text-slate-300'
+                        ? 'bg-[#0d99ff] text-white shadow-xs font-bold'
+                        : 'text-slate-300 hover:text-white hover:bg-[#383838]'
                     }`}
                   >
                     <Icons.Moon size={13} className={currentTheme === 'dark' ? 'text-blue-200' : 'text-slate-400'} />
@@ -216,35 +239,37 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               </div>
 
-              <div className="my-1 border-t border-slate-800" />
+              <div className="border-t border-[#383838]" />
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  onOpenHelp();
-                }}
-                className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
-              >
-                <Icons.HelpCircle size={14} className="text-slate-400" />
-                <span>Panduan Worldbuilding</span>
-              </button>
+              {/* Help & Reset Actions */}
+              <div className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    onOpenHelp();
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-xl hover:bg-[#383838] flex items-center gap-2 text-slate-200 hover:text-white transition-colors cursor-pointer font-medium"
+                >
+                  <Icons.HelpCircle size={14} className="text-slate-400" />
+                  <span>Panduan Worldbuilding</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  onResetWorld();
-                }}
-                className="w-full px-3 py-2 text-left hover:bg-slate-800 text-rose-400 flex items-center gap-2 transition-colors cursor-pointer"
-              >
-                <Icons.RotateCcw size={14} />
-                <span>Bersihkan Workspace</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    onResetWorld();
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-xl hover:bg-[#383838] text-rose-400 flex items-center gap-2 transition-colors cursor-pointer font-medium"
+                >
+                  <Icons.RotateCcw size={14} />
+                  <span>Bersihkan Workspace</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
-
       </div>
     </header>
   );

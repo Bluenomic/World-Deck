@@ -354,7 +354,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
             style={{
               transform: isOpen ? 'translateX(0%)' : 'translateX(100%)',
             }}
-            className="sidebar-panel-transition fixed inset-y-0 right-0 z-[120] w-full max-w-lg app-bg-main border-l app-border shadow-2xl flex flex-col"
+            className="sidebar-panel-transition fixed inset-y-0 right-0 z-[120] w-full max-w-lg bg-[#2c2c2c] border-l border-[#383838] shadow-2xl flex flex-col text-white"
           >
             {headerBar}
             {articleContent}
