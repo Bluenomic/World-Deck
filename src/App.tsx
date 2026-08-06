@@ -434,17 +434,18 @@ export const App: React.FC = () => {
     }));
   };
 
-  // Add New Blank Card directly on Canvas
-  const handleAddCardAtPosition = (x: number = 300, y: number = 300) => {
+  // Add New Card directly on Canvas (or Duplicate Card)
+  const handleAddCardAtPosition = (x: number = 300, y: number = 300, initialData?: Partial<WorldCard>) => {
     const newCard: WorldCard = {
       id: generateId('card'),
-      title: '',
-      subtitle: '',
-      category: selectedCategory === 'all' ? 'character' : selectedCategory,
-      summary: '',
-      content: '',
-      tags: [],
-      attributes: [],
+      title: initialData?.title || '',
+      subtitle: initialData?.subtitle || '',
+      category: initialData?.category || (selectedCategory === 'all' ? 'character' : selectedCategory),
+      summary: initialData?.summary || '',
+      content: initialData?.content || '',
+      tags: initialData?.tags ? [...initialData.tags] : [],
+      attributes: initialData?.attributes ? JSON.parse(JSON.stringify(initialData.attributes)) : [],
+      imageUrl: initialData?.imageUrl || '',
       x,
       y,
       canvasId: activeCanvasId,
@@ -458,7 +459,9 @@ export const App: React.FC = () => {
       cards: [...prev.cards, newCard],
     }));
 
-    setEditingCard(newCard);
+    if (!initialData) {
+      setEditingCard(newCard);
+    }
   };
 
   // Add New Card from Galeri / Deck (Stored in Galeri, NOT placed on canvas automatically)

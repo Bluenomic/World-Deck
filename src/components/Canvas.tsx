@@ -23,7 +23,7 @@ interface CanvasProps {
   onUpdateCardPositionsBatch?: (updates: { id: string; x: number; y: number }[]) => void;
   onAddConnection: (sourceId: string, targetId: string) => void;
   onEditConnection: (connection: CardConnection) => void;
-  onAddCardAtPosition: (x: number, y: number) => void;
+  onAddCardAtPosition: (x: number, y: number, initialData?: Partial<WorldCard>) => void;
   onAddCardsToCanvasAtPosition?: (cardIds: string[], position: { x: number; y: number }) => void;
   onRemoveCardsFromCanvas?: (cardIds: string[]) => void;
   onDeleteCardsRequest: (cardIds: string[]) => void;
@@ -180,7 +180,10 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (targetCardId) {
       const card = cards.find((c) => c.id === targetCardId);
       if (card) {
-        onSelectCard(card);
+        if (!selectedCardIds.includes(card.id)) {
+          onSelectCard(card);
+          setSelectedCardIds([]);
+        }
       }
     }
 
@@ -373,6 +376,41 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     panRef.current = { x: newPanX, y: newPanY };
     setPan({ x: newPanX, y: newPanY });
+  };
+
+  // Fit View onto all cards on canvas
+  const handleFitAllCardsView = () => {
+    if (cards.length === 0 || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+
+    const minX = Math.min(...cards.map((c) => c.x));
+    const maxX = Math.max(...cards.map((c) => c.x + 280));
+    const minY = Math.min(...cards.map((c) => c.y));
+    const maxY = Math.max(...cards.map((c) => c.y + 180));
+
+    const contentWidth = maxX - minX + 120;
+    const contentHeight = maxY - minY + 120;
+
+    const targetZoom = Math.max(0.3, Math.min(1.2, Math.min(rect.width / contentWidth, rect.height / contentHeight)));
+    const contentCenterX = (minX + maxX) / 2;
+    const contentCenterY = (minY + maxY) / 2;
+
+    const newPanX = Math.round(rect.width / 2 - contentCenterX * targetZoom);
+    const newPanY = Math.round(rect.height / 2 - contentCenterY * targetZoom);
+
+    zoomRef.current = targetZoom;
+    panRef.current = { x: newPanX, y: newPanY };
+    setZoom(targetZoom);
+    setPan({ x: newPanX, y: newPanY });
+  };
+
+  // Reset Zoom scale to 100%
+  const handleResetZoom100 = () => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    zoomAtPoint(1.0, centerX, centerY);
   };
 
   // Convert screen coordinates to canvas world coordinates
@@ -1257,10 +1295,12 @@ export const Canvas: React.FC<CanvasProps> = ({
       </div>
 
       {contextMenu.visible && (() => {
+        const isMultiSelectActive = selectedCardIds.length > 1;
         const clickedCard = contextMenu.targetCardId ? cards.find((c) => c.id === contextMenu.targetCardId) : null;
+
         return (
           <div
-            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-56 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-800 max-h-[85vh] overflow-y-auto custom-scrollbar"
+            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-60 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-800 max-h-[85vh] overflow-y-auto custom-scrollbar"
             style={{
               top: `${contextMenu.y}px`,
               left: `${contextMenu.x}px`,
@@ -1268,13 +1308,77 @@ export const Canvas: React.FC<CanvasProps> = ({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {clickedCard ? (
+            {/* CASE 1: MULTI-SELECT CONTEXT MENU */}
+            {isMultiSelectActive ? (
               <>
-                <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
-                  📄 {clickedCard.title || 'Kartu'}
+                <div className="px-3 py-1.5 text-[10px] text-[#0d99ff] font-extrabold uppercase tracking-wider select-none flex items-center justify-between bg-[#0d99ff]/10">
+                  <span>{selectedCardIds.length} Kartu Terpilih</span>
+                </div>
+
+                <div className="py-1 space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCenterViewport();
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
+                  >
+                    <Icons.Maximize size={14} />
+                    <span>Fokus ke Kartu Terpilih (Fit View)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onRemoveCardsFromCanvas) {
+                        onRemoveCardsFromCanvas(selectedCardIds);
+                        setSelectedCardIds([]);
+                      }
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-amber-400 cursor-pointer"
+                  >
+                    <Icons.MinusCircle size={14} />
+                    <span>Lepas Semua Kartu dari Kanvas</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDeleteCardsRequest(selectedCardIds);
+                      setSelectedCardIds([]);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-rose-400 cursor-pointer"
+                  >
+                    <Icons.Trash2 size={14} />
+                    <span>Hapus Semua Kartu Permanen</span>
+                  </button>
                 </div>
 
                 <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCardIds([]);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-slate-400 font-medium cursor-pointer"
+                  >
+                    <Icons.XCircle size={14} />
+                    <span>Batal Pilih (Deselect)</span>
+                  </button>
+                </div>
+              </>
+            ) : clickedCard ? (
+              /* CASE 2: SINGLE CARD CONTEXT MENU */
+              <>
+                <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
+                  📄 {clickedCard.title || 'Kartu Tanpa Judul'}
+                </div>
+
+                <div className="py-1 space-y-0.5">
                   <button
                     type="button"
                     onClick={() => {
@@ -1285,10 +1389,10 @@ export const Canvas: React.FC<CanvasProps> = ({
                       }
                       setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
                   >
                     <Icons.Maximize2 size={14} />
-                    <span>Buka Kartu</span>
+                    <span>Buka Kartu Fullscreen</span>
                   </button>
 
                   <button
@@ -1301,14 +1405,48 @@ export const Canvas: React.FC<CanvasProps> = ({
                       }
                       setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-slate-200 cursor-pointer"
                   >
                     <Icons.Edit3 size={14} />
                     <span>Edit Kartu</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAddCardAtPosition(clickedCard.x + 40, clickedCard.y + 40, {
+                        title: `${clickedCard.title || 'Kartu'} (Salinan)`,
+                        subtitle: clickedCard.subtitle,
+                        category: clickedCard.category,
+                        summary: clickedCard.summary,
+                        content: clickedCard.content,
+                        tags: clickedCard.tags,
+                        attributes: clickedCard.attributes,
+                        imageUrl: clickedCard.imageUrl,
+                      });
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
+                  >
+                    <Icons.Copy size={14} />
+                    <span>Duplikat Kartu</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConnectingSourceId(clickedCard.id);
+                      setConnectionMousePos({ x: clickedCard.x + 140, y: clickedCard.y + 80 });
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-purple-400 cursor-pointer"
+                  >
+                    <Icons.GitCommit size={14} />
+                    <span>Tarik Garis Hubungan</span>
+                  </button>
                 </div>
 
-                <div className="py-1">
+                <div className="py-1 space-y-0.5">
                   <button
                     type="button"
                     onClick={() => {
@@ -1337,8 +1475,9 @@ export const Canvas: React.FC<CanvasProps> = ({
                 </div>
               </>
             ) : (
+              /* CASE 3: EMPTY CANVAS CONTEXT MENU */
               <>
-                <div className="py-1">
+                <div className="py-1 space-y-0.5">
                   <button
                     type="button"
                     onClick={() => {
@@ -1358,21 +1497,45 @@ export const Canvas: React.FC<CanvasProps> = ({
                       setShowAddFromGalleryModal(true);
                       setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-[#0d99ff] cursor-pointer"
                   >
                     <Icons.FolderPlus size={14} strokeWidth={2.5} />
                     <span>Tambah Kartu dari Galeri</span>
                   </button>
                 </div>
 
-                <div className="py-1">
+                <div className="py-1 space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleFitAllCardsView();
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-slate-200 cursor-pointer font-medium"
+                  >
+                    <Icons.Maximize size={14} className="text-[#0d99ff]" />
+                    <span>Fokus Semua Kartu (Fit View)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleResetZoom100();
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-slate-200 cursor-pointer font-medium"
+                  >
+                    <Icons.RotateCcw size={14} className="text-amber-400" />
+                    <span>Reset Zoom (100%)</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
                       handleCenterViewport();
                       setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors cursor-pointer"
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-slate-200 cursor-pointer font-medium"
                   >
                     <Icons.Focus size={14} className="app-text-muted" />
                     <span>Tengahkan Layar</span>
@@ -1384,49 +1547,12 @@ export const Canvas: React.FC<CanvasProps> = ({
                       setIsSpacePressed(!isSpacePressed);
                       setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors cursor-pointer"
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-slate-200 cursor-pointer font-medium"
                   >
                     <Icons.Hand size={14} className="app-text-muted" />
                     <span>{isSpacePressed ? 'Matikan Mode Pan' : 'Aktifkan Mode Pan'}</span>
                   </button>
                 </div>
-
-                {(selectedCardIds.length > 0 || selectedCardId) && (
-                  <div className="py-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const targetIds = selectedCardIds.length > 0 ? selectedCardIds : selectedCardId ? [selectedCardId] : [];
-                        if (targetIds.length > 0 && onRemoveCardsFromCanvas) {
-                          onRemoveCardsFromCanvas(targetIds);
-                          setSelectedCardIds([]);
-                        }
-                        setContextMenu((prev) => ({ ...prev, visible: false }));
-                      }}
-                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-amber-400 font-medium cursor-pointer"
-                    >
-                      <Icons.MinusCircle size={14} />
-                      <span>Lepas Kartu Terpilih</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (selectedCardIds.length > 0) {
-                          onDeleteCardsRequest(selectedCardIds);
-                          setSelectedCardIds([]);
-                        } else if (selectedCardId) {
-                          onDeleteCardsRequest([selectedCardId]);
-                        }
-                        setContextMenu((prev) => ({ ...prev, visible: false }));
-                      }}
-                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
-                    >
-                      <Icons.Trash2 size={14} />
-                      <span>Hapus Kartu Terpilih</span>
-                    </button>
-                  </div>
-                )}
               </>
             )}
           </div>
