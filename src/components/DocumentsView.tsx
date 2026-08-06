@@ -422,14 +422,121 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     }
   };
 
-  // Clear selected image options when leaving editing mode
+  // Clear selected image options and context menus when switching mode or active document
   useEffect(() => {
-    if (mode === 'viewing') {
-      setSelectedImage(null);
-      setImageContextMenu(null);
-      setCropState(null);
+    setSelectedImage(null);
+    setImageContextMenu(null);
+    setEditorContextMenu(null);
+    setCropState(null);
+    setMentionState({ isOpen: false, query: '', x: 0, y: 0, selectedIndex: 0 });
+  }, [activeDocId, mode]);
+
+  // Ref tracking for clean auto-saving on unmount, window close, or refresh
+  const modeRef = useRef(mode);
+  const activeDocRef = useRef(activeDoc);
+  const draftTitleRef = useRef(draftTitle);
+
+  useEffect(() => {
+    modeRef.current = mode;
+    activeDocRef.current = activeDoc;
+    draftTitleRef.current = draftTitle;
+  });
+
+  // Emergency fallback auto-save on component unmount
+  useEffect(() => {
+    return () => {
+      if (modeRef.current === 'editing' && activeDocRef.current) {
+        const finalContent = editorRef.current ? editorRef.current.innerHTML : activeDocRef.current.content;
+        const updatedDoc: WorldDocument = {
+          ...activeDocRef.current,
+          title: draftTitleRef.current.trim() || 'Dokumen Tanpa Judul',
+          content: finalContent,
+          updatedAt: Date.now(),
+        };
+        onSaveDocument(updatedDoc);
+        try {
+          localStorage.removeItem(`worlddeck_draft_${activeDocRef.current.id}`);
+        } catch (_err) {
+          // ignore
+        }
+      }
+    };
+  }, []);
+
+  // Emergency fallback auto-save on window close (Alt+F4/X button), browser tab refresh, or app termination
+  useEffect(() => {
+    const handleEmergencySave = () => {
+      if (modeRef.current === 'editing' && activeDocRef.current) {
+        const finalContent = editorRef.current ? editorRef.current.innerHTML : activeDocRef.current.content;
+        const updatedDoc: WorldDocument = {
+          ...activeDocRef.current,
+          title: draftTitleRef.current.trim() || 'Dokumen Tanpa Judul',
+          content: finalContent,
+          updatedAt: Date.now(),
+        };
+        onSaveDocument(updatedDoc);
+        try {
+          localStorage.setItem(`worlddeck_draft_${activeDocRef.current.id}`, JSON.stringify(updatedDoc));
+        } catch (_err) {
+          // ignore
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleEmergencySave);
+    window.addEventListener('pagehide', handleEmergencySave);
+    return () => {
+      window.removeEventListener('beforeunload', handleEmergencySave);
+      window.removeEventListener('pagehide', handleEmergencySave);
+    };
+  }, []);
+
+  // Periodic draft backup to localStorage every 5s while in editing mode (crash protection)
+  useEffect(() => {
+    if (mode !== 'editing' || !activeDoc) return;
+
+    const intervalId = setInterval(() => {
+      if (editorRef.current && activeDocRef.current) {
+        const currentContent = editorRef.current.innerHTML;
+        const currentTitle = draftTitleRef.current.trim() || 'Dokumen Tanpa Judul';
+        const draftData: WorldDocument = {
+          ...activeDocRef.current,
+          title: currentTitle,
+          content: currentContent,
+          updatedAt: Date.now(),
+        };
+        try {
+          localStorage.setItem(`worlddeck_draft_${activeDocRef.current.id}`, JSON.stringify(draftData));
+        } catch (_err) {
+          // ignore
+        }
+      }
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [mode, activeDocId]);
+
+  // Restore draft backup if app was abruptly killed or crashed during editing
+  useEffect(() => {
+    if (activeDoc) {
+      try {
+        const savedDraftRaw = localStorage.getItem(`worlddeck_draft_${activeDoc.id}`);
+        if (savedDraftRaw) {
+          const savedDraft: WorldDocument = JSON.parse(savedDraftRaw);
+          if (savedDraft && savedDraft.updatedAt > activeDoc.updatedAt) {
+            onSaveDocument(savedDraft);
+            setDraftTitle(savedDraft.title);
+            if (editorRef.current) {
+              editorRef.current.innerHTML = savedDraft.content;
+            }
+          }
+          localStorage.removeItem(`worlddeck_draft_${activeDoc.id}`);
+        }
+      } catch (_err) {
+        // ignore
+      }
     }
-  }, [mode]);
+  }, [activeDocId]);
 
   // Close context menu on document click & scroll
   useEffect(() => {
@@ -1011,8 +1118,49 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     setMentionState({ isOpen: false, query: '', x: 0, y: 0, selectedIndex: 0 });
   };
 
+  // Handle Switching Active Document from Sidebar
+  const handleSelectDoc = (docId: string) => {
+    if (docId === activeDocId) return;
+
+    if (mode === 'editing' && activeDoc) {
+      const finalContent = editorRef.current ? editorRef.current.innerHTML : activeDoc.content;
+      const updatedDoc: WorldDocument = {
+        ...activeDoc,
+        title: draftTitle.trim() || 'Dokumen Tanpa Judul',
+        content: finalContent,
+        updatedAt: Date.now(),
+      };
+      onSaveDocument(updatedDoc);
+    }
+
+    setSelectedImage(null);
+    setImageContextMenu(null);
+    setEditorContextMenu(null);
+    setCropState(null);
+    setMentionState({ isOpen: false, query: '', x: 0, y: 0, selectedIndex: 0 });
+    setMode('viewing');
+    setActiveDocId(docId);
+  };
+
   // Create New Document
   const handleCreateDocument = () => {
+    if (mode === 'editing' && activeDoc) {
+      const finalContent = editorRef.current ? editorRef.current.innerHTML : activeDoc.content;
+      const updatedDoc: WorldDocument = {
+        ...activeDoc,
+        title: draftTitle.trim() || 'Dokumen Tanpa Judul',
+        content: finalContent,
+        updatedAt: Date.now(),
+      };
+      onSaveDocument(updatedDoc);
+    }
+
+    setSelectedImage(null);
+    setImageContextMenu(null);
+    setEditorContextMenu(null);
+    setCropState(null);
+    setMentionState({ isOpen: false, query: '', x: 0, y: 0, selectedIndex: 0 });
+
     const newDoc: WorldDocument = {
       id: generateId('doc'),
       title: 'Dokumen Tanpa Judul',
@@ -1038,6 +1186,11 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       content: finalContent,
       updatedAt: Date.now(),
     };
+    try {
+      localStorage.removeItem(`worlddeck_draft_${activeDoc.id}`);
+    } catch (_err) {
+      // ignore
+    }
     onSaveDocument(updatedDoc);
     setMode('viewing');
     setShowSaveToast(true);
@@ -1179,7 +1332,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   <button
                     key={doc.id}
                     type="button"
-                    onClick={() => setActiveDocId(doc.id)}
+                    onClick={() => handleSelectDoc(doc.id)}
                     className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between group cursor-pointer ${
                       isActive
                         ? 'bg-slate-800 text-white font-semibold shadow-xs'
