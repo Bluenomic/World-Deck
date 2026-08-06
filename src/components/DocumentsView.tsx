@@ -653,6 +653,85 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     };
   }, [selectedImage?.img, selectedImage?.wrapper]);
 
+  // Intercept & Handle Image Drag-and-Drop to Move Image without Duplicating Node
+  useEffect(() => {
+    const editorEl = editorRef.current;
+    if (!editorEl || mode !== 'editing') return;
+
+    let draggedWrapper: HTMLElement | null = null;
+
+    const handleDragStart = (e: DragEvent) => {
+      const target = e.target as HTMLElement;
+      const wrapper = target.closest('.doc-img-wrapper') as HTMLElement | null;
+      if (wrapper) {
+        draggedWrapper = wrapper;
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/html', wrapper.outerHTML);
+        }
+      }
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      if (draggedWrapper) {
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = 'move';
+        }
+      }
+    };
+
+    const handleDragEnd = () => {
+      draggedWrapper = null;
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      if (draggedWrapper) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        let range: Range | null = null;
+        if (document.caretRangeFromPoint) {
+          range = document.caretRangeFromPoint(e.clientX, e.clientY);
+        } else if ((document as any).caretPositionFromPoint) {
+          const pos = (document as any).caretPositionFromPoint(e.clientX, e.clientY);
+          if (pos) {
+            range = document.createRange();
+            range.setStart(pos.offsetNode, pos.offset);
+            range.collapse(true);
+          }
+        }
+
+        const sourceWrapper = draggedWrapper;
+        draggedWrapper = null;
+
+        if (range && sourceWrapper) {
+          const sel = window.getSelection();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+          range.insertNode(sourceWrapper);
+        }
+
+        setSelectedImage(null);
+        updateToolbarState();
+      }
+    };
+
+    editorEl.addEventListener('dragstart', handleDragStart);
+    editorEl.addEventListener('dragover', handleDragOver);
+    editorEl.addEventListener('dragend', handleDragEnd);
+    editorEl.addEventListener('drop', handleDrop);
+
+    return () => {
+      editorEl.removeEventListener('dragstart', handleDragStart);
+      editorEl.removeEventListener('dragover', handleDragOver);
+      editorEl.removeEventListener('dragend', handleDragEnd);
+      editorEl.removeEventListener('drop', handleDrop);
+    };
+  }, [mode]);
+
   // Auto-sync cropState rect position and dimensions with actual image DOM node
   useEffect(() => {
     if (!cropState) return;
