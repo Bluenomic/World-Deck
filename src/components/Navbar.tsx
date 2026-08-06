@@ -54,26 +54,26 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   return (
-    <header className="h-11 bg-[#2c2c2c] border-b border-[#383838] px-3 flex items-center justify-between z-40 relative select-none text-white transition-colors shadow-xs">
+    <header className="h-12 bg-[#2c2c2c] border-b border-[#383838] px-3.5 flex items-center justify-between z-40 relative select-none text-white transition-colors shadow-xs">
       
       {/* LEFT: Figma Icon Menu & Project Switcher */}
       <div className="flex items-center gap-2.5">
         <button
           type="button"
           onClick={onOpenWorldManager}
-          className="w-7 h-7 rounded-lg bg-[#383838] hover:bg-[#444444] text-[#0d99ff] font-extrabold flex items-center justify-center text-xs shadow-xs transition-colors cursor-pointer"
+          className="w-8.5 h-8.5 rounded-xl bg-[#1e1e1e] hover:bg-[#383838] border border-[#383838] hover:border-[#0d99ff] flex items-center justify-center shadow-md transition-all cursor-pointer group"
           title="Buka Pengelola Dunia & Workspace"
         >
-          <img src="/wd-logo-circle.png" alt="WD Logo" className="w-4 h-4 object-contain rounded-full" />
+          <img src="/wd-logo-circle.png" alt="WD Logo" className="w-6 h-6 object-contain rounded-full group-hover:scale-110 transition-transform" />
         </button>
 
         <button
           type="button"
           onClick={onOpenWorldManager}
-          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-slate-200 hover:text-white hover:bg-[#383838] transition-all text-xs font-semibold group cursor-pointer"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-slate-200 hover:text-white hover:bg-[#383838] transition-all text-xs font-bold group cursor-pointer"
           title="Buka Pengelola Workspace & Dunia"
         >
-          <span className="truncate max-w-[140px] sm:max-w-[200px]">
+          <span className="truncate max-w-[140px] sm:max-w-[220px]">
             {projectName}
           </span>
           <Icons.ChevronDown size={12} className="text-slate-400 group-hover:text-white transition-colors" />
