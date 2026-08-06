@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme, WorldDocument } from './types';
+import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme, WorldDocument, WorldCanvas } from './types';
 import { SAMPLE_WORLD } from './data/sampleWorld';
 import { generateId, downloadProjectJson } from './utils/helpers';
 import { saveLocalFileHandle, loadLocalFileHandle, loadWorkspacePreferences, saveWorkspacePreferences } from './utils/storage';
@@ -937,6 +937,35 @@ export const App: React.FC = () => {
     });
   };
 
+  const handleDuplicateCanvas = (canvasId: string) => {
+    updateActiveWorld((prev) => {
+      const sourceCanvas = (prev.canvases || []).find((c) => c.id === canvasId);
+      if (!sourceCanvas) return prev;
+      const newCanvasId = generateId('canvas');
+      const newCanvas: WorldCanvas = {
+        id: newCanvasId,
+        name: `${sourceCanvas.name} (Salinan)`,
+        createdAt: Date.now(),
+      };
+      
+      const sourceCards = prev.cards.filter((c) => c.canvasId === canvasId);
+      const clonedCards: WorldCard[] = sourceCards.map((c) => ({
+        ...c,
+        id: generateId('card'),
+        canvasId: newCanvasId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }));
+
+      return {
+        ...prev,
+        updatedAt: Date.now(),
+        canvases: [...(prev.canvases || [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }]), newCanvas],
+        cards: [...prev.cards, ...clonedCards],
+      };
+    });
+  };
+
   const handleUpdateWorldInfo = (worldId: string, name: string, description: string, author: string) => {
     setWorlds((prev) =>
       prev.map((w) =>
@@ -1100,6 +1129,11 @@ export const App: React.FC = () => {
             onCreateCanvasRequest={handleTriggerCreateCanvas}
             onCanvasRenameRequest={handleTriggerRenameCanvas}
             onCanvasDelete={handleDeleteCanvas}
+            onDuplicateCanvas={handleDuplicateCanvas}
+            onRemoveCardFromCanvas={(cardId) => handleRemoveCardsFromCanvas([cardId])}
+            onDeleteCardRequest={(cardId) => handleRequestDeleteCards([cardId])}
+            onEditCardRequest={(card) => setEditingCard(card)}
+            onFocusCardOnCanvas={(card) => setSelectedCardId(card.id)}
           />
         )}
 
