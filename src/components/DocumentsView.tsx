@@ -1333,19 +1333,28 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     key={doc.id}
                     type="button"
                     onClick={() => handleSelectDoc(doc.id)}
-                    className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between group cursor-pointer ${
+                    className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between group cursor-pointer relative overflow-hidden ${
                       isActive
-                        ? 'bg-slate-800 text-white font-semibold shadow-xs'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                        ? 'bg-blue-500/10 border border-blue-500/30 text-white shadow-xs'
+                        : 'border border-transparent text-slate-300 hover:text-white hover:bg-slate-800/50'
                     }`}
                   >
-                    <div className="truncate pr-2">
-                      <div className="text-xs font-medium text-slate-200 group-hover:text-white truncate">{doc.title || 'Dokumen Tanpa Judul'}</div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    {isActive && (
+                      <div className="absolute left-0 top-2 bottom-2 w-1 bg-blue-500 rounded-r-full" />
+                    )}
+                    <div className="truncate pr-2 pl-1">
+                      <div className={`text-xs font-semibold truncate ${isActive ? 'text-blue-200' : 'text-slate-200 group-hover:text-white'}`}>
+                        {doc.title || 'Dokumen Tanpa Judul'}
+                      </div>
+                      <div className={`text-[10px] font-mono mt-0.5 ${isActive ? 'text-blue-300/70' : 'text-slate-400'}`}>
                         {words} kata
                       </div>
                     </div>
-                    {isActive && <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />}
+                    {isActive ? (
+                      <Icons.FileText size={14} className="text-blue-400 shrink-0" />
+                    ) : (
+                      <Icons.ChevronRight size={13} className="text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    )}
                   </button>
                 );
               })
