@@ -94,10 +94,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [boxStart, setBoxStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [boxCurrent, setBoxCurrent] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Layout Options Dropdown State
-  const [showLayoutMenu, setShowLayoutMenu] = useState<boolean>(false);
-  const layoutMenuRef = useRef<HTMLDivElement>(null);
-
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
@@ -136,26 +132,18 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
   const [connectionMousePos, setConnectionMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Close layout menu and context menu when clicking outside
+  // Close context menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (layoutMenuRef.current && !layoutMenuRef.current.contains(e.target as Node)) {
-        setShowLayoutMenu(false);
-      }
-    };
-    
     const handleCloseContextMenu = () => {
       if (contextMenu.visible) {
         setContextMenu((prev) => ({ ...prev, visible: false }));
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('click', handleCloseContextMenu);
     document.addEventListener('contextmenu', handleCloseContextMenu);
     
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('click', handleCloseContextMenu);
       document.removeEventListener('contextmenu', handleCloseContextMenu);
     };
@@ -666,60 +654,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     // Empty as requested
   };
 
-  // Smart Auto Layout with Mode Selection & Target Box Filtering (Requires > 1 selected cards)
-  const handleAutoLayout = (mode: 'grid' | 'horizontal' | 'vertical' | 'circle' = 'grid') => {
-    if (selectedCardIds.length <= 1) return;
-
-    const targetCards = cards.filter((c) => selectedCardIds.includes(c.id));
-    if (targetCards.length <= 1) return;
-
-    const originX = Math.min(...targetCards.map((c) => c.x));
-    const originY = Math.min(...targetCards.map((c) => c.y));
-    const updates: { id: string; x: number; y: number }[] = [];
-
-    if (mode === 'grid') {
-      const cols = Math.ceil(Math.sqrt(targetCards.length));
-      const spacingX = 420;
-      const spacingY = 300;
-
-      targetCards.forEach((card, index) => {
-        const row = Math.floor(index / cols);
-        const col = index % cols;
-        updates.push({ id: card.id, x: originX + col * spacingX, y: originY + row * spacingY });
-      });
-    } else if (mode === 'horizontal') {
-      const spacingX = 420;
-      targetCards.forEach((card, index) => {
-        updates.push({ id: card.id, x: originX + index * spacingX, y: originY });
-      });
-    } else if (mode === 'vertical') {
-      const spacingY = 300;
-      targetCards.forEach((card, index) => {
-        updates.push({ id: card.id, x: originX, y: originY + index * spacingY });
-      });
-    } else if (mode === 'circle') {
-      const count = targetCards.length;
-      const radius = Math.max(360, count * 85);
-      const centerX = originX + radius;
-      const centerY = originY + radius;
-
-      targetCards.forEach((card, index) => {
-        const angle = (index / count) * 2 * Math.PI - Math.PI / 2;
-        const x = Math.round(centerX + radius * Math.cos(angle) - 144);
-        const y = Math.round(centerY + radius * Math.sin(angle) - 80);
-        updates.push({ id: card.id, x, y });
-      });
-    }
-
-    if (updates.length > 0) {
-      if (onUpdateCardPositionsBatch) {
-        onUpdateCardPositionsBatch(updates);
-      } else {
-        updates.forEach((u) => onUpdateCardPosition(u.id, u.x, u.y));
-      }
-    }
-  };
-
   // Track measured DOM heights for precise connection line anchoring
   const cardHeightsRef = useRef<Map<string, number>>(new Map());
 
@@ -1169,90 +1103,6 @@ export const Canvas: React.FC<CanvasProps> = ({
           <Icons.Plus size={15} className="text-[#0d99ff]" />
           <span className="hidden sm:inline text-xs font-semibold">Kartu</span>
         </button>
-
-        {/* Layout Options Dropdown Menu */}
-        <div className="relative" ref={layoutMenuRef}>
-          <button
-            type="button"
-            disabled={selectedCardIds.length <= 1}
-            onClick={() => selectedCardIds.length > 1 && setShowLayoutMenu(!showLayoutMenu)}
-            className={`p-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-semibold ${
-              selectedCardIds.length > 1
-                ? 'text-amber-400 hover:bg-[#383838] cursor-pointer'
-                : 'text-slate-600 opacity-40 cursor-not-allowed'
-            }`}
-            title={
-              selectedCardIds.length > 1
-                ? `Rapikan ${selectedCardIds.length} Kartu Terpilih`
-                : 'Pilih minimal 2 kartu untuk mengaktifkan fitur Rapikan'
-            }
-          >
-            <Icons.LayoutGrid size={15} />
-            <span className="hidden sm:inline">Rapikan</span>
-            {selectedCardIds.length > 1 && (
-              <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold">
-                {selectedCardIds.length}
-              </span>
-            )}
-          </button>
-
-          {showLayoutMenu && selectedCardIds.length > 1 && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-[#2c2c2c] border border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 text-xs text-white space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
-              <div className="px-2.5 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider border-b border-[#383838] flex items-center justify-between">
-                <span>Rapikan Kartu</span>
-                <span className="text-[#0d99ff] font-mono">{selectedCardIds.length} Kartu</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  handleAutoLayout('grid');
-                  setShowLayoutMenu(false);
-                }}
-                className="w-full px-2.5 py-1.5 rounded-lg text-left hover:bg-[#383838] flex items-center gap-2 text-slate-200 transition-colors font-medium cursor-pointer"
-              >
-                <Icons.LayoutGrid size={14} className="text-[#0d99ff]" />
-                <span>Matriks Grid (2D)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  handleAutoLayout('horizontal');
-                  setShowLayoutMenu(false);
-                }}
-                className="w-full px-2.5 py-1.5 rounded-lg text-left hover:bg-[#383838] flex items-center gap-2 text-slate-200 transition-colors font-medium cursor-pointer"
-              >
-                <Icons.MoveRight size={14} className="text-emerald-400" />
-                <span>Baris Horisontal</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  handleAutoLayout('vertical');
-                  setShowLayoutMenu(false);
-                }}
-                className="w-full px-2.5 py-1.5 rounded-lg text-left hover:bg-[#383838] flex items-center gap-2 text-slate-200 transition-colors font-medium cursor-pointer"
-              >
-                <Icons.MoveDown size={14} className="text-amber-400" />
-                <span>Kolom Vertikal</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  handleAutoLayout('circle');
-                  setShowLayoutMenu(false);
-                }}
-                className="w-full px-2.5 py-1.5 rounded-lg text-left hover:bg-[#383838] flex items-center gap-2 text-slate-200 transition-colors font-medium cursor-pointer"
-              >
-                <Icons.Circle size={14} className="text-purple-400" />
-                <span>Lingkaran (Radial)</span>
-              </button>
-            </div>
-          )}
-        </div>
 
         <div className="w-[1px] h-4 bg-[#383838] mx-0.5" />
 

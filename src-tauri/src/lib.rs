@@ -1,7 +1,10 @@
 pub mod models;
+pub mod processor;
 pub mod storage;
 
-use models::{WorldCard, WorldProject};
+use models::{
+    BezierResult, ProjectStats, TextSegment, WorldCard, WorldProject,
+};
 use tauri::AppHandle;
 
 #[tauri::command]
@@ -52,30 +55,68 @@ fn search_world_cards(
     storage::search_cards(&cards, &query, category.as_deref())
 }
 
+#[tauri::command]
+fn compute_bezier_path(
+    x1: f64,
+    y1: f64,
+    x2: f64,
+    y2: f64,
+    direction: String,
+) -> BezierResult {
+    processor::compute_bezier_path(x1, y1, x2, y2, &direction)
+}
+
+#[tauri::command]
+fn parse_mentions(content: String, cards: Vec<WorldCard>) -> Vec<TextSegment> {
+    processor::parse_mentions(&content, &cards)
+}
+
+
+
+#[tauri::command]
+fn sanitize_project(project: WorldProject) -> WorldProject {
+    processor::sanitize_project(project)
+}
+
+#[tauri::command]
+fn compute_project_stats(project: WorldProject) -> ProjectStats {
+    processor::compute_project_stats(&project)
+}
+
+#[tauri::command]
+fn export_project_to_markdown(project: WorldProject) -> String {
+    processor::export_project_to_markdown(&project)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
-    .plugin(tauri_plugin_dialog::init())
-    .invoke_handler(tauri::generate_handler![
-        save_world_project,
-        load_world_project,
-        list_world_projects,
-        delete_world_project,
-        export_world_project,
-        import_world_project,
-        save_image_asset,
-        search_world_cards
-    ])
-    .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
-      Ok(())
-    })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            save_world_project,
+            load_world_project,
+            list_world_projects,
+            delete_world_project,
+            export_world_project,
+            import_world_project,
+            save_image_asset,
+            search_world_cards,
+            compute_bezier_path,
+            parse_mentions,
+            sanitize_project,
+            compute_project_stats,
+            export_project_to_markdown
+        ])
+        .setup(|app| {
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
+            }
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }

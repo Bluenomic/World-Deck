@@ -117,3 +117,59 @@ pub struct WorldProject {
     pub created_at: f64,
     pub updated_at: f64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextSegment {
+    pub text: String,
+    #[serde(default)]
+    pub card_id: Option<String>,
+    #[serde(default)]
+    pub card_title: Option<String>,
+    pub is_mention: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BezierResult {
+    pub path: String,
+    pub mid_x: f64,
+    pub mid_y: f64,
+}
+
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryStat {
+    pub category: String,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagStat {
+    pub tag: String,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardConnectionStat {
+    pub card_id: String,
+    pub card_title: String,
+    pub connection_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectStats {
+    pub total_cards: usize,
+    pub total_connections: usize,
+    pub total_documents: usize,
+    pub total_canvases: usize,
+    pub category_counts: Vec<CategoryStat>,
+    pub top_tags: Vec<TagStat>,
+    pub most_connected_cards: Vec<CardConnectionStat>,
+    pub orphan_card_ids: Vec<String>,
+}

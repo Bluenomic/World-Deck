@@ -106,7 +106,8 @@ pub fn save_project_to_disk<R: tauri::Runtime>(
     let storage_dir = get_storage_dir(app_handle)?;
     let file_path = storage_dir.join(format!("{}.json", project.id));
     
-    let json_data = serde_json::to_string_pretty(project)
+    let sanitized = crate::processor::sanitize_project(project.clone());
+    let json_data = serde_json::to_string_pretty(&sanitized)
         .map_err(|e| format!("Failed to serialize project: {}", e))?;
 
     // Create a temporary file first for atomic write safety
