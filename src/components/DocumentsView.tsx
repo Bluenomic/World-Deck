@@ -112,9 +112,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const [mentionState, setMentionState] = useState<{
     isOpen: boolean;
     query: string;
+    x: number;
+    y: number;
+    selectedIndex: number;
   }>({
     isOpen: false,
     query: '',
+    x: 0,
+    y: 0,
+    selectedIndex: 0,
   });
 
   // Active document object
@@ -321,8 +327,42 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     execCmd('fontSize', sizeObj.cmdSize);
   };
 
-  // Keyboard Event Handler: Tab, Backspace, Ctrl+Z/Y/B/I/U Shortcuts
+  // Keyboard Event Handler: Tab, Backspace, Ctrl+Z/Y/B/I/U Shortcuts & @ Mention Keyboard Navigation
   const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (mentionState.isOpen && suggestedCards.length > 0) {
+      const maxIdx = suggestedCards.length - 1;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionState((prev) => ({
+          ...prev,
+          selectedIndex: prev.selectedIndex >= maxIdx ? 0 : prev.selectedIndex + 1,
+        }));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionState((prev) => ({
+          ...prev,
+          selectedIndex: prev.selectedIndex <= 0 ? maxIdx : prev.selectedIndex - 1,
+        }));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const safeIdx = Math.min(mentionState.selectedIndex, maxIdx);
+        const cardToInsert = suggestedCards[safeIdx] || suggestedCards[0];
+        if (cardToInsert) {
+          insertMentionCard(cardToInsert);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionState({ isOpen: false, query: '', x: 0, y: 0, selectedIndex: 0 });
+        return;
+      }
+    }
+
     if (e.key === 'Tab') {
       e.preventDefault();
       if (e.shiftKey) {
@@ -520,21 +560,28 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       return;
     }
 
-    // Check if clicked image or image wrapper
-    const imgEl = (target.tagName === 'IMG' ? target : target.querySelector('img')) as HTMLImageElement | null;
-    const wrapper = target.closest('.doc-img-wrapper') as HTMLElement || (imgEl ? imgEl.closest('.doc-img-wrapper') as HTMLElement : null);
+    // Check if clicked directly on image or image wrapper
+    const isImg = target.tagName === 'IMG';
+    const wrapper = target.closest('.doc-img-wrapper') as HTMLElement | null;
 
-    if (wrapper && (imgEl || wrapper.querySelector('img'))) {
-      const activeImg = (imgEl || wrapper.querySelector('img')) as HTMLImageElement;
-      const rect = activeImg.getBoundingClientRect();
-      let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
-      if (wrapper.classList.contains('img-mode-wrap-left') || wrapper.style.float === 'left') {
-        imgAlignMode = 'wrap-left';
-      } else if (wrapper.classList.contains('img-mode-wrap-right') || wrapper.style.float === 'right') {
-        imgAlignMode = 'wrap-right';
+    if (isImg || wrapper) {
+      const activeImg = (isImg ? target : wrapper?.querySelector('img')) as HTMLImageElement | null;
+      const activeWrapper = wrapper || (activeImg ? activeImg.closest('.doc-img-wrapper') as HTMLElement : null) || (activeImg ? activeImg.parentElement : null);
+
+      if (activeImg && activeWrapper) {
+        const rect = activeImg.getBoundingClientRect();
+        let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
+        if (activeWrapper.classList.contains('img-mode-wrap-left') || activeWrapper.style.float === 'left') {
+          imgAlignMode = 'wrap-left';
+        } else if (activeWrapper.classList.contains('img-mode-wrap-right') || activeWrapper.style.float === 'right') {
+          imgAlignMode = 'wrap-right';
+        }
+        setSelectedImage({ wrapper: activeWrapper, img: activeImg, mode: imgAlignMode, rect });
+        return;
       }
-      setSelectedImage({ wrapper, img: activeImg, mode: imgAlignMode, rect });
-    } else if (!target.closest('.doc-image-toolbar-popover') && !target.closest('.doc-image-resize-handle')) {
+    }
+
+    if (!target.closest('.doc-image-toolbar-popover') && !target.closest('.doc-image-resize-handle')) {
       setSelectedImage(null);
     }
   };
@@ -590,29 +637,33 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     if (mode !== 'editing') return;
 
     const target = e.target as HTMLElement;
-    const imgEl = (target.tagName === 'IMG' ? target : target.querySelector('img')) as HTMLImageElement | null;
-    const wrapper = target.closest('.doc-img-wrapper') as HTMLElement || (imgEl ? imgEl.closest('.doc-img-wrapper') as HTMLElement : null);
+    const isImg = target.tagName === 'IMG';
+    const wrapper = target.closest('.doc-img-wrapper') as HTMLElement | null;
 
-    if (wrapper && (imgEl || wrapper.querySelector('img'))) {
-      e.preventDefault();
-      e.stopPropagation();
-      const activeImg = (imgEl || wrapper.querySelector('img')) as HTMLImageElement;
-      const rect = activeImg.getBoundingClientRect();
-      let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
-      if (wrapper.classList.contains('img-mode-wrap-left') || wrapper.style.float === 'left') {
-        imgAlignMode = 'wrap-left';
-      } else if (wrapper.classList.contains('img-mode-wrap-right') || wrapper.style.float === 'right') {
-        imgAlignMode = 'wrap-right';
+    if (isImg || wrapper) {
+      const activeImg = (isImg ? target : wrapper?.querySelector('img')) as HTMLImageElement | null;
+      const activeWrapper = wrapper || (activeImg ? activeImg.closest('.doc-img-wrapper') as HTMLElement : null) || (activeImg ? activeImg.parentElement : null);
+
+      if (activeImg && activeWrapper) {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = activeImg.getBoundingClientRect();
+        let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
+        if (activeWrapper.classList.contains('img-mode-wrap-left') || activeWrapper.style.float === 'left') {
+          imgAlignMode = 'wrap-left';
+        } else if (activeWrapper.classList.contains('img-mode-wrap-right') || activeWrapper.style.float === 'right') {
+          imgAlignMode = 'wrap-right';
+        }
+
+        setSelectedImage({ wrapper: activeWrapper, img: activeImg, mode: imgAlignMode, rect });
+        setImageContextMenu({
+          x: Math.min(window.innerWidth - 230, e.clientX),
+          y: Math.min(window.innerHeight - 250, e.clientY),
+          wrapper: activeWrapper,
+          img: activeImg,
+          mode: imgAlignMode,
+        });
       }
-
-      setSelectedImage({ wrapper, img: activeImg, mode: imgAlignMode, rect });
-      setImageContextMenu({
-        x: Math.min(window.innerWidth - 230, e.clientX),
-        y: Math.min(window.innerHeight - 250, e.clientY),
-        wrapper,
-        img: activeImg,
-        mode: imgAlignMode,
-      });
     }
   };
 
@@ -818,7 +869,11 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   };
 
   // Handle Inline @ Mention in ContentEditable
-  const handleEditorKeyUp = () => {
+  const handleEditorKeyUp = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (mentionState.isOpen && ['ArrowUp', 'ArrowDown', 'Enter', 'Tab', 'Escape'].includes(e.key)) {
+      return;
+    }
+
     updateToolbarState();
     const selection = window.getSelection();
     if (!selection || !selection.focusNode) return;
@@ -833,25 +888,69 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       if (charBeforeAt === ' ' || charBeforeAt === '\u00A0' || lastAtIndex === 0) {
         const queryCandidate = textBeforeCursor.substring(lastAtIndex + 1);
         if (!queryCandidate.includes(' ') && !queryCandidate.includes('\u00A0')) {
-          setMentionState({
+          let cursorX = 100;
+          let cursorY = 100;
+          if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0).cloneRange();
+            let rect = range.getBoundingClientRect();
+            if ((rect.width === 0 && rect.height === 0) || (rect.top === 0 && rect.left === 0)) {
+              const rects = range.getClientRects();
+              if (rects.length > 0) {
+                rect = rects[0];
+              } else if (selection.focusNode.parentElement) {
+                rect = selection.focusNode.parentElement.getBoundingClientRect();
+              }
+            }
+            cursorX = Math.min(window.innerWidth - 300, Math.max(10, rect.left));
+            cursorY = Math.min(window.innerHeight - 260, rect.bottom + 4);
+          }
+
+          const newQuery = queryCandidate.toLowerCase();
+          setMentionState((prev) => ({
             isOpen: true,
-            query: queryCandidate.toLowerCase(),
-          });
+            query: newQuery,
+            x: cursorX,
+            y: cursorY,
+            selectedIndex: prev.query !== newQuery ? 0 : prev.selectedIndex,
+          }));
           return;
         }
       }
     }
 
     if (mentionState.isOpen) {
-      setMentionState({ isOpen: false, query: '' });
+      setMentionState({ isOpen: false, query: '', x: 0, y: 0, selectedIndex: 0 });
     }
   };
 
-  // Insert Mentioned Card as Rich Pill Badge
+  // Insert Mentioned Card as Rich Pill Badge & Delete Typed @query Text
   const insertMentionCard = (card: WorldCard) => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const focusNode = selection.focusNode;
+      if (focusNode && focusNode.nodeType === Node.TEXT_NODE) {
+        const text = focusNode.textContent || '';
+        const offset = selection.focusOffset;
+        const textBefore = text.substring(0, offset);
+        const lastAtIndex = textBefore.lastIndexOf('@');
+        if (lastAtIndex !== -1) {
+          try {
+            const range = document.createRange();
+            range.setStart(focusNode, lastAtIndex);
+            range.setEnd(focusNode, offset);
+            range.deleteContents();
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } catch (_e) {
+            // ignore range errors
+          }
+        }
+      }
+    }
+
     const badgeHtml = `<span contenteditable="false" data-card-id="${card.id}" class="card-mention-badge inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs font-semibold shadow-xs select-none cursor-pointer hover:bg-blue-500/30 transition-colors">@${card.title}</span>&nbsp;`;
     insertHtmlAtCursor(badgeHtml);
-    setMentionState({ isOpen: false, query: '' });
+    setMentionState({ isOpen: false, query: '', x: 0, y: 0, selectedIndex: 0 });
   };
 
   // Create New Document
@@ -1563,9 +1662,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                         className="w-full flex-1 bg-transparent text-base leading-relaxed app-text-main focus:outline-none resize-none font-sans space-y-3 p-1 min-h-[650px] border-0 break-words [overflow-wrap:anywhere] min-w-0 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:text-3xl [&_h1]:font-extrabold [&_h1]:my-4 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:my-3 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:my-2"
                       />
 
-                      {/* Inline @ Mention Suggestion Overlay */}
+                      {/* Inline @ Mention Suggestion Overlay (Positioned precisely at text cursor) */}
                       {mentionState.isOpen && (
-                        <div className="absolute top-12 left-0 w-72 app-bg-secondary border border-blue-500/40 rounded-2xl shadow-2xl p-2 z-50 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 space-y-1">
+                        <div
+                          className="doc-mention-popover fixed z-[160] w-72 app-bg-secondary border border-blue-500/40 rounded-2xl shadow-2xl p-2 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 space-y-1"
+                          style={{
+                            top: `${mentionState.y}px`,
+                            left: `${mentionState.x}px`,
+                          }}
+                        >
                           <div className="px-2 py-1 text-[10px] font-bold text-slate-300 uppercase border-b border-slate-800 flex items-center justify-between">
                             <span>Sisipkan Kartu (@)</span>
                             <span className="text-blue-400">{suggestedCards.length} ditemukan</span>
@@ -1576,28 +1681,36 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                               Tidak ada kartu yang cocok...
                             </div>
                           ) : (
-                            suggestedCards.map((card) => (
-                              <button
-                                key={card.id}
-                                type="button"
-                                onClick={() => insertMentionCard(card)}
-                                className="w-full text-left px-3 py-2 rounded-xl hover:bg-blue-600/20 hover:border-blue-500/30 border border-transparent transition-all flex items-center justify-between group cursor-pointer"
-                              >
-                                <div className="truncate pr-2">
-                                  <div className="text-xs font-bold text-slate-100 group-hover:text-blue-300 truncate">
-                                    {card.title}
-                                  </div>
-                                  {card.subtitle && (
-                                    <div className="text-[10px] text-slate-400 truncate">
-                                      {card.subtitle}
+                            suggestedCards.map((card, idx) => {
+                              const isSelected = idx === mentionState.selectedIndex;
+                              return (
+                                <button
+                                  key={card.id}
+                                  type="button"
+                                  onClick={() => insertMentionCard(card)}
+                                  onMouseEnter={() => setMentionState((prev) => ({ ...prev, selectedIndex: idx }))}
+                                  className={`w-full text-left px-3 py-2 rounded-xl border transition-all flex items-center justify-between group cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-blue-600/30 border-blue-500/60 text-white shadow-xs'
+                                      : 'border-transparent hover:bg-slate-800/60 text-slate-300 hover:text-white'
+                                  }`}
+                                >
+                                  <div className="truncate pr-2">
+                                    <div className={`text-xs font-bold truncate ${isSelected ? 'text-blue-200' : 'text-slate-100 group-hover:text-blue-300'}`}>
+                                      {card.title}
                                     </div>
-                                  )}
-                                </div>
-                                <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-mono app-accent-bg text-white shrink-0">
-                                  {card.category}
-                                </span>
-                              </button>
-                            ))
+                                    {card.subtitle && (
+                                      <div className="text-[10px] text-slate-400 truncate">
+                                        {card.subtitle}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-mono app-accent-bg text-white shrink-0">
+                                    {card.category}
+                                  </span>
+                                </button>
+                              );
+                            })
                           )}
                         </div>
                       )}
