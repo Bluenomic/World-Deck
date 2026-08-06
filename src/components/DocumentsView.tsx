@@ -12,6 +12,7 @@ interface DocumentsViewProps {
   onDeleteDocument: (docId: string) => void;
   onCreateDocument: (doc: WorldDocument) => void;
   onOpenCard?: (card: WorldCard) => void;
+  onCreateCard?: (card: WorldCard) => void;
 }
 
 const FONT_SIZES = [
@@ -29,6 +30,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   onDeleteDocument,
   onCreateDocument,
   onOpenCard,
+  onCreateCard,
 }) => {
   const [activeDocId, setActiveDocId] = useState<string | null>(
     documents.length > 0 ? documents[0].id : null
@@ -63,6 +65,14 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     wrapper: HTMLElement;
     img: HTMLImageElement;
     mode: 'inline' | 'wrap-left' | 'wrap-right';
+  } | null>(null);
+
+  // Context Menu State for Right-Clicking Text / Editor Area
+  const [editorContextMenu, setEditorContextMenu] = useState<{
+    x: number;
+    y: number;
+    selectedText: string;
+    showMentionSubmenu?: boolean;
   } | null>(null);
 
   // Inline Google Docs-style Crop State
@@ -421,16 +431,27 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     }
   }, [mode]);
 
-  // Close context menu on document click
+  // Close context menu on document click & scroll
   useEffect(() => {
     const handleCloseMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('.doc-image-context-menu')) {
+      if (!target.closest('.doc-image-context-menu') && !target.closest('.doc-text-context-menu')) {
         setImageContextMenu(null);
+        setEditorContextMenu(null);
       }
     };
+
+    const handleScrollClose = () => {
+      setImageContextMenu(null);
+      setEditorContextMenu(null);
+    };
+
     window.addEventListener('click', handleCloseMenu);
-    return () => window.removeEventListener('click', handleCloseMenu);
+    window.addEventListener('scroll', handleScrollClose, true);
+    return () => {
+      window.removeEventListener('click', handleCloseMenu);
+      window.removeEventListener('scroll', handleScrollClose, true);
+    };
   }, []);
 
   // Auto-sync selectedImage rect position and dimensions with actual image DOM node
@@ -632,7 +653,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  // Handle Right-Click Context Menu on Image
+  // Handle Right-Click Context Menu on Image or Text Editor
   const handleContextMenuDetect = (e: React.MouseEvent<HTMLDivElement>) => {
     if (mode !== 'editing') return;
 
@@ -663,8 +684,45 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
           img: activeImg,
           mode: imgAlignMode,
         });
+        setEditorContextMenu(null);
       }
+    } else {
+      e.preventDefault();
+      e.stopPropagation();
+      const selText = window.getSelection()?.toString().trim() || '';
+      setImageContextMenu(null);
+      setEditorContextMenu({
+        x: Math.min(window.innerWidth - 270, e.clientX),
+        y: Math.min(window.innerHeight - 380, e.clientY),
+        selectedText: selText,
+      });
     }
+  };
+
+  // Create New Card from Selected Text in Editor
+  const handleCreateCardFromSelectedText = (selectedText: string) => {
+    if (!selectedText.trim()) return;
+    const title = selectedText.length > 40 ? `${selectedText.substring(0, 40)}...` : selectedText;
+    const newCard: WorldCard = {
+      id: generateId('card'),
+      title,
+      subtitle: 'Dibuat dari teks naskah',
+      category: 'character',
+      summary: selectedText,
+      content: `<p>${selectedText}</p>`,
+      tags: ['naskah'],
+      attributes: [],
+      x: 300,
+      y: 300,
+      canvasId: undefined,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    if (onCreateCard) {
+      onCreateCard(newCard);
+    }
+    insertMentionCard(newCard);
   };
 
   // Inline Crop Drag Handler (Google Docs style 8 handles)
@@ -2091,6 +2149,286 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
             <Icons.Trash2 size={14} />
             <span>Hapus Gambar</span>
           </button>
+        </div>
+      )}
+
+      {/* Right-Click Context Menu for General Document Text & Editor */}
+      {editorContextMenu && (
+        <div
+          className="doc-text-context-menu fixed z-[150] w-64 app-bg-secondary border border-slate-700/80 shadow-2xl rounded-2xl py-1.5 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 select-none space-y-0.5"
+          style={{
+            top: `${editorContextMenu.y}px`,
+            left: `${editorContextMenu.x}px`,
+          }}
+        >
+          {/* Section: Worldbuilding & Card Actions */}
+          {cards.length > 0 && (
+            <div className="p-1 space-y-0.5">
+              {/* Insert Card Mention (@) */}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditorContextMenu((prev) =>
+                      prev ? { ...prev, showMentionSubmenu: !prev.showMentionSubmenu } : null
+                    );
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between hover:bg-slate-800 text-blue-300 font-medium transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Icons.AtSign size={14} className="text-blue-400" />
+                    <span>Sisipkan Kartu (@)</span>
+                  </div>
+                  <Icons.ChevronRight size={13} className="text-slate-400" />
+                </button>
+
+                {/* Submenu for Cards List */}
+                {editorContextMenu.showMentionSubmenu && (
+                  <div className="absolute left-full top-0 ml-1 w-56 max-h-60 overflow-y-auto app-bg-secondary border border-slate-700/80 shadow-2xl rounded-2xl p-1 z-[160] space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                      Pilih Kartu
+                    </div>
+                    {cards.slice(0, 15).map((card) => {
+                      const config = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
+                      const IconComp = (Icons as any)[config.iconName] || Icons.HelpCircle;
+                      return (
+                        <button
+                          key={card.id}
+                          type="button"
+                          onClick={() => {
+                            insertMentionCard(card);
+                            setEditorContextMenu(null);
+                          }}
+                          className="w-full px-2 py-1.5 rounded-lg flex items-center gap-2 hover:bg-blue-600/20 hover:text-blue-200 text-left transition-colors cursor-pointer truncate"
+                        >
+                          <IconComp size={13} className="text-blue-400 shrink-0" />
+                          <span className="truncate text-xs">{card.title}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Create New Card from Selected Text */}
+              {editorContextMenu.selectedText && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleCreateCardFromSelectedText(editorContextMenu.selectedText);
+                    setEditorContextMenu(null);
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-xl flex items-center gap-2 hover:bg-amber-500/20 text-amber-300 font-medium transition-colors cursor-pointer"
+                >
+                  <Icons.Sparkles size={14} className="text-amber-400 shrink-0" />
+                  <span className="truncate">Buat Kartu dari Teks Pilihan</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="my-1 border-t border-slate-800" />
+
+          {/* Section: Clipboard Operations */}
+          <div className="p-1 grid grid-cols-3 gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                document.execCommand('cut');
+                setEditorContextMenu(null);
+              }}
+              className="px-2 py-1.5 rounded-lg hover:bg-slate-800 flex flex-col items-center justify-center gap-1 text-slate-300 transition-colors cursor-pointer"
+              title="Potong (Ctrl+X)"
+            >
+              <Icons.Scissors size={14} />
+              <span className="text-[10px]">Potong</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                document.execCommand('copy');
+                setEditorContextMenu(null);
+              }}
+              className="px-2 py-1.5 rounded-lg hover:bg-slate-800 flex flex-col items-center justify-center gap-1 text-slate-300 transition-colors cursor-pointer"
+              title="Salin (Ctrl+C)"
+            >
+              <Icons.Copy size={14} />
+              <span className="text-[10px]">Salin</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const text = await navigator.clipboard.readText();
+                  if (text) {
+                    insertHtmlAtCursor(text.replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+                  }
+                } catch (_err) {
+                  document.execCommand('paste');
+                }
+                setEditorContextMenu(null);
+              }}
+              className="px-2 py-1.5 rounded-lg hover:bg-slate-800 flex flex-col items-center justify-center gap-1 text-slate-300 transition-colors cursor-pointer"
+              title="Tempel (Ctrl+V)"
+            >
+              <Icons.Clipboard size={14} />
+              <span className="text-[10px]">Tempel</span>
+            </button>
+          </div>
+
+          <div className="my-1 border-t border-slate-800" />
+
+          {/* Section: Formatting Shortcuts */}
+          <div className="p-1 space-y-0.5">
+            <div className="flex items-center justify-between gap-1 px-1">
+              <button
+                type="button"
+                onClick={() => {
+                  execCmd('bold');
+                  setEditorContextMenu(null);
+                }}
+                className="flex-1 p-1.5 rounded-lg hover:bg-slate-800 flex items-center justify-center text-slate-200 transition-colors cursor-pointer"
+                title="Tebal (Ctrl+B)"
+              >
+                <Icons.Bold size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  execCmd('italic');
+                  setEditorContextMenu(null);
+                }}
+                className="flex-1 p-1.5 rounded-lg hover:bg-slate-800 flex items-center justify-center text-slate-200 transition-colors cursor-pointer"
+                title="Miring (Ctrl+I)"
+              >
+                <Icons.Italic size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  execCmd('underline');
+                  setEditorContextMenu(null);
+                }}
+                className="flex-1 p-1.5 rounded-lg hover:bg-slate-800 flex items-center justify-center text-slate-200 transition-colors cursor-pointer"
+                title="Garis Bawah (Ctrl+U)"
+              >
+                <Icons.Underline size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  execCmd('strikeThrough');
+                  setEditorContextMenu(null);
+                }}
+                className="flex-1 p-1.5 rounded-lg hover:bg-slate-800 flex items-center justify-center text-slate-200 transition-colors cursor-pointer"
+                title="Coret"
+              >
+                <Icons.Strikethrough size={14} />
+              </button>
+            </div>
+
+            {/* Header Toggles */}
+            <div className="grid grid-cols-4 gap-1 px-1 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  toggleHeader('h1');
+                  setEditorContextMenu(null);
+                }}
+                className="px-1.5 py-1 rounded bg-slate-800/80 hover:bg-blue-600/30 text-[10px] font-bold text-slate-200 text-center transition-colors cursor-pointer"
+              >
+                H1
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleHeader('h2');
+                  setEditorContextMenu(null);
+                }}
+                className="px-1.5 py-1 rounded bg-slate-800/80 hover:bg-blue-600/30 text-[10px] font-bold text-slate-200 text-center transition-colors cursor-pointer"
+              >
+                H2
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleHeader('h3');
+                  setEditorContextMenu(null);
+                }}
+                className="px-1.5 py-1 rounded bg-slate-800/80 hover:bg-blue-600/30 text-[10px] font-bold text-slate-200 text-center transition-colors cursor-pointer"
+              >
+                H3
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleHeader('p');
+                  setEditorContextMenu(null);
+                }}
+                className="px-1.5 py-1 rounded bg-slate-800/80 hover:bg-blue-600/30 text-[10px] text-slate-300 text-center transition-colors cursor-pointer"
+              >
+                Teks
+              </button>
+            </div>
+
+            {/* Clear Formatting */}
+            <button
+              type="button"
+              onClick={() => {
+                execCmd('removeFormat');
+                setEditorContextMenu(null);
+              }}
+              className="w-full px-2.5 py-1.5 rounded-xl flex items-center gap-2 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              <Icons.RemoveFormatting size={13} />
+              <span>Hapus Format Teks</span>
+            </button>
+          </div>
+
+          <div className="my-1 border-t border-slate-800" />
+
+          {/* Section: Insert Elements */}
+          <div className="p-1 space-y-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                imageInputRef.current?.click();
+                setEditorContextMenu(null);
+              }}
+              className="w-full px-2.5 py-1.5 rounded-xl flex items-center gap-2 hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
+            >
+              <Icons.Image size={14} className="text-emerald-400" />
+              <span>Sisipkan Gambar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                insertHtmlAtCursor('<hr class="my-6 border-slate-700/80" /><p><br/></p>');
+                setEditorContextMenu(null);
+              }}
+              className="w-full px-2.5 py-1.5 rounded-xl flex items-center gap-2 hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
+            >
+              <Icons.Minus size={14} className="text-slate-400" />
+              <span>Garis Pembatas (HR)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                insertHtmlAtCursor(
+                  '<div class="p-4 my-4 bg-blue-950/40 border-l-4 border-blue-500 rounded-r-xl text-slate-200"><p>📌 Catatan penting...</p></div><p><br/></p>'
+                );
+                setEditorContextMenu(null);
+              }}
+              className="w-full px-2.5 py-1.5 rounded-xl flex items-center gap-2 hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
+            >
+              <Icons.SquarePen size={14} className="text-amber-400" />
+              <span>Kotak Catatan (Callout)</span>
+            </button>
+          </div>
         </div>
       )}
 

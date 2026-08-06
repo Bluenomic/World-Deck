@@ -1185,6 +1185,13 @@ export const App: React.FC = () => {
               onDeleteDocument={handleDeleteDocument}
               onCreateDocument={handleCreateDocument}
               onOpenCard={(card) => setReaderCardId(card.id)}
+              onCreateCard={(newCard) => {
+                updateActiveWorld((prev) => ({
+                  ...prev,
+                  updatedAt: Date.now(),
+                  cards: [...prev.cards, newCard],
+                }));
+              }}
             />
           )}
         </main>
