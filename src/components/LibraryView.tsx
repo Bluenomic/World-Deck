@@ -1538,10 +1538,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
         {/* UNIFIED GRID / LIST DISPLAY SECTION */}
         {totalItemsCount === 0 ? (
-          <div className="text-center py-16 bg-[#2c2c2c] rounded-2xl border border-[#383838] text-slate-400 space-y-3">
-            <Icons.FileText size={36} className="mx-auto text-slate-500 opacity-50" />
-            <p className="text-xs">Tidak ada item atau kartu ditemukan dalam galeri ini.</p>
-            <p className="text-[11px] text-slate-500">Klik kanan di area kosong untuk membuat kartu atau deck baru.</p>
+          <div className="text-center py-20 text-slate-400 space-y-3 select-none">
+            {activeDeckId ? (
+              <>
+                <Icons.SquareStack size={56} className="mx-auto text-slate-500/50 stroke-[1.5]" />
+                <p className="text-sm font-medium text-slate-400">Tidak ada kartu di deck ini</p>
+              </>
+            ) : (
+              <>
+                <Icons.FileText size={56} className="mx-auto text-slate-500/50 stroke-[1.5]" />
+                <p className="text-sm font-medium text-slate-400">Tidak ada item atau kartu ditemukan dalam galeri ini</p>
+                <p className="text-xs text-slate-500">Klik kanan di area kosong untuk membuat kartu atau deck baru.</p>
+              </>
+            )}
           </div>
         ) : viewLayout === 'list' ? (
           /* COMPACT LIST / TABLE VIEW */
