@@ -104,6 +104,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     canvasX: number;
     canvasY: number;
     targetCardId?: string | null;
+    isNearRight?: boolean;
+    isNearBottom?: boolean;
   }>({
     visible: false,
     x: 0,
@@ -111,6 +113,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     canvasX: 0,
     canvasY: 0,
     targetCardId: null,
+    isNearRight: false,
+    isNearBottom: false,
   });
 
   // Add Card From Gallery Modal State
@@ -180,13 +184,18 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
     }
 
+    const isNearRight = e.clientX > window.innerWidth - 240;
+    const isNearBottom = e.clientY > window.innerHeight - 220;
+
     setContextMenu({
       visible: true,
-      x: screenX,
-      y: screenY,
+      x: e.clientX,
+      y: e.clientY,
       canvasX,
       canvasY,
       targetCardId,
+      isNearRight,
+      isNearBottom,
     });
   };
 
@@ -213,6 +222,23 @@ export const Canvas: React.FC<CanvasProps> = ({
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
+
+  // Close context menu on window scroll or canvas zoom/pan wheel
+  useEffect(() => {
+    if (!contextMenu.visible) return;
+
+    const handleScrollOrWheel = () => {
+      setContextMenu((prev) => ({ ...prev, visible: false }));
+    };
+
+    window.addEventListener('scroll', handleScrollOrWheel, true);
+    window.addEventListener('wheel', handleScrollOrWheel, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrWheel, true);
+      window.removeEventListener('wheel', handleScrollOrWheel);
+    };
+  }, [contextMenu.visible]);
 
   // Delete/Backspace Key Listener for Selected Cards & Selected Connections
   useEffect(() => {
@@ -1234,8 +1260,12 @@ export const Canvas: React.FC<CanvasProps> = ({
         const clickedCard = contextMenu.targetCardId ? cards.find((c) => c.id === contextMenu.targetCardId) : null;
         return (
           <div
-            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-52 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-800"
-            style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-56 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-800 max-h-[85vh] overflow-y-auto custom-scrollbar"
+            style={{
+              top: `${contextMenu.y}px`,
+              left: `${contextMenu.x}px`,
+              transform: `translate(${contextMenu.isNearRight ? '-100%' : '0'}, ${contextMenu.isNearBottom ? '-100%' : '0'})`,
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {clickedCard ? (
@@ -1308,10 +1338,6 @@ export const Canvas: React.FC<CanvasProps> = ({
               </>
             ) : (
               <>
-                <div className="px-3 py-1.5 text-[10px] app-text-muted font-semibold uppercase tracking-wider select-none">
-                  Aksi Canvas
-                </div>
-
                 <div className="py-1">
                   <button
                     type="button"

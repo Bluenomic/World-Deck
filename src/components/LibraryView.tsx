@@ -109,12 +109,16 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     y: number;
     targetCard: WorldCard | null;
     targetDeck: WorldDeck | null;
+    isNearRight?: boolean;
+    isNearBottom?: boolean;
   }>({
     visible: false,
     x: 0,
     y: 0,
     targetCard: null,
     targetDeck: null,
+    isNearRight: false,
+    isNearBottom: false,
   });
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
@@ -1238,19 +1242,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     );
   };
 
-  // Context Menu Handlers with Smart Viewport Clamping
+  // Context Menu Handlers with Smart Viewport Flipping
   const handleContextMenu = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
     e.preventDefault();
     e.stopPropagation();
 
-    const menuWidth = 240;
-    const menuHeight = 360;
-    const clampedX = Math.min(e.clientX, window.innerWidth - menuWidth - 16);
-    const clampedY = Math.min(e.clientY, window.innerHeight - menuHeight - 16);
-    const posX = Math.max(16, clampedX);
-    const posY = Math.max(16, clampedY);
+    const isNearRight = e.clientX > window.innerWidth - 240;
+    const isNearBottom = e.clientY > window.innerHeight - 250;
 
     // Check if right-clicked on a card
     const cardEl = target.closest('.card-grid-item');
@@ -1258,7 +1258,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       const cardId = cardEl.getAttribute('data-card-id');
       const card = cardId ? cards.find(c => c.id === cardId) : null;
       if (card) {
-        setContextMenu({ visible: true, x: posX, y: posY, targetCard: card, targetDeck: null });
+        setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: card, targetDeck: null, isNearRight, isNearBottom });
         return;
       }
     }
@@ -1269,14 +1269,31 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       const deckId = deckEl.getAttribute('data-deck-id');
       const deck = deckId ? decks.find(d => d.id === deckId) : null;
       if (deck) {
-        setContextMenu({ visible: true, x: posX, y: posY, targetCard: null, targetDeck: deck });
+        setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: null, targetDeck: deck, isNearRight, isNearBottom });
         return;
       }
     }
 
-    // Background click
-    setContextMenu({ visible: true, x: posX, y: posY, targetCard: null, targetDeck: null });
+    // Right-clicked on empty space
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: null, targetDeck: null, isNearRight, isNearBottom });
   };
+
+  // Close context menu on window scroll or wheel
+  useEffect(() => {
+    if (!contextMenu.visible) return;
+
+    const handleScrollOrWheel = () => {
+      setContextMenu((prev) => ({ ...prev, visible: false }));
+    };
+
+    window.addEventListener('scroll', handleScrollOrWheel, true);
+    window.addEventListener('wheel', handleScrollOrWheel, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrWheel, true);
+      window.removeEventListener('wheel', handleScrollOrWheel);
+    };
+  }, [contextMenu.visible]);
 
   useEffect(() => {
     if (!contextMenu.visible) return;
@@ -1641,7 +1658,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           <div
             ref={contextMenuRef}
             className="fixed bg-[#2c2c2c] border border-[#383838] rounded-xl shadow-2xl py-1.5 w-60 max-h-[85vh] overflow-y-auto custom-scrollbar z-[100] text-xs text-white animate-in fade-in zoom-in-95 duration-100 divide-y divide-[#383838]"
-            style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+            style={{
+              top: `${contextMenu.y}px`,
+              left: `${contextMenu.x}px`,
+              transform: `translate(${contextMenu.isNearRight ? '-100%' : '0'}, ${contextMenu.isNearBottom ? '-100%' : '0'})`,
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {contextMenu.targetDeck ? (
