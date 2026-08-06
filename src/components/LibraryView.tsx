@@ -43,8 +43,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   // View Layout Mode: 'grid' (Card Grid) vs 'list' (Compact Table/List)
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
 
-  // Sorting Mode: 'updated' | 'created' | 'title'
-  const [sortBy, setSortBy] = useState<'updated' | 'created' | 'title'>('updated');
+  // Sorting Mode: 'custom' (Manual Drag Order) | 'updated' | 'created' | 'title'
+  const [sortBy, setSortBy] = useState<'custom' | 'updated' | 'created' | 'title'>('custom');
 
   // Tag Filter State
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
@@ -315,6 +315,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
     setTimeout(() => {
       if (currentLiveOrder) {
+        setSortBy('custom');
         onReorderCards(currentLiveOrder);
       }
       setJustDroppedCardId(currentCardId);
@@ -440,6 +441,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
   // Filtered & Sorted Cards
   const sortedCards = React.useMemo(() => {
+    // When dragging live to reorder OR when in manual drag order, preserve displayCards order!
+    if (liveOrder || sortBy === 'custom') {
+      let list = [...displayCards];
+      if (selectedTagFilter) {
+        list = list.filter((c) => c.tags && c.tags.includes(selectedTagFilter));
+      }
+      return list;
+    }
+
     let list = [...displayCards];
 
     if (selectedTagFilter) {
@@ -461,7 +471,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     });
 
     return list;
-  }, [displayCards, selectedTagFilter, pinnedCardIds, sortBy]);
+  }, [displayCards, liveOrder, selectedTagFilter, pinnedCardIds, sortBy]);
 
   // Determine if remove zone should be visible (only inside deck + dragging + near top/hovered/success)
   const shouldShowRemoveZone =
@@ -1014,12 +1024,233 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     );
   };
 
-  // Context Menu Handlers
+  // Render Compact List View Row for Card
+  const renderCardListItem = (card: WorldCard) => {
+    const cfg = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
+    const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle || (() => null);
+    const assignedDeck = decks.find((d) => d.id === card.deckId || (d.cardIds || []).includes(card.id));
+    const isPinned = pinnedCardIds.has(card.id);
+    const isSelected = selectedCardIds.has(card.id);
+    const isBeingDragged = draggedCardId === card.id;
+
+    return (
+      <div
+        key={`list-card-${card.id}`}
+        ref={(el) => {
+          if (el) cardDomRefs.current.set(card.id, el);
+          else cardDomRefs.current.delete(card.id);
+        }}
+        draggable={true}
+        onMouseDown={() => handleTouchMouseDown(card.id)}
+        onMouseUp={handleTouchMouseUp}
+        onMouseLeave={handleTouchMouseUp}
+        onTouchStart={() => handleTouchMouseDown(card.id)}
+        onTouchEnd={handleTouchMouseUp}
+        onDragStart={(e) => {
+          if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+          }
+          isLongPressRef.current = false;
+          if (isDroppingRef.current) return;
+          e.dataTransfer.setData('text/plain', card.id);
+          e.dataTransfer.effectAllowed = 'move';
+          draggedCardIdRef.current = card.id;
+
+          setDraggedCardData(card);
+
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          dragOffsetRef.current = {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          };
+          dragPosRef.current = { x: e.clientX, y: e.clientY };
+
+          if (transparentImgRef.current && e.dataTransfer.setDragImage) {
+            e.dataTransfer.setDragImage(transparentImgRef.current, 0, 0);
+          }
+
+          cardDomRefs.current.forEach((el, id) => {
+            if (el) prevRectsRef.current.set(id, el.getBoundingClientRect());
+          });
+
+          const initOrder = cardsToDisplay.map((c) => c.id);
+          liveOrderRef.current = initOrder;
+          setLiveOrder(initOrder);
+          setDraggedCardId(card.id);
+          setDroppingCardId(null);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (isDroppingRef.current || !draggedCardId || draggedCardId === card.id || !liveOrder) return;
+
+          const now = Date.now();
+          if (now - lastSwapTimeRef.current < 120) return;
+
+          const fromIdx = liveOrder.indexOf(draggedCardId);
+          const toIdx = liveOrder.indexOf(card.id);
+
+          if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const cursorY = e.clientY;
+            const midY = rect.top + rect.height / 2;
+
+            const isForward = fromIdx < toIdx;
+            const crossedMidpoint = isForward ? cursorY > midY + 4 : cursorY < midY - 4;
+
+            if (crossedMidpoint) {
+              lastSwapTimeRef.current = now;
+              const nextOrder = [...liveOrder];
+              nextOrder.splice(fromIdx, 1);
+              nextOrder.splice(toIdx, 0, draggedCardId);
+              updateLiveOrderWithFLIP(nextOrder);
+            }
+          }
+        }}
+        onDragEnd={handleCardDrop}
+        onDrop={handleCardDrop}
+        data-card-id={card.id}
+        onClick={(e) => {
+          if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+          }
+
+          if (isLongPressRef.current) {
+            isLongPressRef.current = false;
+            return;
+          }
+
+          if (!draggedCardIdRef.current && !isDroppingRef.current) {
+            if (isSelectionMode || e.ctrlKey || e.metaKey) {
+              setSelectedCardIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(card.id)) next.delete(card.id);
+                else next.add(card.id);
+                return next;
+              });
+            } else {
+              setSelectedCardIds(new Set());
+              onCardClick(card);
+            }
+          }
+        }}
+        className={`px-4 py-2.5 rounded-xl border flex items-center justify-between gap-3 transition-all cursor-grab active:cursor-grabbing select-none group bg-[#2c2c2c] border-[#383838] hover:border-[#0d99ff] ${
+          isBeingDragged
+            ? 'opacity-30 border-dashed border-[#0d99ff]'
+            : isSelected
+            ? 'bg-[#0d99ff]/10 border-[#0d99ff] ring-1 ring-[#0d99ff]'
+            : ''
+        }`}
+      >
+        <div className="flex items-center gap-3 overflow-hidden">
+          {/* Pin Button */}
+          <button
+            type="button"
+            onClick={(e) => togglePinCard(card.id, e)}
+            className={`p-1 rounded-md transition-colors cursor-pointer shrink-0 ${
+              isPinned ? 'text-amber-400 bg-amber-400/10' : 'text-slate-500 opacity-30 group-hover:opacity-100 hover:text-amber-400'
+            }`}
+            title={isPinned ? 'Lepas Sematan' : 'Sematkan ke Atas'}
+          >
+            <Icons.Pin size={13} className={isPinned ? 'fill-amber-400' : ''} />
+          </button>
+
+          {/* Square Image Thumbnail Avatar (36x36px) or Category Icon */}
+          {card.imageUrl ? (
+            <div className="w-9 h-9 rounded-lg overflow-hidden border border-[#383838] bg-[#1e1e1e] shrink-0">
+              <img
+                src={card.imageUrl}
+                alt={card.title}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            </div>
+          ) : (
+            <div
+              className="w-9 h-9 rounded-lg flex items-center justify-center border shrink-0 bg-[#1e1e1e]"
+              style={{ borderColor: `${cfg.color}40`, color: cfg.color }}
+            >
+              <IconComp size={16} />
+            </div>
+          )}
+
+          {/* Category Badge */}
+          <div
+            className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border shrink-0 ${cfg.bgGradient} ${cfg.borderColor}`}
+            style={{ color: cfg.color }}
+          >
+            <IconComp size={11} />
+            <span>{cfg.label}</span>
+          </div>
+
+          {/* Title & Summary */}
+          <div className="truncate">
+            <h4 className="text-xs font-bold text-white group-hover:text-[#0d99ff] transition-colors truncate">
+              {card.title || 'Kartu Tanpa Judul'}
+            </h4>
+            <p className="text-[10px] text-slate-400 truncate max-w-[300px] md:max-w-[450px]">
+              {card.summary || card.subtitle || 'Belum ada ringkasan...'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0 text-xs">
+          {/* Assigned Deck Badge */}
+          {assignedDeck ? (
+            <span
+              className="text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 shrink-0"
+              style={{
+                borderColor: assignedDeck.color || '#0d99ff',
+                color: assignedDeck.color || '#0d99ff',
+                backgroundColor: `${assignedDeck.color || '#0d99ff'}15`,
+              }}
+            >
+              <Icons.Layers size={10} />
+              <span className="truncate max-w-[90px]">{assignedDeck.name}</span>
+            </span>
+          ) : (
+            <span className="text-[10px] text-slate-500 italic shrink-0 hidden sm:inline">Mandiri</span>
+          )}
+
+          {/* Tags */}
+          {card.tags && card.tags.length > 0 && (
+            <div className="hidden lg:flex items-center gap-1 shrink-0">
+              {card.tags.slice(0, 2).map((t, idx) => (
+                <span key={idx} className="text-[9px] px-1.5 py-0.5 rounded bg-[#1e1e1e] text-slate-400 border border-[#383838]">
+                  #{t}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Date */}
+          <span className="text-[10px] font-mono text-slate-400 hidden md:inline shrink-0">
+            {new Date(card.updatedAt || Date.now()).toLocaleDateString('id-ID', {
+              day: 'numeric',
+              month: 'short',
+            })}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  // Context Menu Handlers with Smart Viewport Clamping
   const handleContextMenu = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
     e.preventDefault();
     e.stopPropagation();
+
+    const menuWidth = 240;
+    const menuHeight = 360;
+    const clampedX = Math.min(e.clientX, window.innerWidth - menuWidth - 16);
+    const clampedY = Math.min(e.clientY, window.innerHeight - menuHeight - 16);
+    const posX = Math.max(16, clampedX);
+    const posY = Math.max(16, clampedY);
 
     // Check if right-clicked on a card
     const cardEl = target.closest('.card-grid-item');
@@ -1027,7 +1258,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       const cardId = cardEl.getAttribute('data-card-id');
       const card = cardId ? cards.find(c => c.id === cardId) : null;
       if (card) {
-        setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: card, targetDeck: null });
+        setContextMenu({ visible: true, x: posX, y: posY, targetCard: card, targetDeck: null });
         return;
       }
     }
@@ -1038,13 +1269,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       const deckId = deckEl.getAttribute('data-deck-id');
       const deck = deckId ? decks.find(d => d.id === deckId) : null;
       if (deck) {
-        setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: null, targetDeck: deck });
+        setContextMenu({ visible: true, x: posX, y: posY, targetCard: null, targetDeck: deck });
         return;
       }
     }
 
     // Background click
-    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, targetCard: null, targetDeck: null });
+    setContextMenu({ visible: true, x: posX, y: posY, targetCard: null, targetDeck: null });
   };
 
   useEffect(() => {
@@ -1201,6 +1432,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   onChange={(e) => setSortBy(e.target.value as any)}
                   className="px-2.5 py-1.5 rounded-xl bg-[#1e1e1e] border border-[#383838] text-slate-200 text-xs font-semibold cursor-pointer outline-none"
                 >
+                  <option value="custom">Urutan Manual (Drag & Drop)</option>
                   <option value="updated">Terakhir Diubah</option>
                   <option value="created">Tanggal Dibuat</option>
                   <option value="title">Judul (A-Z)</option>
@@ -1314,7 +1546,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 </span>
               </div>
             ))}
-            {showCardsInGrid && sortedCards.map(renderCardItem)}
+            {showCardsInGrid && sortedCards.map(renderCardListItem)}
           </div>
         ) : (
           /* CARD GRID VIEW */
@@ -1408,14 +1640,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         {contextMenu.visible && (
           <div
             ref={contextMenuRef}
-            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-52 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-700/50"
+            className="fixed bg-[#2c2c2c] border border-[#383838] rounded-xl shadow-2xl py-1.5 w-60 max-h-[85vh] overflow-y-auto custom-scrollbar z-[100] text-xs text-white animate-in fade-in zoom-in-95 duration-100 divide-y divide-[#383838]"
             style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
             onClick={(e) => e.stopPropagation()}
           >
             {contextMenu.targetDeck ? (
               <>
-                <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate flex items-center gap-1.5">
-                  <Icons.Layers size={12} className="text-blue-400 shrink-0" />
+                <div className="px-3 py-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider select-none truncate flex items-center gap-1.5">
+                  <div
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: contextMenu.targetDeck.color || '#0d99ff' }}
+                  />
                   <span className="truncate">{contextMenu.targetDeck.name}</span>
                 </div>
 
@@ -1424,9 +1659,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     type="button"
                     onClick={() => {
                       setActiveDeckId(contextMenu.targetDeck!.id);
-                      setContextMenu(prev => ({ ...prev, visible: false }));
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
+                    className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
                   >
                     <Icons.FolderOpen size={14} />
                     <span>Buka Deck</span>
@@ -1436,12 +1671,36 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     type="button"
                     onClick={() => {
                       onEditDeckRequest(contextMenu.targetDeck!);
-                      setContextMenu(prev => ({ ...prev, visible: false }));
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                    className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-slate-200 cursor-pointer"
                   >
                     <Icons.Edit3 size={14} />
-                    <span>Ganti Nama Deck</span>
+                    <span>Ganti Nama & Warna Deck</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      togglePinDeck(contextMenu.targetDeck!.id, e);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-amber-400 cursor-pointer"
+                  >
+                    <Icons.Pin size={14} className={pinnedDeckIds.has(contextMenu.targetDeck!.id) ? 'fill-amber-400' : ''} />
+                    <span>{pinnedDeckIds.has(contextMenu.targetDeck!.id) ? 'Buka Sematan Deck' : 'Sematkan Deck ke Atas'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAddCard(contextMenu.targetDeck!.id);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-purple-400 cursor-pointer"
+                  >
+                    <Icons.Plus size={14} />
+                    <span>+ Buat Kartu dalam Deck Ini</span>
                   </button>
                 </div>
 
@@ -1450,9 +1709,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     type="button"
                     onClick={() => {
                       onDeleteDeckRequest(contextMenu.targetDeck!.id);
-                      setContextMenu(prev => ({ ...prev, visible: false }));
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
+                    className="w-full px-3 py-2 text-left hover:bg-rose-500/20 flex items-center gap-2 transition-colors text-rose-400 font-medium cursor-pointer"
                   >
                     <Icons.Trash2 size={14} />
                     <span>Hapus Deck</span>
@@ -1461,64 +1720,123 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               </>
             ) : contextMenu.targetCard ? (
               <>
-                <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
-                  📄 {contextMenu.targetCard.title || 'Kartu'}
-                </div>
-
-                <div className="py-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenCardFullPage(contextMenu.targetCard!);
-                      setContextMenu(prev => ({ ...prev, visible: false }));
-                    }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
-                  >
-                    <Icons.Maximize2 size={14} />
-                    <span>Buka Kartu</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onEditCardRequest(contextMenu.targetCard!);
-                      setContextMenu(prev => ({ ...prev, visible: false }));
-                    }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
-                  >
-                    <Icons.Edit3 size={14} />
-                    <span>Edit Kartu</span>
-                  </button>
-                </div>
-
-                <div className="py-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onDeleteCardsRequest([contextMenu.targetCard!.id]);
-                      setContextMenu(prev => ({ ...prev, visible: false }));
-                    }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
-                  >
-                    <Icons.Trash2 size={14} />
-                    <span>Hapus Kartu Permanen</span>
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="px-3 py-1.5 text-[10px] app-text-muted font-semibold uppercase tracking-wider select-none">
-                  Aksi Galeri
+                <div className="px-3 py-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider select-none truncate">
+                  📄 {contextMenu.targetCard.title || 'Kartu Tanpa Judul'}
                 </div>
 
                 <div className="py-1 space-y-0.5">
                   <button
                     type="button"
                     onClick={() => {
-                      onAddCard(activeDeckId || undefined);
-                      setContextMenu(prev => ({ ...prev, visible: false }));
+                      onOpenCardFullPage(contextMenu.targetCard!);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
+                    className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
+                  >
+                    <Icons.Maximize2 size={14} />
+                    <span>Buka Kartu Fullscreen</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onEditCardRequest(contextMenu.targetCard!);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-slate-200 cursor-pointer"
+                  >
+                    <Icons.Edit3 size={14} />
+                    <span>Edit Kartu</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      togglePinCard(contextMenu.targetCard!.id, e);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-amber-400 cursor-pointer"
+                  >
+                    <Icons.Pin size={14} className={pinnedCardIds.has(contextMenu.targetCard!.id) ? 'fill-amber-400' : ''} />
+                    <span>{pinnedCardIds.has(contextMenu.targetCard!.id) ? 'Buka Sematan Kartu' : 'Sematkan Kartu ke Atas'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${contextMenu.targetCard!.title}\n${contextMenu.targetCard!.summary || ''}`);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-slate-300 cursor-pointer"
+                  >
+                    <Icons.Copy size={14} />
+                    <span>Salin Judul & Ringkasan</span>
+                  </button>
+                </div>
+
+                {/* Assign to Deck Option */}
+                {decks.length > 0 && (
+                  <div className="py-1">
+                    <div className="px-3 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                      Pindahkan ke Deck:
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onAssignCardToDeck(contextMenu.targetCard!.id, undefined);
+                        setContextMenu((prev) => ({ ...prev, visible: false }));
+                      }}
+                      className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-slate-300 flex items-center gap-2 transition-colors text-[11px]"
+                    >
+                      <Icons.FileText size={12} />
+                      <span>Mandiri (Tanpa Deck)</span>
+                    </button>
+                    {decks.map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => {
+                          onAssignCardToDeck(contextMenu.targetCard!.id, d.id);
+                          setContextMenu((prev) => ({ ...prev, visible: false }));
+                        }}
+                        className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-slate-200 flex items-center justify-between transition-colors text-[11px]"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <Icons.Layers size={12} style={{ color: d.color || '#0d99ff' }} />
+                          <span className="truncate">{d.name}</span>
+                        </div>
+                        {contextMenu.targetCard!.deckId === d.id && (
+                          <Icons.Check size={12} className="text-[#0d99ff]" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDeleteCardsRequest([contextMenu.targetCard!.id]);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-rose-500/20 flex items-center gap-2 transition-colors text-rose-400 font-medium cursor-pointer"
+                  >
+                    <Icons.Trash2 size={14} />
+                    <span>Hapus Kartu</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="py-1 space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAddCard(activeDeckId || undefined);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
                   >
                     <Icons.Plus size={14} strokeWidth={2.5} />
                     <span>Buat Kartu Baru</span>
@@ -1528,28 +1846,115 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     type="button"
                     onClick={() => {
                       onCreateDeckRequest();
-                      setContextMenu(prev => ({ ...prev, visible: false }));
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
-                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
+                    className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-bold text-purple-400 cursor-pointer"
                   >
-                    <Icons.SquareStack size={14} />
+                    <Icons.FolderPlus size={14} />
                     <span>Buat Deck Baru</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCardIds(new Set(displayCards.map((c) => c.id)));
+                      setIsSelectionMode(true);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-slate-200 cursor-pointer"
+                  >
+                    <Icons.CheckSquare size={14} />
+                    <span>Pilih Semua Kartu</span>
                   </button>
                 </div>
 
-                {selectedCardIds.size > 0 && (
+                {/* Quick Sort Submenu */}
+                <div className="py-1">
+                  <div className="px-3 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    Urutkan Berdasarkan:
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('updated');
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-slate-200 flex items-center justify-between text-[11px]"
+                  >
+                    <span>Terakhir Diubah</span>
+                    {sortBy === 'updated' && <Icons.Check size={12} className="text-[#0d99ff]" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('created');
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-slate-200 flex items-center justify-between text-[11px]"
+                  >
+                    <span>Tanggal Dibuat</span>
+                    {sortBy === 'created' && <Icons.Check size={12} className="text-[#0d99ff]" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('title');
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-slate-200 flex items-center justify-between text-[11px]"
+                  >
+                    <span>Judul (A-Z)</span>
+                    {sortBy === 'title' && <Icons.Check size={12} className="text-[#0d99ff]" />}
+                  </button>
+                </div>
+
+                {/* Layout Mode Submenu */}
+                <div className="py-1">
+                  <div className="px-3 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    Mode Tampilan:
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewLayout('grid');
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-slate-200 flex items-center justify-between text-[11px]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icons.LayoutGrid size={12} />
+                      <span>Grid Kartu</span>
+                    </div>
+                    {viewLayout === 'grid' && <Icons.Check size={12} className="text-[#0d99ff]" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewLayout('list');
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-slate-200 flex items-center justify-between text-[11px]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icons.List size={12} />
+                      <span>Tabel / List Ringkas</span>
+                    </div>
+                    {viewLayout === 'list' && <Icons.Check size={12} className="text-[#0d99ff]" />}
+                  </button>
+                </div>
+
+                {selectedTagFilter && (
                   <div className="py-1">
                     <button
                       type="button"
                       onClick={() => {
-                        onDeleteCardsRequest(Array.from(selectedCardIds));
-                        setSelectedCardIds(new Set());
-                        setContextMenu(prev => ({ ...prev, visible: false }));
+                        setSelectedTagFilter(null);
+                        setContextMenu((prev) => ({ ...prev, visible: false }));
                       }}
-                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
+                      className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-amber-400 flex items-center gap-2 text-[11px]"
                     >
-                      <Icons.Trash2 size={14} />
-                      <span>Hapus {selectedCardIds.size} Kartu Terpilih</span>
+                      <Icons.RotateCcw size={12} />
+                      <span>Reset Filter Tag (#{selectedTagFilter})</span>
                     </button>
                   </div>
                 )}
@@ -1567,6 +1972,66 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           // Initial position from refs
           const initX = dragPosRef.current.x - dragOffsetRef.current.x;
           const initY = dragPosRef.current.y - dragOffsetRef.current.y;
+
+          if (viewLayout === 'list') {
+            return (
+              <div
+                ref={floatingPreviewRef}
+                className="card-floating-preview"
+                style={{
+                  position: 'fixed',
+                  left: 0,
+                  top: 0,
+                  transform: `translate3d(${initX}px, ${initY}px, 0)`,
+                  width: '400px',
+                  maxWidth: '90vw',
+                  zIndex: 99999,
+                  pointerEvents: 'none',
+                }}
+              >
+                <div className="px-4 py-2.5 rounded-xl border flex items-center justify-between gap-3 shadow-2xl bg-[#2c2c2c] border-[#0d99ff] ring-2 ring-[#0d99ff]/50 text-white">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    {/* Square Image Thumbnail Avatar (36x36px) or Category Icon */}
+                    {dragCard.imageUrl ? (
+                      <div className="w-9 h-9 rounded-lg overflow-hidden border border-[#383838] bg-[#1e1e1e] shrink-0">
+                        <img
+                          src={dragCard.imageUrl}
+                          alt={dragCard.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="w-9 h-9 rounded-lg flex items-center justify-center border shrink-0 bg-[#1e1e1e]"
+                        style={{ borderColor: `${cfg.color}40`, color: cfg.color }}
+                      >
+                        <IconComp size={16} />
+                      </div>
+                    )}
+
+                    {/* Category Badge */}
+                    <div
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border shrink-0 ${cfg.bgGradient} ${cfg.borderColor}`}
+                      style={{ color: cfg.color }}
+                    >
+                      <IconComp size={11} />
+                      <span>{cfg.label}</span>
+                    </div>
+
+                    {/* Title */}
+                    <div className="truncate">
+                      <h4 className="text-xs font-bold text-white truncate">
+                        {dragCard.title || 'Kartu Tanpa Judul'}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 truncate max-w-[180px]">
+                        {dragCard.summary || 'Belum ada ringkasan...'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
 
           return (
             <div
