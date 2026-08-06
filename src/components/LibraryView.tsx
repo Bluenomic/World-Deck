@@ -40,6 +40,68 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [activeTab, setActiveTab] = useState<'all' | 'decks' | 'cards'>('all');
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
 
+  // View Layout Mode: 'grid' (Card Grid) vs 'list' (Compact Table/List)
+  const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
+
+  // Sorting Mode: 'updated' | 'created' | 'title'
+  const [sortBy, setSortBy] = useState<'updated' | 'created' | 'title'>('updated');
+
+  // Tag Filter State
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
+
+  // Pin / Favorite States for Cards and Decks
+  const [pinnedCardIds, setPinnedCardIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('worlddeck_pinned_cards');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  const [pinnedDeckIds, setPinnedDeckIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('worlddeck_pinned_decks');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Sync Pinned state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('worlddeck_pinned_cards', JSON.stringify(Array.from(pinnedCardIds)));
+    } catch {}
+  }, [pinnedCardIds]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('worlddeck_pinned_decks', JSON.stringify(Array.from(pinnedDeckIds)));
+    } catch {}
+  }, [pinnedDeckIds]);
+
+  // Toggle Pin Handlers
+  const togglePinCard = (cardId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setPinnedCardIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardId)) next.delete(cardId);
+      else next.add(cardId);
+      return next;
+    });
+  };
+
+  const togglePinDeck = (deckId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setPinnedDeckIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(deckId)) next.delete(deckId);
+      else next.add(deckId);
+      return next;
+    });
+  };
+
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
@@ -346,6 +408,61 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const totalItemsCount =
     (showDecksInGrid ? filteredDecks.length : 0) + (showCardsInGrid ? displayCards.length : 0);
 
+  // Extract all unique tags across all cards for the Tag Filter Bar
+  const allUniqueTags = React.useMemo(() => {
+    const set = new Set<string>();
+    cards.forEach((c) => {
+      if (c.tags) {
+        c.tags.forEach((t) => set.add(t));
+      }
+    });
+    return Array.from(set).sort();
+  }, [cards]);
+
+  // Filtered & Sorted Decks
+  const sortedDecks = React.useMemo(() => {
+    const list = [...filteredDecks];
+    list.sort((a, b) => {
+      const isAPinned = pinnedDeckIds.has(a.id);
+      const isBPinned = pinnedDeckIds.has(b.id);
+      if (isAPinned !== isBPinned) return isAPinned ? -1 : 1;
+
+      if (sortBy === 'title') {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+      if (sortBy === 'created') {
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      }
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
+    return list;
+  }, [filteredDecks, pinnedDeckIds, sortBy]);
+
+  // Filtered & Sorted Cards
+  const sortedCards = React.useMemo(() => {
+    let list = [...displayCards];
+
+    if (selectedTagFilter) {
+      list = list.filter((c) => c.tags && c.tags.includes(selectedTagFilter));
+    }
+
+    list.sort((a, b) => {
+      const isAPinned = pinnedCardIds.has(a.id);
+      const isBPinned = pinnedCardIds.has(b.id);
+      if (isAPinned !== isBPinned) return isAPinned ? -1 : 1;
+
+      if (sortBy === 'title') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
+      if (sortBy === 'created') {
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      }
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
+
+    return list;
+  }, [displayCards, selectedTagFilter, pinnedCardIds, sortBy]);
+
   // Determine if remove zone should be visible (only inside deck + dragging + near top/hovered/success)
   const shouldShowRemoveZone =
     activeDeck && (isSuccessRemove || (draggedCardId && (isNearTop || isHoveredRemoveZone)));
@@ -515,7 +632,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         style={{
           boxShadow: `inset 0 3px 0 0 ${isHovered ? 'var(--accent)' : deckColor}`,
         }}
-        className={`deck-grid-item group relative flex flex-col space-y-2 p-3.5 pt-4 cursor-pointer transition-all duration-300 rounded-2xl select-none app-bg-secondary border border-slate-700/60 hover:border-blue-500/70 ${
+        className={`deck-grid-item group relative flex flex-col space-y-2 p-3.5 pt-4 cursor-pointer transition-all duration-300 rounded-2xl select-none bg-[#2c2c2c] border border-[#383838] hover:border-[#0d99ff] ${
           isSuccess
             ? 'scale-105 border-emerald-400 ring-4 ring-emerald-500/40'
             : isHovered
@@ -523,6 +640,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             : ''
         }`}
       >
+        {/* Pin Badge Button */}
+        <button
+          type="button"
+          onClick={(e) => togglePinDeck(deck.id, e)}
+          className={`absolute top-3 right-3 z-20 p-1.5 rounded-lg transition-all cursor-pointer ${
+            pinnedDeckIds.has(deck.id)
+              ? 'text-amber-400 bg-amber-400/10 opacity-100'
+              : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-amber-400'
+          }`}
+          title={pinnedDeckIds.has(deck.id) ? 'Lepas Sematan' : 'Sematkan ke Atas'}
+        >
+          <Icons.Pin size={13} className={pinnedDeckIds.has(deck.id) ? 'fill-amber-400' : ''} />
+        </button>
 
         {/* Drop Zone Overlay Hint */}
         {isHovered && (
@@ -785,17 +915,31 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         ) : (
           <>
             {/* Category Header Bar */}
-            <div className="px-3 py-2 app-bg-main border-b app-border flex items-center justify-between gap-2">
-              <div
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${cfg.bgGradient} ${cfg.borderColor}`}
-                style={{ color: cfg.color }}
-              >
-                <IconComp size={11} />
-                <span>{cfg.label}</span>
+            <div className="px-3 py-2 bg-[#1e1e1e] border-b border-[#383838] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={(e) => togglePinCard(card.id, e)}
+                  className={`p-1 rounded-md transition-all cursor-pointer ${
+                    pinnedCardIds.has(card.id)
+                      ? 'text-amber-400 bg-amber-400/10 opacity-100'
+                      : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-amber-400'
+                  }`}
+                  title={pinnedCardIds.has(card.id) ? 'Lepas Sematan' : 'Sematkan ke Atas'}
+                >
+                  <Icons.Pin size={12} className={pinnedCardIds.has(card.id) ? 'fill-amber-400' : ''} />
+                </button>
+                <div
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${cfg.bgGradient} ${cfg.borderColor}`}
+                  style={{ color: cfg.color }}
+                >
+                  <IconComp size={11} />
+                  <span>{cfg.label}</span>
+                </div>
               </div>
 
               <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity" title="Geser kartu">
-                <Icons.GripHorizontal size={14} className="app-text-muted cursor-grab" />
+                <Icons.GripHorizontal size={14} className="text-slate-400 cursor-grab" />
               </div>
             </div>
 
@@ -928,58 +1072,194 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         
 
 
-        {/* Back button to gallery when inside a Deck (Icon only) */}
+        {/* Header Action & Filter Strip */}
         {activeDeck ? (
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={() => setActiveDeckId(null)}
-              title="Kembali ke Galeri"
-              className="p-2.5 rounded-xl app-bg-secondary border app-border hover:border-blue-400 app-text-main flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-sm"
-            >
-              <Icons.ArrowLeft size={18} />
-            </button>
-          </div>
-        ) : (
-          /* Filter Tabs */
-          <div className="flex items-center justify-between">
-            <div className="flex bg-slate-900/60 p-1 rounded-xl border app-border text-xs font-semibold">
+          <div className="flex items-center justify-between bg-[#2c2c2c] p-2.5 rounded-2xl border border-[#383838] shadow-md text-xs text-white">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setActiveTab('all')}
-                className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'all'
-                    ? 'app-accent-bg text-white shadow-sm'
-                    : 'app-text-muted hover:app-text-main'
-                }`}
+                onClick={() => setActiveDeckId(null)}
+                title="Kembali ke Galeri Utama"
+                className="p-2 rounded-xl bg-[#1e1e1e] hover:bg-[#383838] border border-[#383838] text-slate-200 hover:text-white flex items-center gap-1.5 font-semibold transition-all cursor-pointer"
               >
-                Semua ({decks.length + cards.length})
+                <Icons.ArrowLeft size={16} className="text-[#0d99ff]" />
+                <span>Galeri Utama</span>
               </button>
+
+              <div className="h-5 w-px bg-[#383838]" />
+
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full shrink-0"
+                  style={{ backgroundColor: activeDeck.color || '#0d99ff' }}
+                />
+                <h2 className="text-sm font-bold text-white tracking-tight truncate max-w-[200px] sm:max-w-[300px]">
+                  {activeDeck.name}
+                </h2>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#1e1e1e] border border-[#383838] text-[#0d99ff] font-bold shrink-0">
+                  {cards.filter((c) => c.deckId === activeDeck.id || (activeDeck.cardIds || []).includes(c.id)).length} Kartu
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setActiveTab('decks')}
-                className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === 'decks'
-                    ? 'app-accent-bg text-white shadow-sm'
-                    : 'app-text-muted hover:app-text-main'
-                }`}
+                onClick={() => onEditDeckRequest(activeDeck)}
+                className="px-3 py-1.5 rounded-xl bg-[#1e1e1e] hover:bg-[#383838] border border-[#383838] text-slate-200 hover:text-white font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
               >
-                <Icons.SquareStack size={14} />
-                <span>Deck ({decks.length})</span>
+                <Icons.Edit3 size={14} className="text-amber-400" />
+                <span className="hidden sm:inline">Edit Deck</span>
               </button>
+
               <button
                 type="button"
-                onClick={() => setActiveTab('cards')}
-                className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === 'cards'
-                    ? 'app-accent-bg text-white shadow-sm'
-                    : 'app-text-muted hover:app-text-main'
-                }`}
+                onClick={() => onAddCard(activeDeck.id)}
+                className="px-3.5 py-1.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
               >
-                <Icons.FileText size={14} />
-                <span>Kartu ({cards.length})</span>
+                <Icons.Plus size={15} />
+                <span>+ Kartu ke Deck</span>
               </button>
             </div>
+          </div>
+        ) : (
+          /* Main Gallery View Filter Tabs & Action Buttons */
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#2c2c2c] p-2 rounded-2xl border border-[#383838] shadow-md">
+              {/* View Mode Segmented Tabs */}
+              <div className="flex items-center gap-1 bg-[#1e1e1e] p-1 rounded-xl border border-[#383838] text-xs font-semibold select-none">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('all')}
+                  className={`px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                    activeTab === 'all'
+                      ? 'bg-[#2c2c2c] text-white font-bold shadow-xs border border-[#383838]'
+                      : 'text-slate-300 hover:text-white hover:bg-[#2c2c2c]/50'
+                  }`}
+                >
+                  Semua ({decks.length + cards.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('decks')}
+                  className={`px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'decks'
+                      ? 'bg-[#2c2c2c] text-white font-bold shadow-xs border border-[#383838]'
+                      : 'text-slate-300 hover:text-white hover:bg-[#2c2c2c]/50'
+                  }`}
+                >
+                  <Icons.SquareStack size={14} className={activeTab === 'decks' ? 'text-purple-400' : 'text-slate-400'} />
+                  <span>Deck ({decks.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('cards')}
+                  className={`px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'cards'
+                      ? 'bg-[#2c2c2c] text-white font-bold shadow-xs border border-[#383838]'
+                      : 'text-slate-300 hover:text-white hover:bg-[#2c2c2c]/50'
+                  }`}
+                >
+                  <Icons.FileText size={14} className={activeTab === 'cards' ? 'text-[#0d99ff]' : 'text-slate-400'} />
+                  <span>Kartu ({cards.length})</span>
+                </button>
+              </div>
+
+              {/* Layout Grid/List Switcher & Sort By Controls */}
+              <div className="flex items-center gap-2">
+                {/* Grid / List Switcher */}
+                <div className="flex bg-[#1e1e1e] p-1 rounded-xl border border-[#383838] text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setViewLayout('grid')}
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                      viewLayout === 'grid'
+                        ? 'bg-[#2c2c2c] text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Tampilan Grid Kartu"
+                  >
+                    <Icons.LayoutGrid size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewLayout('list')}
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                      viewLayout === 'list'
+                        ? 'bg-[#2c2c2c] text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Tampilan Tabel/List Ringkas"
+                  >
+                    <Icons.List size={15} />
+                  </button>
+                </div>
+
+                {/* Sort By Select */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-2.5 py-1.5 rounded-xl bg-[#1e1e1e] border border-[#383838] text-slate-200 text-xs font-semibold cursor-pointer outline-none"
+                >
+                  <option value="updated">Terakhir Diubah</option>
+                  <option value="created">Tanggal Dibuat</option>
+                  <option value="title">Judul (A-Z)</option>
+                </select>
+
+                {/* Quick Create Action Buttons */}
+                <button
+                  type="button"
+                  onClick={onCreateDeckRequest}
+                  className="px-3 py-1.5 rounded-xl bg-[#1e1e1e] hover:bg-[#383838] border border-[#383838] text-purple-400 hover:text-purple-300 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Icons.FolderPlus size={14} />
+                  <span className="hidden sm:inline">+ Deck</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onAddCard()}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                >
+                  <Icons.Plus size={15} />
+                  <span>+ Kartu</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Tag Filter Pills Bar */}
+            {allUniqueTags.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto py-1 custom-scrollbar text-xs">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">
+                  Tag:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTagFilter(null)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer shrink-0 ${
+                    selectedTagFilter === null
+                      ? 'bg-[#0d99ff] text-white shadow-xs'
+                      : 'bg-[#2c2c2c] border border-[#383838] text-slate-300 hover:text-white'
+                  }`}
+                >
+                  Semua Tag
+                </button>
+                {allUniqueTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setSelectedTagFilter(selectedTagFilter === tag ? null : tag)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer shrink-0 ${
+                      selectedTagFilter === tag
+                        ? 'bg-[#0d99ff] text-white shadow-xs'
+                        : 'bg-[#2c2c2c] border border-[#383838] text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1007,14 +1287,37 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
         )}
 
-        {/* UNIFIED GRID DISPLAY SECTION */}
+        {/* UNIFIED GRID / LIST DISPLAY SECTION */}
         {totalItemsCount === 0 ? (
-          <div className="text-center py-16 app-bg-secondary rounded-2xl border app-border app-text-muted space-y-3">
-            <Icons.FileText size={36} className="mx-auto app-text-muted opacity-50" />
+          <div className="text-center py-16 bg-[#2c2c2c] rounded-2xl border border-[#383838] text-slate-400 space-y-3">
+            <Icons.FileText size={36} className="mx-auto text-slate-500 opacity-50" />
             <p className="text-xs">Tidak ada item atau kartu ditemukan dalam galeri ini.</p>
-            <p className="text-[11px] app-text-muted">Klik kanan di area kosong untuk membuat kartu atau deck baru.</p>
+            <p className="text-[11px] text-slate-500">Klik kanan di area kosong untuk membuat kartu atau deck baru.</p>
+          </div>
+        ) : viewLayout === 'list' ? (
+          /* COMPACT LIST / TABLE VIEW */
+          <div className="space-y-2">
+            {showDecksInGrid && sortedDecks.map((deck) => (
+              <div
+                key={`list-deck-${deck.id}`}
+                onClick={() => setActiveDeckId(deck.id)}
+                className="px-4 py-3 rounded-xl bg-[#2c2c2c] border border-[#383838] hover:border-purple-400 flex items-center justify-between gap-3 cursor-pointer group transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <Icons.SquareStack size={18} className="text-purple-400 shrink-0" />
+                  <h4 className="text-xs font-bold text-white group-hover:text-purple-300 transition-colors">
+                    {deck.name}
+                  </h4>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#1e1e1e] border border-[#383838] text-purple-300 font-bold">
+                  {cards.filter((c) => c.deckId === deck.id || (deck.cardIds || []).includes(c.id)).length} Kartu
+                </span>
+              </div>
+            ))}
+            {showCardsInGrid && sortedCards.map(renderCardItem)}
           </div>
         ) : (
+          /* CARD GRID VIEW */
           <div
             className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
             onDragOver={(e) => {
@@ -1024,8 +1327,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             }}
             onDrop={handleCardDrop}
           >
-            {showDecksInGrid && filteredDecks.map(renderDeckItem)}
-            {showCardsInGrid && displayCards.map((card) => renderCardItem(card))}
+            {showDecksInGrid && sortedDecks.map(renderDeckItem)}
+            {showCardsInGrid && sortedCards.map((card) => renderCardItem(card))}
           </div>
         )}
 
@@ -1033,53 +1336,60 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         {/* MINIMALIST FLOATING DRAG PREVIEW */}
         {/* ======================== */}
         {/* Right-Click Context Menu */}
-        {/* Multi-Select Floating Toolbar */}
+        {/* Multi-Select Floating Toolbar with Batch Operations */}
         {(selectedCardIds.size > 0 || isSelectionMode) && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[90] app-bg-secondary border app-border rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-3 duration-200">
-            <div className="flex items-center gap-2 text-xs font-bold app-text-main">
-              <Icons.CheckSquare size={16} className="text-blue-400" />
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[90] bg-[#2c2c2c] border border-[#383838] rounded-2xl shadow-2xl px-5 py-2.5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 duration-200 select-none text-xs text-white backdrop-blur-md">
+            <div className="flex items-center gap-2 font-bold text-white">
+              <Icons.CheckSquare size={16} className="text-[#0d99ff]" />
               <span>{selectedCardIds.size} kartu dipilih</span>
-              {isSelectionMode && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-semibold">
-                  Mode Seleksi
-                </span>
-              )}
             </div>
 
-            <div className="h-5 w-px bg-slate-600" />
+            <div className="h-4 w-px bg-[#383838]" />
 
-            {activeDeck && selectedCardIds.size > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    selectedCardIds.forEach((id) => onAssignCardToDeck(id, undefined));
-                    setSelectedCardIds(new Set());
-                    setIsSelectionMode(false);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Icons.FolderOutput size={14} />
-                  <span>Keluarkan dari Deck ({selectedCardIds.size})</span>
-                </button>
-                <div className="h-5 w-px bg-slate-600" />
-              </>
-            )}
-
-            {selectedCardIds.size > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  onDeleteCardsRequest(Array.from(selectedCardIds));
+            {/* Select All / Clear */}
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedCardIds.size === displayCards.length) {
                   setSelectedCardIds(new Set());
-                  setIsSelectionMode(false);
-                }}
-                className="px-3 py-1.5 rounded-lg bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Icons.Trash2 size={13} />
-                <span>Hapus Semua</span>
-              </button>
-            )}
+                } else {
+                  setSelectedCardIds(new Set(displayCards.map((c) => c.id)));
+                }
+              }}
+              className="px-2.5 py-1 rounded-lg hover:bg-[#383838] text-slate-300 hover:text-white font-semibold transition-colors cursor-pointer"
+            >
+              {selectedCardIds.size === displayCards.length ? 'Batal Semua' : 'Pilih Semua'}
+            </button>
+
+            {/* Batch Pin */}
+            <button
+              type="button"
+              onClick={() => {
+                setPinnedCardIds((prev) => {
+                  const next = new Set(prev);
+                  selectedCardIds.forEach((id) => next.add(id));
+                  return next;
+                });
+              }}
+              className="px-2.5 py-1 rounded-lg hover:bg-[#383838] text-amber-400 hover:text-amber-300 font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <Icons.Pin size={13} />
+              <span>Sematkan</span>
+            </button>
+
+            {/* Batch Delete */}
+            <button
+              type="button"
+              onClick={() => {
+                onDeleteCardsRequest(Array.from(selectedCardIds));
+                setSelectedCardIds(new Set());
+                setIsSelectionMode(false);
+              }}
+              className="px-2.5 py-1 rounded-lg hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <Icons.Trash2 size={13} />
+              <span>Hapus</span>
+            </button>
 
             <button
               type="button"
@@ -1087,14 +1397,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 setSelectedCardIds(new Set());
                 setIsSelectionMode(false);
               }}
-              className="px-3 py-1.5 rounded-lg app-bg-main app-text-muted hover:app-text-main text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer border app-border"
+              className="p-1 rounded-lg hover:bg-[#383838] text-slate-400 hover:text-white transition-colors cursor-pointer"
+              title="Batal Mode Seleksi"
             >
-              <Icons.X size={13} />
-              <span>Batal</span>
+              <Icons.X size={15} />
             </button>
           </div>
         )}
-
         {/* Right-Click Context Menu */}
         {contextMenu.visible && (
           <div
