@@ -77,73 +77,76 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 backdrop-animate-appear cursor-pointer"
+      className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-[100] backdrop-animate-appear select-none"
       onClick={onClose}
     >
       <div 
-        className="app-bg-secondary border app-border w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden app-text-main transition-colors modal-animate-appear cursor-default"
+        className="bg-[#2c2c2c] border border-[#383838] w-full max-w-3xl max-h-[88vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white transition-colors modal-animate-appear cursor-default relative"
         onClick={(e) => e.stopPropagation()}
       >
         
-        {/* Header */}
-        <div className="px-6 py-4 app-bg-main border-b app-border flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <img
-              src="/wd-logo-transparent.png"
-              alt="World Deck Logo"
-              className="h-9 w-auto object-contain"
-            />
+        {/* Header Strip */}
+        <div className="px-6 py-4 bg-[#1e1e1e] border-b border-[#383838] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#2c2c2c] border border-[#383838] flex items-center justify-center shrink-0 shadow-md">
+              <img
+                src="/wd-logo-circle.png"
+                alt="World Deck Logo"
+                className="w-7 h-7 object-contain rounded-full"
+              />
+            </div>
             <div>
-              <h2 className="text-base font-bold app-text-main">Pengelola Workspace & Dunia</h2>
-              <p className="text-xs app-text-muted">Kelola, buat, dan impor universe worldbuilding Anda</p>
+              <h2 className="text-base font-extrabold text-white tracking-tight">Pengelola Workspace & Dunia</h2>
+              <p className="text-xs text-slate-400">Kelola, buat, dan impor universe worldbuilding Anda</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 app-text-muted hover:app-text-main rounded-lg hover:app-bg-hover cursor-pointer"
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#383838] transition-colors cursor-pointer"
             title="Tutup Modal"
           >
             <Icons.X size={18} />
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b app-border app-bg-main px-6 gap-4 text-xs font-medium app-text-muted">
+        {/* Tab Navigation Segmented Bar */}
+        <div className="flex border-b border-[#383838] bg-[#1e1e1e] px-6 gap-6 text-xs font-semibold text-slate-400">
           <button
             type="button"
             onClick={() => setActiveTab('list')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`py-3 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
               activeTab === 'list'
-                ? 'border-blue-500 app-text-main font-semibold'
-                : 'border-transparent hover:app-text-main'
+                ? 'border-[#0d99ff] text-white font-bold'
+                : 'border-transparent hover:text-white'
             }`}
           >
-            <Icons.FolderGit2 size={14} />
+            <Icons.FolderGit2 size={15} className={activeTab === 'list' ? 'text-[#0d99ff]' : ''} />
             <span>Daftar Workspace ({worlds.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('create')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`py-3 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
               activeTab === 'create'
-                ? 'border-blue-500 app-text-main font-semibold'
-                : 'border-transparent hover:app-text-main'
+                ? 'border-[#0d99ff] text-white font-bold'
+                : 'border-transparent hover:text-white'
             }`}
           >
-            <Icons.PlusCircle size={14} />
-            <span>+ Buat Workspace Baru</span>
+            <Icons.PlusCircle size={15} className={activeTab === 'create' ? 'text-[#0d99ff]' : ''} />
+            <span>+ Buat / Impor Workspace</span>
           </button>
         </div>
 
-        {/* Modal Body */}
+        {/* Modal Content Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           
+          {/* TAB 1: DAFTAR WORKSPACE */}
           {activeTab === 'list' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {worlds.map((w) => {
                   const isActive = w.id === activeWorldId;
                   const isEditing = editingWorldId === w.id;
@@ -153,39 +156,48 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                       <form
                         key={w.id}
                         onSubmit={saveEditWorld}
-                        className="app-bg-main p-4 rounded-xl border border-blue-500 space-y-2.5"
+                        className="bg-[#1e1e1e] p-4 rounded-xl border border-[#0d99ff] space-y-3 shadow-lg"
                       >
-                        <h4 className="text-xs font-bold app-accent-text">Edit Informasi Workspace</h4>
-                        <input
-                          type="text"
-                          required
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          className="w-full app-bg-secondary border app-border rounded px-2.5 py-1.5 text-xs app-text-main"
-                        />
-                        <textarea
-                          rows={2}
-                          value={editDesc}
-                          onChange={(e) => setEditDesc(e.target.value)}
-                          className="w-full app-bg-secondary border app-border rounded p-2 text-xs app-text-main"
-                        />
-                        <input
-                          type="text"
-                          value={editAuthor}
-                          onChange={(e) => setEditAuthor(e.target.value)}
-                          className="w-full app-bg-secondary border app-border rounded px-2.5 py-1.5 text-xs app-text-main"
-                        />
+                        <h4 className="text-xs font-bold text-[#0d99ff] uppercase tracking-wider">Edit Informasi Workspace</h4>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Nama Workspace</label>
+                          <input
+                            type="text"
+                            required
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="w-full bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Deskripsi</label>
+                          <textarea
+                            rows={2}
+                            value={editDesc}
+                            onChange={(e) => setEditDesc(e.target.value)}
+                            className="w-full bg-[#2c2c2c] border border-[#383838] rounded-lg p-2 text-xs text-white focus:outline-none focus:border-[#0d99ff] leading-relaxed resize-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Penulis</label>
+                          <input
+                            type="text"
+                            value={editAuthor}
+                            onChange={(e) => setEditAuthor(e.target.value)}
+                            className="w-full bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
+                          />
+                        </div>
                         <div className="flex justify-end gap-2 pt-1">
                           <button
                             type="button"
                             onClick={() => setEditingWorldId(null)}
-                            className="px-2.5 py-1 rounded text-xs app-text-muted cursor-pointer"
+                            className="px-3 py-1 rounded-lg border border-[#383838] bg-[#2c2c2c] hover:bg-[#383838] text-xs font-bold text-slate-300 cursor-pointer"
                           >
                             Batal
                           </button>
                           <button
                             type="submit"
-                            className="px-3 py-1 rounded app-accent-bg text-white text-xs font-medium cursor-pointer"
+                            className="px-4 py-1 rounded-lg bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold shadow-md cursor-pointer"
                           >
                             Simpan
                           </button>
@@ -201,42 +213,50 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                         onSelectWorld(w.id);
                         onClose();
                       }}
-                      className={`p-4 rounded-xl border transition-all flex flex-col justify-between space-y-3 cursor-pointer group hover:scale-[1.01] ${
+                      className={`p-4 rounded-2xl border transition-all flex flex-col justify-between space-y-3.5 cursor-pointer group hover:border-[#0d99ff] ${
                         isActive
-                          ? 'app-bg-secondary border-blue-500 shadow-md ring-1 ring-blue-500/30'
-                          : 'app-bg-main border app-border hover:border-blue-400'
+                          ? 'bg-[#1e1e1e] border-[#0d99ff] ring-2 ring-[#0d99ff]/30 shadow-xl'
+                          : 'bg-[#1e1e1e] border-[#383838] hover:bg-[#2c2c2c]/50'
                       }`}
                     >
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <Icons.Globe size={16} className={isActive ? 'app-accent-text' : 'app-text-muted'} />
-                            <h3 className="text-sm font-bold app-text-main group-hover:text-blue-400 transition-colors">
-                              {w.name}
-                            </h3>
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <div className={`p-2 rounded-xl border shrink-0 ${isActive ? 'bg-[#0d99ff]/15 border-[#0d99ff]/30 text-[#0d99ff]' : 'bg-[#2c2c2c] border-[#383838] text-slate-400'}`}>
+                              <Icons.Globe size={18} />
+                            </div>
+                            <div className="truncate">
+                              <h3 className="text-sm font-extrabold text-white group-hover:text-[#0d99ff] transition-colors truncate">
+                                {w.name}
+                              </h3>
+                              <p className="text-[10px] text-slate-400 font-mono">
+                                Penulis: {w.author || 'Penulis Worldbuilding'}
+                              </p>
+                            </div>
                           </div>
                           {isActive && (
-                            <span className="px-2 py-0.2 rounded app-accent-bg text-white text-[9px] font-bold uppercase tracking-wider">
+                            <span className="px-2 py-0.5 rounded-full bg-[#0d99ff]/15 border border-[#0d99ff]/40 text-[#0d99ff] text-[9px] font-bold uppercase tracking-wider shrink-0 shadow-xs">
                               Aktif
                             </span>
                           )}
                         </div>
 
-                        <p className="text-xs app-text-muted line-clamp-2 leading-relaxed">
-                          {w.description || 'Tidak ada deskripsi.'}
+                        <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+                          {w.description || 'Tidak ada deskripsi workspace.'}
                         </p>
 
-                        <div className="flex flex-wrap gap-2 text-[10px] font-mono app-text-muted pt-1">
-                          <span className="px-1.5 py-0.2 rounded app-bg-main border app-border">
+                        <div className="flex flex-wrap gap-2 text-[10px] font-mono text-slate-400 pt-1">
+                          <span className="px-2 py-0.5 rounded-md bg-[#2c2c2c] border border-[#383838] font-semibold text-slate-300">
                             🎴 {w.cards ? w.cards.length : 0} Kartu
                           </span>
-                          <span className="px-1.5 py-0.2 rounded app-bg-main border app-border">
+                          <span className="px-2 py-0.5 rounded-md bg-[#2c2c2c] border border-[#383838] font-semibold text-slate-300">
                             🔗 {w.connections ? w.connections.length : 0} Relasi
                           </span>
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t app-border flex items-center justify-between gap-1">
+                      {/* Card Action Buttons */}
+                      <div className="pt-3 border-t border-[#383838] flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
@@ -244,8 +264,8 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                               e.stopPropagation();
                               startEditWorld(w);
                             }}
-                            className="p-1.5 rounded app-text-muted hover:app-text-main hover:app-bg-hover transition-colors cursor-pointer"
-                            title="Edit Info"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
+                            title="Edit Informasi Workspace"
                           >
                             <Icons.Edit3 size={14} />
                           </button>
@@ -255,7 +275,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                               e.stopPropagation();
                               onDuplicateWorld(w.id);
                             }}
-                            className="p-1.5 rounded app-text-muted hover:app-text-main hover:app-bg-hover transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
                             title="Duplikat Workspace"
                           >
                             <Icons.Copy size={14} />
@@ -266,8 +286,8 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                               e.stopPropagation();
                               downloadProjectJson(w);
                             }}
-                            className="p-1.5 rounded app-text-muted hover:app-text-main hover:app-bg-hover transition-colors cursor-pointer"
-                            title="Ekspor JSON"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
+                            title="Ekspor File JSON"
                           >
                             <Icons.Download size={14} />
                           </button>
@@ -278,7 +298,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                                 e.stopPropagation();
                                 onDeleteWorld(w.id);
                               }}
-                              className="p-1.5 rounded text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer"
                               title="Hapus Workspace"
                             >
                               <Icons.Trash2 size={14} />
@@ -287,12 +307,12 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                         </div>
 
                         {!isActive ? (
-                          <span className="px-3 py-1 rounded-lg app-accent-bg text-white text-xs font-medium">
+                          <span className="px-3.5 py-1.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold shadow-md transition-all">
                             Buka Workspace
                           </span>
                         ) : (
-                          <span className="px-3 py-1 rounded-lg app-bg-main app-text-main border app-border text-xs font-medium">
-                            Workspace Aktif
+                          <span className="px-3.5 py-1.5 rounded-xl bg-[#2c2c2c] text-white border border-[#383838] text-xs font-bold">
+                            Sedang Dibuka
                           </span>
                         )}
                       </div>
@@ -303,46 +323,47 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
             </div>
           )}
 
+          {/* TAB 2: BUAT & IMPOR WORKSPACE */}
           {activeTab === 'create' && (
             <div className="space-y-5 max-w-lg mx-auto py-2">
-              {/* Option A: Create Blank Workspace Form */}
-              <form onSubmit={handleCreateSubmit} className="space-y-3.5 app-bg-main p-4 rounded-xl border app-border">
-                <h3 className="text-xs font-bold uppercase tracking-wider app-accent-text flex items-center gap-1.5">
-                  <Icons.PlusCircle size={14} />
+              {/* Form Buat Workspace Baru */}
+              <form onSubmit={handleCreateSubmit} className="space-y-4 bg-[#1e1e1e] p-5 rounded-2xl border border-[#383838] shadow-xl">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#0d99ff] flex items-center gap-2">
+                  <Icons.PlusCircle size={15} />
                   <span>Buat Workspace Baru dari Awal</span>
                 </h3>
                 
                 <div>
-                  <label className="block text-xs font-semibold app-text-muted mb-1">Nama Workspace *</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Nama Workspace *</label>
                   <input
                     type="text"
                     required
                     value={newWorldName}
                     onChange={(e) => setNewWorldName(e.target.value)}
-                    placeholder="Contoh: Worldbuilding Nusantara"
-                    className="w-full app-bg-secondary border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-blue-500"
+                    placeholder="Contoh: Universe High Fantasy Nusantara"
+                    className="w-full bg-[#2c2c2c] border border-[#383838] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold app-text-muted mb-1">Deskripsi Singkat</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Deskripsi Singkat</label>
                   <textarea
                     rows={2}
                     value={newWorldDesc}
                     onChange={(e) => setNewWorldDesc(e.target.value)}
-                    placeholder="Konsep umum latar belakang workspace..."
-                    className="w-full app-bg-secondary border app-border rounded-lg p-2.5 text-xs app-text-main focus:outline-none focus:border-blue-500"
+                    placeholder="Konsep umum latar belakang universe..."
+                    className="w-full bg-[#2c2c2c] border border-[#383838] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-[#0d99ff] leading-relaxed resize-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold app-text-muted mb-1">Penulis</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Penulis / Creator</label>
                   <input
                     type="text"
                     value={newWorldAuthor}
                     onChange={(e) => setNewWorldAuthor(e.target.value)}
                     placeholder="Nama Penulis..."
-                    className="w-full app-bg-secondary border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[#2c2c2c] border border-[#383838] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                   />
                 </div>
 
@@ -350,32 +371,32 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveTab('list')}
-                    className="px-3.5 py-1.5 rounded-lg border app-border text-xs app-text-muted hover:app-text-main cursor-pointer"
+                    className="px-4 py-2 rounded-xl border border-[#383838] bg-[#2c2c2c] hover:bg-[#383838] text-xs font-bold text-slate-300 cursor-pointer transition-colors"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-1.5 app-accent-bg text-white rounded-lg text-xs font-semibold hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                    className="px-5 py-2 bg-[#0d99ff] hover:bg-[#0b85de] text-white rounded-xl text-xs font-bold shadow-md active:scale-95 transition-all cursor-pointer"
                   >
-                    Buat & Buka
+                    Buat & Buka Workspace
                   </button>
                 </div>
               </form>
 
-              {/* Option B: Import Workspace from JSON File */}
-              <div className="app-bg-main p-4 rounded-xl border border-dashed app-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="space-y-0.5">
-                  <h4 className="text-xs font-bold app-text-main flex items-center gap-1.5">
-                    <Icons.Upload size={14} className="text-blue-400" />
-                    <span>Atau Impor Workspace dari File JSON</span>
+              {/* Import Workspace JSON */}
+              <div className="bg-[#1e1e1e] p-5 rounded-2xl border border-dashed border-[#383838] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Icons.Upload size={15} className="text-[#0d99ff]" />
+                    <span>Impor Workspace dari File JSON</span>
                   </h4>
-                  <p className="text-[11px] app-text-muted">
-                    Muat data berkas .json cadangan workspace yang pernah diekspor sebelumnya.
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Muat data berkas `.json` cadangan workspace yang pernah diekspor sebelumnya.
                   </p>
                 </div>
 
-                <label className="px-3.5 py-2 rounded-xl app-accent-bg text-white text-xs font-bold cursor-pointer flex items-center gap-1.5 shrink-0 hover:brightness-110 active:scale-95 transition-all shadow-sm">
+                <label className="px-4 py-2 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold cursor-pointer flex items-center gap-1.5 shrink-0 active:scale-95 transition-all shadow-md">
                   <Icons.Upload size={14} />
                   <span>Pilih File JSON</span>
                   <input type="file" accept=".json" onChange={onImportWorld} className="hidden" />
