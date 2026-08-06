@@ -320,6 +320,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
               {Object.entries(CATEGORY_CONFIGS).map(([key, cfg]) => {
                 const count = cards.filter((c) => c.category === key).length;
                 const isSelected = selectedCategory === key;
+                const CategoryIcon = (Icons as any)[cfg.iconName] || Icons.HelpCircle;
 
                 return (
                   <button
@@ -333,10 +334,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                     }`}
                   >
                     <span className="flex items-center gap-2 truncate">
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: cfg.color }}
-                      />
+                      <CategoryIcon size={14} style={{ color: cfg.color }} className="shrink-0" />
                       <span className="truncate">{cfg.label}</span>
                     </span>
                     <span className="text-[10px] font-mono px-1.5 py-0.2 rounded app-bg-main border app-border">
@@ -462,7 +460,8 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
               ) : (
                 filteredCards.map((card) => {
                   const isSelected = selectedCardId === card.id;
-                  const cfg = CATEGORY_CONFIGS[card.category];
+                  const cfg = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
+                  const CardCategoryIcon = (Icons as any)[cfg.iconName] || Icons.HelpCircle;
 
                   return (
                     <button
@@ -476,7 +475,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                           : 'app-text-muted hover:app-text-main app-bg-hover'
                       }`}
                     >
-                      <Icons.FileText size={13} className="shrink-0 app-text-muted" />
+                      <CardCategoryIcon size={13} style={{ color: cfg.color }} className="shrink-0" />
                       <span className="truncate flex-1">{card.title || 'Kartu Tanpa Judul'}</span>
                       <span
                         className="w-1.5 h-1.5 rounded-full shrink-0"
