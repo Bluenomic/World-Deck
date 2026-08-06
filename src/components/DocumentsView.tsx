@@ -54,7 +54,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const [selectedImage, setSelectedImage] = useState<{
     wrapper: HTMLElement;
     img: HTMLImageElement;
-    mode: 'inline' | 'wrap-left' | 'wrap-right';
+    mode: 'inline' | 'wrap-left' | 'wrap-right' | 'block';
     rect: DOMRect;
   } | null>(null);
 
@@ -64,7 +64,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     y: number;
     wrapper: HTMLElement;
     img: HTMLImageElement;
-    mode: 'inline' | 'wrap-left' | 'wrap-right';
+    mode: 'inline' | 'wrap-left' | 'wrap-right' | 'block';
   } | null>(null);
 
   // Context Menu State for Right-Clicking Text / Editor Area
@@ -720,11 +720,13 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
       if (activeImg && activeWrapper) {
         const rect = activeImg.getBoundingClientRect();
-        let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
+        let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' | 'block' = 'inline';
         if (activeWrapper.classList.contains('img-mode-wrap-left') || activeWrapper.style.float === 'left') {
           imgAlignMode = 'wrap-left';
         } else if (activeWrapper.classList.contains('img-mode-wrap-right') || activeWrapper.style.float === 'right') {
           imgAlignMode = 'wrap-right';
+        } else if (activeWrapper.classList.contains('img-mode-block') || activeWrapper.style.display === 'block') {
+          imgAlignMode = 'block';
         }
         setSelectedImage({ wrapper: activeWrapper, img: activeImg, mode: imgAlignMode, rect });
         return;
@@ -798,11 +800,13 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         e.preventDefault();
         e.stopPropagation();
         const rect = activeImg.getBoundingClientRect();
-        let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' = 'inline';
+        let imgAlignMode: 'inline' | 'wrap-left' | 'wrap-right' | 'block' = 'inline';
         if (activeWrapper.classList.contains('img-mode-wrap-left') || activeWrapper.style.float === 'left') {
           imgAlignMode = 'wrap-left';
         } else if (activeWrapper.classList.contains('img-mode-wrap-right') || activeWrapper.style.float === 'right') {
           imgAlignMode = 'wrap-right';
+        } else if (activeWrapper.classList.contains('img-mode-block') || activeWrapper.style.display === 'block') {
+          imgAlignMode = 'block';
         }
 
         setSelectedImage({ wrapper: activeWrapper, img: activeImg, mode: imgAlignMode, rect });
@@ -984,35 +988,41 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     updateToolbarState();
   };
 
-  const applyImageMode = (mode: 'inline' | 'wrap-left' | 'wrap-right') => {
+  const applyImageMode = (mode: 'inline' | 'wrap-left' | 'wrap-right' | 'block') => {
     if (!selectedImage) return;
     const { wrapper } = selectedImage;
-    wrapper.classList.remove('img-mode-inline', 'img-mode-wrap-left', 'img-mode-wrap-right');
+    wrapper.classList.remove('img-mode-inline', 'img-mode-wrap-left', 'img-mode-wrap-right', 'img-mode-block');
 
     if (mode === 'inline') {
       wrapper.classList.add('img-mode-inline');
+      wrapper.style.float = 'none';
+      wrapper.style.display = 'inline-block';
+      wrapper.style.verticalAlign = 'middle';
+      wrapper.style.margin = '0.25rem 0.5rem';
+      wrapper.style.clear = 'none';
+      wrapper.style.maxWidth = '100%';
+    } else if (mode === 'wrap-left') {
+      wrapper.classList.add('img-mode-wrap-left');
+      wrapper.style.float = 'left';
+      wrapper.style.display = 'inline-block';
+      wrapper.style.margin = '0.25rem 1rem 0.5rem 0';
+      wrapper.style.clear = 'none';
+      wrapper.style.maxWidth = '45%';
+    } else if (mode === 'wrap-right') {
+      wrapper.classList.add('img-mode-wrap-right');
+      wrapper.style.float = 'right';
+      wrapper.style.display = 'inline-block';
+      wrapper.style.margin = '0.25rem 0 0.5rem 1rem';
+      wrapper.style.clear = 'none';
+      wrapper.style.maxWidth = '45%';
+    } else if (mode === 'block') {
+      wrapper.classList.add('img-mode-block');
       wrapper.style.float = 'none';
       wrapper.style.display = 'block';
       wrapper.style.margin = '1.5rem auto';
       wrapper.style.textAlign = 'center';
       wrapper.style.clear = 'both';
       wrapper.style.maxWidth = '100%';
-    } else if (mode === 'wrap-left') {
-      wrapper.classList.add('img-mode-wrap-left');
-      wrapper.style.float = 'left';
-      wrapper.style.display = 'block';
-      wrapper.style.margin = '0.5rem 1.5rem 1rem 0';
-      wrapper.style.textAlign = 'left';
-      wrapper.style.clear = 'left';
-      wrapper.style.maxWidth = '45%';
-    } else if (mode === 'wrap-right') {
-      wrapper.classList.add('img-mode-wrap-right');
-      wrapper.style.float = 'right';
-      wrapper.style.display = 'block';
-      wrapper.style.margin = '0.5rem 0 1rem 1.5rem';
-      wrapper.style.textAlign = 'right';
-      wrapper.style.clear = 'right';
-      wrapper.style.maxWidth = '45%';
     }
 
     const rect = selectedImage.img.getBoundingClientRect();
@@ -1038,7 +1048,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         const base64Data = event.target?.result as string;
         const savedUrl = await saveImageAsset(base64Data, file.name);
         if (savedUrl) {
-          const imgHtml = `<div class="doc-img-wrapper img-mode-inline my-6 text-center select-none" contenteditable="false" style="float: none; display: block; margin: 1.5rem auto; text-align: center; clear: both;"><img src="${savedUrl}" alt="${file.name}" class="max-h-[450px] rounded-2xl mx-auto border border-slate-700/60 shadow-2xl object-cover w-auto" /></div><p><br/></p>`;
+          const imgHtml = `\u00A0<span class="doc-img-wrapper img-mode-inline select-none" contenteditable="false" style="display: inline-block; vertical-align: middle; margin: 0.25rem 0.5rem; float: none; clear: none;"><img src="${savedUrl}" alt="${file.name}" class="max-h-[350px] rounded-xl border border-slate-700/60 shadow-md object-contain w-auto inline-block align-middle" /></span>\u00A0`;
           insertHtmlAtCursor(imgHtml);
         }
       };
@@ -1047,7 +1057,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64Data = event.target?.result as string;
-        const imgHtml = `<div class="doc-img-wrapper img-mode-inline my-6 text-center select-none" contenteditable="false" style="float: none; display: block; margin: 1.5rem auto; text-align: center; clear: both;"><img src="${base64Data}" alt="${file.name}" class="max-h-[450px] rounded-2xl mx-auto border border-slate-700/60 shadow-2xl object-cover w-auto" /></div><p><br/></p>`;
+        const imgHtml = `\u00A0<span class="doc-img-wrapper img-mode-inline select-none" contenteditable="false" style="display: inline-block; vertical-align: middle; margin: 0.25rem 0.5rem; float: none; clear: none;"><img src="${base64Data}" alt="${file.name}" class="max-h-[350px] rounded-xl border border-slate-700/60 shadow-md object-contain w-auto inline-block align-middle" /></span>\u00A0`;
         insertHtmlAtCursor(imgHtml);
       };
       reader.readAsDataURL(file);
@@ -2216,8 +2226,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               }`}
             >
               <div className="flex items-center gap-2">
-                <Icons.AlignJustify size={14} />
-                <span>Sebaris dengan Teks</span>
+                <Icons.Type size={14} />
+                <span>Sebaris dengan Teks (Inline)</span>
               </div>
               {imageContextMenu.mode === 'inline' && <Icons.Check size={13} />}
             </button>
@@ -2236,7 +2246,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Icons.AlignLeft size={14} />
-                <span>Wrap Kiri (Penggabungan)</span>
+                <span>Wrap Teks Kiri</span>
               </div>
               {imageContextMenu.mode === 'wrap-left' && <Icons.Check size={13} />}
             </button>
@@ -2255,9 +2265,28 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Icons.AlignRight size={14} />
-                <span>Wrap Kanan (Penggabungan)</span>
+                <span>Wrap Teks Kanan</span>
               </div>
               {imageContextMenu.mode === 'wrap-right' && <Icons.Check size={13} />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                applyImageMode('block');
+                setImageContextMenu(null);
+              }}
+              className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
+                imageContextMenu.mode === 'block'
+                  ? 'bg-blue-600/20 text-blue-300 font-bold'
+                  : 'hover:bg-slate-800 text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Icons.AlignCenter size={14} />
+                <span>Blok Terpisah (Tengah)</span>
+              </div>
+              {imageContextMenu.mode === 'block' && <Icons.Check size={13} />}
             </button>
           </div>
 
