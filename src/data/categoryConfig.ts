@@ -1,9 +1,11 @@
 import type { CardCategory, CategoryConfig } from '../types';
 
+export const PRIMARY_CATEGORIES: CardCategory[] = ['character', 'faction', 'location', 'lore', 'item'];
+
 export const CATEGORY_CONFIGS: Record<CardCategory, CategoryConfig> = {
   character: {
     id: 'character',
-    label: 'Karakter',
+    label: 'Karakter & Tokoh',
     iconName: 'User',
     color: 'var(--text-primary)',
     bgGradient: 'app-bg-secondary',
@@ -21,7 +23,7 @@ export const CATEGORY_CONFIGS: Record<CardCategory, CategoryConfig> = {
   },
   location: {
     id: 'location',
-    label: 'Lokasi & Tempat',
+    label: 'Lokasi & Wilayah',
     iconName: 'MapPin',
     color: 'var(--text-primary)',
     bgGradient: 'app-bg-secondary',
@@ -30,17 +32,8 @@ export const CATEGORY_CONFIGS: Record<CardCategory, CategoryConfig> = {
   },
   lore: {
     id: 'lore',
-    label: 'Lore & Mitologi',
+    label: 'Lore & Timeline',
     iconName: 'BookOpen',
-    color: 'var(--text-primary)',
-    bgGradient: 'app-bg-secondary',
-    borderColor: 'app-border',
-    glowColor: '',
-  },
-  timeline: {
-    id: 'timeline',
-    label: 'Peristiwa Timeline',
-    iconName: 'Clock',
     color: 'var(--text-primary)',
     bgGradient: 'app-bg-secondary',
     borderColor: 'app-border',
@@ -55,14 +48,22 @@ export const CATEGORY_CONFIGS: Record<CardCategory, CategoryConfig> = {
     borderColor: 'app-border',
     glowColor: '',
   },
+  timeline: {
+    id: 'lore',
+    label: 'Lore & Timeline',
+    iconName: 'BookOpen',
+    color: 'var(--text-primary)',
+    bgGradient: 'app-bg-secondary',
+    borderColor: 'app-border',
+    glowColor: '',
+  },
   realm: {
-    id: 'realm',
-    label: 'Negara / Wilayah',
-    iconName: 'Castle',
+    id: 'location',
+    label: 'Lokasi & Wilayah',
+    iconName: 'MapPin',
     color: 'var(--text-primary)',
     bgGradient: 'app-bg-secondary',
     borderColor: 'app-border',
     glowColor: '',
   },
 };
-

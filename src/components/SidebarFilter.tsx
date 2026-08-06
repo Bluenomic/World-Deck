@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { WorldCard, CardCategory, WorldCanvas } from '../types';
-import { CATEGORY_CONFIGS } from '../data/categoryConfig';
+import { CATEGORY_CONFIGS, PRIMARY_CATEGORIES } from '../data/categoryConfig';
 import { loadWorkspacePreferences, saveWorkspacePreferences } from '../utils/storage';
 import * as Icons from 'lucide-react';
 
@@ -317,16 +317,22 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                 </span>
               </button>
 
-              {Object.entries(CATEGORY_CONFIGS).map(([key, cfg]) => {
-                const count = cards.filter((c) => c.category === key).length;
-                const isSelected = selectedCategory === key;
+              {PRIMARY_CATEGORIES.map((catKey) => {
+                const cfg = CATEGORY_CONFIGS[catKey];
+                const count = cards.filter((c) => {
+                  if (c.category === catKey) return true;
+                  if (catKey === 'lore' && c.category === 'timeline') return true;
+                  if (catKey === 'location' && c.category === 'realm') return true;
+                  return false;
+                }).length;
+                const isSelected = selectedCategory === catKey;
                 const CategoryIcon = (Icons as any)[cfg.iconName] || Icons.HelpCircle;
 
                 return (
                   <button
-                    key={key}
+                    key={catKey}
                     type="button"
-                    onClick={() => onCategorySelect(key as CardCategory)}
+                    onClick={() => onCategorySelect(catKey as CardCategory)}
                     className={`w-full px-2.5 py-1.5 rounded-md text-left transition-colors flex items-center justify-between text-xs cursor-pointer ${
                       isSelected
                         ? 'app-bg-main app-text-main font-semibold border-l-2 border-blue-500'

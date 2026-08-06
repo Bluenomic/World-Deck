@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { WorldCard, CardCategory, CustomAttribute, CardConnection } from '../types';
-import { CATEGORY_CONFIGS } from '../data/categoryConfig';
+import { CATEGORY_CONFIGS, PRIMARY_CATEGORIES } from '../data/categoryConfig';
 import { generateId, parseMentions } from '../utils/helpers';
 import { isTauriAvailable, saveImageAsset } from '../utils/tauriStorage';
 import * as Icons from 'lucide-react';
@@ -194,7 +194,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                   <div
                     className="absolute left-0 top-full mt-1.5 w-48 bg-[#1e1e1e] border border-[#383838] rounded-xl shadow-2xl py-1 z-[150] space-y-0.5 custom-scrollbar max-h-60 overflow-y-auto"
                   >
-                    {(Object.keys(CATEGORY_CONFIGS) as CardCategory[]).map((cat) => {
+                    {PRIMARY_CATEGORIES.map((cat) => {
                       const cfg = CATEGORY_CONFIGS[cat];
                       const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle;
                       const isSelected = category === cat;
