@@ -42,6 +42,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   const [title, setTitle] = useState(card.title);
   const [subtitle, setSubtitle] = useState(card.subtitle || '');
   const [category, setCategory] = useState<CardCategory>(card.category);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [summary, setSummary] = useState(card.summary || '');
   const [content, setContent] = useState(card.content || '');
   const [imageUrl, setImageUrl] = useState(card.imageUrl || '');
@@ -157,6 +158,9 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     (c) => c.sourceId === card.id || c.targetId === card.id
   );
 
+  const categoryConfig = CATEGORY_CONFIGS[category] || CATEGORY_CONFIGS.character;
+  const CategoryIcon = (Icons as any)[categoryConfig.iconName] || Icons.HelpCircle;
+
   return (
     <div
       className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-6 backdrop-animate-appear select-none"
@@ -169,20 +173,57 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
         {/* Header Action Strip */}
         <div className="px-5 py-3 bg-[#1e1e1e] border-b border-[#383838] flex items-center justify-between text-xs text-slate-300">
           <div className="flex items-center gap-2">
-            {/* Category Select Dropdown */}
-            <div className="relative group">
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as CardCategory)}
-                className="appearance-none bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1 pr-7 text-xs font-bold text-white cursor-pointer outline-none hover:border-[#0d99ff]"
+            {/* Custom Category Select Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+                className="bg-[#2c2c2c] border border-[#383838] hover:border-[#0d99ff] rounded-lg px-2.5 py-1 flex items-center gap-2 text-xs font-bold text-white cursor-pointer transition-colors"
               >
-                {(Object.keys(CATEGORY_CONFIGS) as CardCategory[]).map((cat) => (
-                  <option key={cat} value={cat}>
-                    {CATEGORY_CONFIGS[cat].label}
-                  </option>
-                ))}
-              </select>
-              <Icons.ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <CategoryIcon size={14} style={{ color: categoryConfig.color }} className="shrink-0" />
+                <span>{categoryConfig.label}</span>
+                <Icons.ChevronDown size={12} className="text-slate-400 shrink-0 ml-0.5" />
+              </button>
+
+              {isCategoryOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-[140]"
+                    onClick={() => setIsCategoryOpen(false)}
+                  />
+                  <div
+                    className="absolute left-0 top-full mt-1.5 w-48 bg-[#1e1e1e] border border-[#383838] rounded-xl shadow-2xl py-1 z-[150] space-y-0.5 custom-scrollbar max-h-60 overflow-y-auto"
+                  >
+                    {(Object.keys(CATEGORY_CONFIGS) as CardCategory[]).map((cat) => {
+                      const cfg = CATEGORY_CONFIGS[cat];
+                      const IconComp = (Icons as any)[cfg.iconName] || Icons.HelpCircle;
+                      const isSelected = category === cat;
+
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setCategory(cat);
+                            setIsCategoryOpen(false);
+                          }}
+                          className={`w-full px-3 py-1.5 text-left text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#0d99ff]/15 text-[#0d99ff]'
+                              : 'text-slate-200 hover:bg-[#2c2c2c]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <IconComp size={14} style={{ color: cfg.color }} className="shrink-0" />
+                            <span>{cfg.label}</span>
+                          </div>
+                          {isSelected && <Icons.Check size={13} className="text-[#0d99ff]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
 
             <span className="text-slate-600">/</span>
