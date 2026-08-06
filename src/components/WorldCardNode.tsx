@@ -16,6 +16,7 @@ interface WorldCardNodeProps {
   connectionCount: number;
   onMeasureHeight?: (cardId: string, height: number) => void;
   onUpdateDimensions?: (cardId: string, width: number, height: number) => void;
+  onUpdateImageHeight?: (cardId: string, imageHeight: number) => void;
 }
 
 export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
@@ -31,6 +32,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
   connectionCount,
   onMeasureHeight,
   onUpdateDimensions,
+  onUpdateImageHeight,
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const config = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
@@ -81,6 +83,36 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
     window.addEventListener('touchend', handlePointerUp);
   };
 
+  // Drag Resize Handler for Cover Image Height
+  const handleImageResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const defaultImgH = isDetailed ? 144 : 96;
+    const startImgH = card.imageHeight || defaultImgH;
+
+    const handlePointerMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const moveY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
+      const deltaY = (moveY - clientY) / (zoom || 1);
+
+      const newImageHeight = Math.round(Math.max(48, Math.min(500, startImgH + deltaY)));
+      onUpdateImageHeight?.(card.id, newImageHeight);
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerMove);
+      window.removeEventListener('touchend', handlePointerUp);
+    };
+
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('touchmove', handlePointerMove);
+    window.addEventListener('touchend', handlePointerUp);
+  };
+
   return (
     <div
       data-card-id={card.id}
@@ -113,11 +145,16 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       {/* Cover Image Preview (Hidden in compact view) */}
       {!isCompact && (
         card.imageUrl ? (
-          <div className={`w-full overflow-hidden relative rounded-t-xl shrink-0 ${isDetailed ? 'h-36' : 'h-24'}`}>
+          <div
+            style={{ height: card.imageHeight ? `${card.imageHeight}px` : undefined }}
+            className={`w-full overflow-hidden relative rounded-t-xl shrink-0 group/img ${
+              !card.imageHeight ? (isDetailed ? 'h-36' : 'h-24') : ''
+            }`}
+          >
             <img
               src={card.imageUrl}
               alt={card.title}
-              className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity pointer-events-none select-none"
+              className="w-full h-full object-cover opacity-90 group-hover/img:opacity-100 transition-opacity pointer-events-none select-none"
               draggable={false}
               onDragStart={(e) => e.preventDefault()}
               loading="lazy"
@@ -125,6 +162,18 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
                 (e.target as HTMLElement).style.display = 'none';
               }}
             />
+
+            {/* Image Height Drag Resize Handle */}
+            {onUpdateImageHeight && (
+              <div
+                className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity cursor-ns-resize flex items-center justify-center z-20 group/imghandle"
+                onMouseDown={handleImageResizeStart}
+                onTouchStart={handleImageResizeStart}
+                title="Tarik untuk mengubah tinggi/ukuran gambar kartu"
+              >
+                <div className="w-12 h-1 rounded-full bg-white/70 group-hover/imghandle:bg-[#0d99ff] group-hover/imghandle:scale-x-125 transition-all shadow-md" />
+              </div>
+            )}
           </div>
         ) : (
           <div className="h-2 w-full rounded-t-xl shrink-0" style={{ backgroundColor: config.color, opacity: 0.8 }} />

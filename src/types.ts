@@ -37,6 +37,7 @@ export interface WorldCard {
   summary: string;
   content: string;
   imageUrl?: string;
+  imageHeight?: number;
   images?: string[];
   tags: string[];
   attributes: CustomAttribute[];

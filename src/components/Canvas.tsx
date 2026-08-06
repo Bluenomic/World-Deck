@@ -30,6 +30,7 @@ interface CanvasProps {
   onDeleteConnection?: (id: string) => void;
   onDeleteConnections?: (ids: string[]) => void;
   onUpdateCardDimensions?: (id: string, width: number, height: number) => void;
+  onUpdateCardImageHeight?: (id: string, imageHeight: number) => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onUndo?: () => void;
@@ -60,6 +61,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onDeleteConnection,
   onDeleteConnections,
   onUpdateCardDimensions,
+  onUpdateCardImageHeight,
   canUndo,
   canRedo,
   onUndo,
@@ -1060,6 +1062,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               connectionCount={connCount}
               onMeasureHeight={(id, h) => cardHeightsRef.current.set(id, h)}
               onUpdateDimensions={onUpdateCardDimensions}
+              onUpdateImageHeight={onUpdateCardImageHeight}
             />
           );
         })}

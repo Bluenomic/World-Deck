@@ -434,6 +434,14 @@ export const App: React.FC = () => {
     }));
   };
 
+  const handleUpdateCardImageHeight = (id: string, imageHeight: number) => {
+    updateActiveWorld((prev) => ({
+      ...prev,
+      updatedAt: Date.now(),
+      cards: prev.cards.map((c) => (c.id === id ? { ...c, imageHeight } : c)),
+    }));
+  };
+
   // Add New Card directly on Canvas (or Duplicate Card)
   const handleAddCardAtPosition = (x: number = 300, y: number = 300, initialData?: Partial<WorldCard>) => {
     const newCard: WorldCard = {
@@ -1170,6 +1178,7 @@ export const App: React.FC = () => {
               onDeleteConnection={handleDeleteConnection}
               onDeleteConnections={handleDeleteConnections}
               onUpdateCardDimensions={handleUpdateCardDimensions}
+              onUpdateCardImageHeight={handleUpdateCardImageHeight}
               canUndo={canUndo}
               canRedo={canRedo}
               onUndo={handleUndo}
