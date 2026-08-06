@@ -127,6 +127,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   // Editable div reference for Google Docs style WYSIWYG
   const editorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const replaceImageInputRef = useRef<HTMLInputElement>(null);
 
   // Inline @ Mention Suggestion Popup State
   const [mentionState, setMentionState] = useState<{
@@ -809,10 +810,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
           imgAlignMode = 'block';
         }
 
+        const imgMenuWidth = 260;
+        const imgMenuHeight = 440;
+        const imgX = e.clientX + imgMenuWidth > window.innerWidth ? Math.max(10, e.clientX - imgMenuWidth) : Math.max(10, e.clientX);
+        const imgY = e.clientY + imgMenuHeight > window.innerHeight ? Math.max(10, e.clientY - imgMenuHeight) : Math.max(10, e.clientY);
+
         setSelectedImage({ wrapper: activeWrapper, img: activeImg, mode: imgAlignMode, rect });
         setImageContextMenu({
-          x: Math.min(window.innerWidth - 230, e.clientX),
-          y: Math.min(window.innerHeight - 250, e.clientY),
+          x: imgX,
+          y: imgY,
           wrapper: activeWrapper,
           img: activeImg,
           mode: imgAlignMode,
@@ -824,9 +830,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       e.stopPropagation();
       const selText = window.getSelection()?.toString().trim() || '';
       setImageContextMenu(null);
+
+      const textMenuWidth = 270;
+      const textMenuHeight = 380;
+      const textX = e.clientX + textMenuWidth > window.innerWidth ? Math.max(10, e.clientX - textMenuWidth) : Math.max(10, e.clientX);
+      const textY = e.clientY + textMenuHeight > window.innerHeight ? Math.max(10, e.clientY - textMenuHeight) : Math.max(10, e.clientY);
+
       setEditorContextMenu({
-        x: Math.min(window.innerWidth - 270, e.clientX),
-        y: Math.min(window.innerHeight - 380, e.clientY),
+        x: textX,
+        y: textY,
         selectedText: selText,
       });
     }
@@ -1028,6 +1040,89 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     const rect = selectedImage.img.getBoundingClientRect();
     setSelectedImage({ wrapper, img: selectedImage.img, mode, rect });
     updateToolbarState();
+  };
+
+  const applyImageSizePreset = (preset: '25%' | '50%' | '100%' | 'reset') => {
+    if (!selectedImage) return;
+    const { wrapper, img } = selectedImage;
+    if (preset === 'reset') {
+      wrapper.style.width = 'auto';
+      wrapper.style.maxWidth = '100%';
+      img.style.width = 'auto';
+      img.style.maxHeight = '450px';
+    } else {
+      wrapper.style.width = preset;
+      img.style.width = '100%';
+      img.style.maxHeight = 'none';
+    }
+    const rect = img.getBoundingClientRect();
+    setSelectedImage({ ...selectedImage, rect });
+    updateToolbarState();
+  };
+
+  const toggleImageCaption = () => {
+    if (!selectedImage) return;
+    const { wrapper } = selectedImage;
+    let caption = wrapper.querySelector('figcaption');
+    if (caption) {
+      caption.remove();
+    } else {
+      caption = document.createElement('figcaption');
+      caption.className = 'doc-img-caption text-center text-xs italic text-slate-400 mt-1 focus:outline-none border-b border-transparent focus:border-[#0d99ff]/50 py-0.5';
+      caption.setAttribute('contenteditable', 'true');
+      caption.innerText = 'Tulis keterangan gambar di sini...';
+      wrapper.appendChild(caption);
+      setTimeout(() => {
+        caption?.focus();
+      }, 50);
+    }
+    updateToolbarState();
+  };
+
+  const duplicateSelectedImage = () => {
+    if (!selectedImage) return;
+    const clone = selectedImage.wrapper.cloneNode(true) as HTMLElement;
+    selectedImage.wrapper.after(clone);
+    updateToolbarState();
+  };
+
+  const downloadSelectedImage = () => {
+    if (!selectedImage) return;
+    const a = document.createElement('a');
+    a.href = selectedImage.img.src;
+    a.download = `gambar-naskah-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleReplaceImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedImage) return;
+
+    if (isTauriAvailable()) {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64Data = event.target?.result as string;
+        const savedUrl = await saveImageAsset(base64Data, file.name);
+        if (savedUrl) {
+          selectedImage.img.src = savedUrl;
+          selectedImage.img.alt = file.name;
+          updateToolbarState();
+        }
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64Data = event.target?.result as string;
+        selectedImage.img.src = base64Data;
+        selectedImage.img.alt = file.name;
+        updateToolbarState();
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = '';
   };
 
   const deleteSelectedImage = () => {
@@ -1280,12 +1375,19 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
   return (
     <div className="flex-1 flex app-bg-main overflow-hidden app-text-main h-full font-sans select-none relative">
-      {/* Hidden Image File Input */}
+      {/* Hidden Image File Inputs */}
       <input
         ref={imageInputRef}
         type="file"
         accept="image/*"
         onChange={handleImageUpload}
+        className="hidden"
+      />
+      <input
+        ref={replaceImageInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleReplaceImageUpload}
         className="hidden"
       />
 
@@ -1310,9 +1412,14 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
           e.stopPropagation();
           setImageContextMenu(null);
           setEditorContextMenu(null);
+          const sideMenuWidth = 230;
+          const sideMenuHeight = 220;
+          const sideX = e.clientX + sideMenuWidth > window.innerWidth ? Math.max(10, e.clientX - sideMenuWidth) : Math.max(10, e.clientX);
+          const sideY = e.clientY + sideMenuHeight > window.innerHeight ? Math.max(10, e.clientY - sideMenuHeight) : Math.max(10, e.clientY);
+
           setSidebarContextMenu({
-            x: Math.min(window.innerWidth - 230, e.clientX),
-            y: Math.min(window.innerHeight - 200, e.clientY),
+            x: sideX,
+            y: sideY,
           });
         }}
         style={{ width: isSidebarOpen ? '280px' : '0px' }}
@@ -1399,9 +1506,14 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     e.stopPropagation();
                     setImageContextMenu(null);
                     setEditorContextMenu(null);
+                    const itemMenuWidth = 230;
+                    const itemMenuHeight = 260;
+                    const itemX = e.clientX + itemMenuWidth > window.innerWidth ? Math.max(10, e.clientX - itemMenuWidth) : Math.max(10, e.clientX);
+                    const itemY = e.clientY + itemMenuHeight > window.innerHeight ? Math.max(10, e.clientY - itemMenuHeight) : Math.max(10, e.clientY);
+
                     setSidebarContextMenu({
-                      x: Math.min(window.innerWidth - 230, e.clientX),
-                      y: Math.min(window.innerHeight - 260, e.clientY),
+                      x: itemX,
+                      y: itemY,
                       targetDoc: doc,
                     });
                   }}
@@ -2201,18 +2313,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       {/* Right-Click Context Menu for Images */}
       {imageContextMenu && (
         <div
-          className="doc-image-context-menu fixed z-[150] w-56 app-bg-secondary border border-slate-700/80 shadow-2xl rounded-2xl py-1.5 text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 select-none space-y-0.5"
+          className="doc-image-context-menu fixed z-[150] w-64 bg-[#1e1e1e] border border-[#383838] shadow-2xl rounded-2xl py-2 text-xs text-white animate-in fade-in zoom-in-95 duration-100 select-none space-y-1"
           style={{
             top: `${imageContextMenu.y}px`,
             left: `${imageContextMenu.x}px`,
           }}
         >
-          <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 flex items-center justify-between">
-            <span>Opsi Gambar</span>
-            <Icons.Image size={13} className="text-blue-400" />
-          </div>
-
-          <div className="px-1 py-1">
+          {/* Alignment & Flow Modes */}
+          <div className="px-1.5 py-0.5 space-y-0.5">
+            <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase">Posisi & Aliran Teks</div>
             <button
               type="button"
               onClick={() => {
@@ -2221,8 +2330,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               }}
               className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
                 imageContextMenu.mode === 'inline'
-                  ? 'bg-blue-600/20 text-blue-300 font-bold'
-                  : 'hover:bg-slate-800 text-slate-300'
+                  ? 'bg-[#0d99ff]/20 text-[#0d99ff] font-bold border border-[#0d99ff]/30'
+                  : 'hover:bg-[#2c2c2c] text-slate-300'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -2240,8 +2349,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               }}
               className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
                 imageContextMenu.mode === 'wrap-left'
-                  ? 'bg-blue-600/20 text-blue-300 font-bold'
-                  : 'hover:bg-slate-800 text-slate-300'
+                  ? 'bg-[#0d99ff]/20 text-[#0d99ff] font-bold border border-[#0d99ff]/30'
+                  : 'hover:bg-[#2c2c2c] text-slate-300'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -2259,8 +2368,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               }}
               className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
                 imageContextMenu.mode === 'wrap-right'
-                  ? 'bg-blue-600/20 text-blue-300 font-bold'
-                  : 'hover:bg-slate-800 text-slate-300'
+                  ? 'bg-[#0d99ff]/20 text-[#0d99ff] font-bold border border-[#0d99ff]/30'
+                  : 'hover:bg-[#2c2c2c] text-slate-300'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -2278,8 +2387,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
               }}
               className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
                 imageContextMenu.mode === 'block'
-                  ? 'bg-blue-600/20 text-blue-300 font-bold'
-                  : 'hover:bg-slate-800 text-slate-300'
+                  ? 'bg-[#0d99ff]/20 text-[#0d99ff] font-bold border border-[#0d99ff]/30'
+                  : 'hover:bg-[#2c2c2c] text-slate-300'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -2290,78 +2399,188 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
             </button>
           </div>
 
-          <div className="my-1 border-t border-slate-800" />
+          <div className="my-1 border-t border-[#383838]" />
 
-          {/* Crop Action */}
-          <button
-            type="button"
-            onClick={() => {
-              const { img, wrapper } = imageContextMenu;
-              let originalSrc = img.getAttribute('data-original-src');
-              if (!originalSrc) {
-                originalSrc = img.src;
-                img.setAttribute('data-original-src', originalSrc);
-              }
+          {/* Preset Size Options */}
+          <div className="px-1.5 py-1 space-y-1">
+            <div className="px-2 text-[10px] font-bold text-slate-400 uppercase">Ukuran Gambar Presets</div>
+            <div className="grid grid-cols-4 gap-1 px-1">
+              <button
+                type="button"
+                onClick={() => {
+                  applyImageSizePreset('25%');
+                  setImageContextMenu(null);
+                }}
+                className="py-1 rounded-lg bg-[#2c2c2c] hover:bg-[#383838] text-[11px] font-bold text-slate-200 transition-colors text-center cursor-pointer"
+                title="Kecil (25%)"
+              >
+                25%
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  applyImageSizePreset('50%');
+                  setImageContextMenu(null);
+                }}
+                className="py-1 rounded-lg bg-[#2c2c2c] hover:bg-[#383838] text-[11px] font-bold text-slate-200 transition-colors text-center cursor-pointer"
+                title="Sedang (50%)"
+              >
+                50%
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  applyImageSizePreset('100%');
+                  setImageContextMenu(null);
+                }}
+                className="py-1 rounded-lg bg-[#2c2c2c] hover:bg-[#383838] text-[11px] font-bold text-slate-200 transition-colors text-center cursor-pointer"
+                title="Penuh (100%)"
+              >
+                100%
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  applyImageSizePreset('reset');
+                  setImageContextMenu(null);
+                }}
+                className="py-1 rounded-lg bg-[#2c2c2c] hover:bg-[#383838] text-[10px] font-bold text-slate-400 transition-colors text-center cursor-pointer"
+                title="Reset Ukuran Asli"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
 
-              const existingTop = Number(img.getAttribute('data-crop-top')) || 0;
-              const existingBottom = Number(img.getAttribute('data-crop-bottom')) || 0;
-              const existingLeft = Number(img.getAttribute('data-crop-left')) || 0;
-              const existingRight = Number(img.getAttribute('data-crop-right')) || 0;
+          <div className="my-1 border-t border-[#383838]" />
 
-              const rect = img.getBoundingClientRect();
-              setCropState({
-                isActive: true,
-                wrapper,
-                img,
-                rect,
-                originalSrc,
-                cropTop: existingTop,
-                cropBottom: existingBottom,
-                cropLeft: existingLeft,
-                cropRight: existingRight,
-              });
-              setImageContextMenu(null);
-              setSelectedImage(null);
-            }}
-            className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors font-medium text-amber-400 cursor-pointer"
-          >
-            <Icons.Crop size={14} />
-            <span>Potong / Crop Gambar</span>
-          </button>
-
-          {/* Reset Crop Action (If image is cropped) */}
-          {(Number(imageContextMenu.img.getAttribute('data-crop-top')) > 0 ||
-            Number(imageContextMenu.img.getAttribute('data-crop-bottom')) > 0 ||
-            Number(imageContextMenu.img.getAttribute('data-crop-left')) > 0 ||
-            Number(imageContextMenu.img.getAttribute('data-crop-right')) > 0 ||
-            (imageContextMenu.img.style.clipPath && imageContextMenu.img.style.clipPath !== 'none')) && (
+          {/* Caption & Manipulations */}
+          <div className="px-1.5 space-y-0.5">
+            {/* Toggle Image Caption */}
             <button
               type="button"
               onClick={() => {
-                resetImageCrop(imageContextMenu.img);
+                toggleImageCaption();
                 setImageContextMenu(null);
               }}
-              className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center gap-2 transition-colors font-medium text-blue-400 cursor-pointer"
+              className="w-full px-2.5 py-1.5 rounded-xl text-left hover:bg-[#2c2c2c] flex items-center gap-2 text-slate-200 hover:text-white transition-colors cursor-pointer font-medium"
             >
-              <Icons.RotateCcw size={14} />
-              <span>Reset Crop (Kembalikan Utuh)</span>
+              <Icons.MessageSquare size={14} className="text-[#0d99ff]" />
+              <span>{imageContextMenu.wrapper.querySelector('figcaption') ? 'Hapus Keterangan' : 'Tambah Keterangan (Caption)'}</span>
             </button>
-          )}
 
-          <div className="my-1 border-t border-slate-800" />
+            {/* Replace Image */}
+            <button
+              type="button"
+              onClick={() => {
+                replaceImageInputRef.current?.click();
+                setImageContextMenu(null);
+              }}
+              className="w-full px-2.5 py-1.5 rounded-xl text-left hover:bg-[#2c2c2c] flex items-center gap-2 text-slate-200 hover:text-white transition-colors cursor-pointer font-medium"
+            >
+              <Icons.RefreshCw size={14} className="text-emerald-400" />
+              <span>Ganti Gambar</span>
+            </button>
+
+            {/* Duplicate Image */}
+            <button
+              type="button"
+              onClick={() => {
+                duplicateSelectedImage();
+                setImageContextMenu(null);
+              }}
+              className="w-full px-2.5 py-1.5 rounded-xl text-left hover:bg-[#2c2c2c] flex items-center gap-2 text-slate-200 hover:text-white transition-colors cursor-pointer font-medium"
+            >
+              <Icons.Copy size={14} className="text-purple-400" />
+              <span>Duplikat Gambar</span>
+            </button>
+
+            {/* Download Image */}
+            <button
+              type="button"
+              onClick={() => {
+                downloadSelectedImage();
+                setImageContextMenu(null);
+              }}
+              className="w-full px-2.5 py-1.5 rounded-xl text-left hover:bg-[#2c2c2c] flex items-center gap-2 text-slate-200 hover:text-white transition-colors cursor-pointer font-medium"
+            >
+              <Icons.Download size={14} className="text-[#0d99ff]" />
+              <span>Unduh Berkas Gambar</span>
+            </button>
+
+            {/* Crop Action */}
+            <button
+              type="button"
+              onClick={() => {
+                const { img, wrapper } = imageContextMenu;
+                let originalSrc = img.getAttribute('data-original-src');
+                if (!originalSrc) {
+                  originalSrc = img.src;
+                  img.setAttribute('data-original-src', originalSrc);
+                }
+
+                const existingTop = Number(img.getAttribute('data-crop-top')) || 0;
+                const existingBottom = Number(img.getAttribute('data-crop-bottom')) || 0;
+                const existingLeft = Number(img.getAttribute('data-crop-left')) || 0;
+                const existingRight = Number(img.getAttribute('data-crop-right')) || 0;
+
+                const rect = img.getBoundingClientRect();
+                setCropState({
+                  isActive: true,
+                  wrapper,
+                  img,
+                  rect,
+                  originalSrc,
+                  cropTop: existingTop,
+                  cropBottom: existingBottom,
+                  cropLeft: existingLeft,
+                  cropRight: existingRight,
+                });
+                setImageContextMenu(null);
+                setSelectedImage(null);
+              }}
+              className="w-full px-2.5 py-1.5 rounded-xl text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors font-medium text-amber-400 cursor-pointer"
+            >
+              <Icons.Crop size={14} />
+              <span>Potong / Crop Gambar</span>
+            </button>
+
+            {/* Reset Crop Action */}
+            {(Number(imageContextMenu.img.getAttribute('data-crop-top')) > 0 ||
+              Number(imageContextMenu.img.getAttribute('data-crop-bottom')) > 0 ||
+              Number(imageContextMenu.img.getAttribute('data-crop-left')) > 0 ||
+              Number(imageContextMenu.img.getAttribute('data-crop-right')) > 0 ||
+              (imageContextMenu.img.style.clipPath && imageContextMenu.img.style.clipPath !== 'none')) && (
+              <button
+                type="button"
+                onClick={() => {
+                  resetImageCrop(imageContextMenu.img);
+                  setImageContextMenu(null);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-xl text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors font-medium text-blue-400 cursor-pointer"
+              >
+                <Icons.RotateCcw size={14} />
+                <span>Reset Crop</span>
+              </button>
+            )}
+          </div>
+
+          <div className="my-1 border-t border-[#383838]" />
 
           {/* Delete Action */}
-          <button
-            type="button"
-            onClick={() => {
-              deleteSelectedImage();
-              setImageContextMenu(null);
-            }}
-            className="w-full px-3 py-2 text-left hover:bg-slate-800 text-rose-400 flex items-center gap-2 transition-colors cursor-pointer font-medium"
-          >
-            <Icons.Trash2 size={14} />
-            <span>Hapus Gambar</span>
-          </button>
+          <div className="px-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                deleteSelectedImage();
+                setImageContextMenu(null);
+              }}
+              className="w-full px-2.5 py-1.5 rounded-xl text-left hover:bg-rose-500/10 text-rose-400 flex items-center gap-2 transition-colors cursor-pointer font-medium"
+            >
+              <Icons.Trash2 size={14} />
+              <span>Hapus Gambar</span>
+            </button>
+          </div>
         </div>
       )}
 
