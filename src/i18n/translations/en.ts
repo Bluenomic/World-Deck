@@ -49,7 +49,7 @@ export const en: typeof id = {
     appLanguage: 'Language',
     langId: 'Indonesia',
     langEn: 'English',
-    worldGuide: 'Worldbuilding Guide',
+    worldGuide: 'Tutorial',
     clearWorkspace: 'Clear Workspace',
     openWorldManager: 'Open World & Workspace Manager',
   },

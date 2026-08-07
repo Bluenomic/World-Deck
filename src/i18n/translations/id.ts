@@ -47,7 +47,7 @@ export const id = {
     appLanguage: 'Bahasa',
     langId: 'Indonesia',
     langEn: 'English',
-    worldGuide: 'Panduan Worldbuilding',
+    worldGuide: 'Tutorial',
     clearWorkspace: 'Bersihkan Workspace',
     openWorldManager: 'Buka Pengelola Dunia & Workspace',
   },
