@@ -404,6 +404,18 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [historyIndex, historyStack, activeWorldId]);
 
+  // Disable Default Web Browser Context Menu Globally Across Application
+  useEffect(() => {
+    const handleGlobalContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('contextmenu', handleGlobalContextMenu);
+    return () => {
+      window.removeEventListener('contextmenu', handleGlobalContextMenu);
+    };
+  }, []);
+
   // Card Management Actions
   const handleUpdateCardPosition = (id: string, x: number, y: number) => {
     updateActiveWorld((prev) => ({
