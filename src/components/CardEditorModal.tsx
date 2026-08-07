@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import type { WorldCard, CardCategory, CustomAttribute, CardConnection } from '../types';
 import { CATEGORY_CONFIGS, PRIMARY_CATEGORIES } from '../data/categoryConfig';
 import { generateId } from '../utils/helpers';
-import { isTauriAvailable, saveImageAsset } from '../utils/tauriStorage';
 import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
@@ -116,17 +115,13 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   const handleCoverFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       if (event.target?.result) {
         const base64Data = event.target.result as string;
-        let finalUrl = base64Data;
-        if (isTauriAvailable()) {
-          const assetUrl = await saveImageAsset(base64Data, title || 'card-image');
-          if (assetUrl) finalUrl = assetUrl;
-        }
-        setImages((prev) => Array.from(new Set([...prev, finalUrl])));
-        if (!imageUrl) setImageUrl(finalUrl);
+        setImages((prev) => Array.from(new Set([...prev, base64Data])));
+        if (!imageUrl) setImageUrl(base64Data);
         setShowCoverInput(false);
       }
     };

@@ -412,9 +412,10 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
+.group:hover .connection-handle-visual,
 .connection-handle-trigger:hover .connection-handle-visual {
   opacity: 1;
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 /* Premium Modal Animations */

@@ -7,6 +7,7 @@ import { TimelineDeleteModal } from './TimelineDeleteModal';
 import type { TimelineDeleteTarget } from './TimelineDeleteModal';
 import { ConfirmModal } from './ConfirmModal';
 import type { ConfirmModalConfig } from './ConfirmModal';
+import { isTauriAvailable, saveImageAsset } from '../utils/tauriStorage';
 
 interface TimelineTrack {
   id: string;
@@ -2055,11 +2056,20 @@ const SimpleNodeModal: React.FC<{
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const res = ev.target?.result as string;
       if (res) {
-        setImages((prev) => (prev.includes(res) ? prev : [...prev, res]));
-        if (!imageUrl) setImageUrl(res);
+        let finalUrl = res;
+        if (isTauriAvailable()) {
+          try {
+            const savedUrl = await saveImageAsset(res, title || 'event-image');
+            if (savedUrl) finalUrl = savedUrl;
+          } catch (err) {
+            console.warn('saveImageAsset error, fallback to base64:', err);
+          }
+        }
+        setImages((prev) => (prev.includes(finalUrl) ? prev : [...prev, finalUrl]));
+        if (!imageUrl) setImageUrl(finalUrl);
       }
     };
     reader.readAsDataURL(file);

@@ -1181,28 +1181,23 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     const file = e.target.files?.[0];
     if (!file || !selectedImage) return;
 
-    if (isTauriAvailable()) {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64Data = event.target?.result as string;
-        const savedUrl = await saveImageAsset(base64Data, file.name);
-        if (savedUrl) {
-          selectedImage.img.src = savedUrl;
-          selectedImage.img.alt = file.name;
-          updateToolbarState();
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64Data = event.target?.result as string;
+      let finalUrl = base64Data;
+      if (isTauriAvailable()) {
+        try {
+          const savedUrl = await saveImageAsset(base64Data, file.name);
+          if (savedUrl) finalUrl = savedUrl;
+        } catch (err) {
+          console.warn('saveImageAsset failed, using base64:', err);
         }
-      };
-      reader.readAsDataURL(file);
-    } else {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64Data = event.target?.result as string;
-        selectedImage.img.src = base64Data;
-        selectedImage.img.alt = file.name;
-        updateToolbarState();
-      };
-      reader.readAsDataURL(file);
-    }
+      }
+      selectedImage.img.src = finalUrl;
+      selectedImage.img.alt = file.name;
+      updateToolbarState();
+    };
+    reader.readAsDataURL(file);
     e.target.value = '';
   };
 
@@ -1218,26 +1213,22 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (isTauriAvailable()) {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64Data = event.target?.result as string;
-        const savedUrl = await saveImageAsset(base64Data, file.name);
-        if (savedUrl) {
-          const imgHtml = `\u00A0<span class="doc-img-wrapper img-mode-inline select-none" contenteditable="false" style="display: inline-block; vertical-align: middle; margin: 0.25rem 0.5rem; float: none; clear: none;"><img src="${savedUrl}" alt="${file.name}" class="max-h-[350px] rounded-xl border border-slate-700/60 shadow-md object-contain w-auto inline-block align-middle" /></span>\u00A0`;
-          insertHtmlAtCursor(imgHtml);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64Data = event.target?.result as string;
+      let finalUrl = base64Data;
+      if (isTauriAvailable()) {
+        try {
+          const savedUrl = await saveImageAsset(base64Data, file.name);
+          if (savedUrl) finalUrl = savedUrl;
+        } catch (err) {
+          console.warn('saveImageAsset failed, using base64:', err);
         }
-      };
-      reader.readAsDataURL(file);
-    } else {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64Data = event.target?.result as string;
-        const imgHtml = `\u00A0<span class="doc-img-wrapper img-mode-inline select-none" contenteditable="false" style="display: inline-block; vertical-align: middle; margin: 0.25rem 0.5rem; float: none; clear: none;"><img src="${base64Data}" alt="${file.name}" class="max-h-[350px] rounded-xl border border-slate-700/60 shadow-md object-contain w-auto inline-block align-middle" /></span>\u00A0`;
-        insertHtmlAtCursor(imgHtml);
-      };
-      reader.readAsDataURL(file);
-    }
+      }
+      const imgHtml = `\u00A0<span class="doc-img-wrapper img-mode-inline select-none" contenteditable="false" style="display: inline-block; vertical-align: middle; margin: 0.25rem 0.5rem; float: none; clear: none;"><img src="${finalUrl}" alt="${file.name}" class="max-h-[350px] rounded-xl border border-slate-700/60 shadow-md object-contain w-auto inline-block align-middle" /></span>\u00A0`;
+      insertHtmlAtCursor(imgHtml);
+    };
+    reader.readAsDataURL(file);
     e.target.value = '';
   };
 

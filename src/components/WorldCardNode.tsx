@@ -129,7 +129,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
         width: `${width}px`,
         height: height ? `${height}px` : undefined,
       }}
-      className={`absolute rounded-xl bg-[#2c2c2c] border transition-[border-color,box-shadow,opacity] cursor-grab active:cursor-grabbing group select-none flex flex-col overflow-hidden ${
+      className={`absolute rounded-xl bg-[#2c2c2c] border transition-[border-color,box-shadow,opacity] cursor-grab active:cursor-grabbing group select-none flex flex-col overflow-visible ${
         isDimmed ? 'opacity-20 pointer-events-none grayscale-[40%]' : 'opacity-100 pointer-events-auto'
       } ${
         isSelected
@@ -160,9 +160,6 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
               draggable={false}
               onDragStart={(e) => e.preventDefault()}
               loading="lazy"
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none';
-              }}
             />
 
             {/* Image Height Drag Resize Handle */}
@@ -299,7 +296,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       {/* Right */}
       <button
         type="button"
-        className="connection-handle-trigger -right-5 top-1/2 -translate-x-1/2"
+        className="connection-handle-trigger right-0 top-1/2 -translate-y-1/2 translate-x-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();
           onStartConnection(card.id, e);
@@ -317,7 +314,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       {/* Left */}
       <button
         type="button"
-        className="connection-handle-trigger -left-5 top-1/2 -translate-x-1/2"
+        className="connection-handle-trigger left-0 top-1/2 -translate-y-1/2 -translate-x-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();
           onStartConnection(card.id, e);
@@ -335,7 +332,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       {/* Top */}
       <button
         type="button"
-        className="connection-handle-trigger left-1/2 -top-5 -translate-x-1/2"
+        className="connection-handle-trigger left-1/2 top-0 -translate-x-1/2 -translate-y-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();
           onStartConnection(card.id, e);
@@ -353,7 +350,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       {/* Bottom */}
       <button
         type="button"
-        className="connection-handle-trigger left-1/2 -bottom-5 -translate-x-1/2"
+        className="connection-handle-trigger left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();
           onStartConnection(card.id, e);
