@@ -88,6 +88,37 @@ fn export_project_to_markdown(project: WorldProject) -> String {
     processor::export_project_to_markdown(&project)
 }
 
+#[tauri::command]
+fn window_minimize(window: tauri::Window) -> Result<(), String> {
+    window.minimize().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn window_toggle_maximize(window: tauri::Window) -> Result<bool, String> {
+    if window.is_maximized().unwrap_or(false) {
+        window.unmaximize().map_err(|e| e.to_string())?;
+        Ok(false)
+    } else {
+        window.maximize().map_err(|e| e.to_string())?;
+        Ok(true)
+    }
+}
+
+#[tauri::command]
+fn window_close(window: tauri::Window) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn window_start_dragging(window: tauri::Window) -> Result<(), String> {
+    window.start_dragging().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn window_is_maximized(window: tauri::Window) -> bool {
+    window.is_maximized().unwrap_or(false)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -105,7 +136,12 @@ pub fn run() {
             parse_mentions,
             sanitize_project,
             compute_project_stats,
-            export_project_to_markdown
+            export_project_to_markdown,
+            window_minimize,
+            window_toggle_maximize,
+            window_close,
+            window_start_dragging,
+            window_is_maximized
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

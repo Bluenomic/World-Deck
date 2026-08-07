@@ -170,3 +170,89 @@ export const searchCardsViaRust = async (
     return cards;
   }
 };
+
+/**
+ * Window Controls IPC Helpers
+ */
+export const minimizeTauriWindow = async (): Promise<void> => {
+  if (!isTauriAvailable()) return;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('window_minimize');
+  } catch (error) {
+    console.error('Tauri window_minimize failed, trying JS API:', error);
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      await getCurrentWindow().minimize();
+    } catch (e) {
+      console.error('JS minimize failed:', e);
+    }
+  }
+};
+
+export const toggleMaximizeTauriWindow = async (): Promise<boolean> => {
+  if (!isTauriAvailable()) return false;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const isMax = await invoke<boolean>('window_toggle_maximize');
+    return isMax;
+  } catch (error) {
+    console.error('Tauri window_toggle_maximize failed, trying JS API:', error);
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const win = getCurrentWindow();
+      await win.toggleMaximize();
+      return await win.isMaximized();
+    } catch (e) {
+      console.error('JS toggleMaximize failed:', e);
+      return false;
+    }
+  }
+};
+
+export const closeTauriWindow = async (): Promise<void> => {
+  if (!isTauriAvailable()) return;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('window_close');
+  } catch (error) {
+    console.error('Tauri window_close failed, trying JS API:', error);
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      await getCurrentWindow().close();
+    } catch (e) {
+      console.error('JS close failed:', e);
+    }
+  }
+};
+
+export const startDraggingTauriWindow = async (): Promise<void> => {
+  if (!isTauriAvailable()) return;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('window_start_dragging');
+  } catch (error) {
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      await getCurrentWindow().startDragging();
+    } catch (e) {
+      // silent
+    }
+  }
+};
+
+export const isTauriWindowMaximized = async (): Promise<boolean> => {
+  if (!isTauriAvailable()) return false;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return await invoke<boolean>('window_is_maximized');
+  } catch (error) {
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      return await getCurrentWindow().isMaximized();
+    } catch (e) {
+      return false;
+    }
+  }
+};
+
