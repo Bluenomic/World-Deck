@@ -123,6 +123,8 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     }
   };
 
+  const [imageHeight, setImageHeight] = useState<number | undefined>(card.imageHeight);
+
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     onSave({
@@ -133,6 +135,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
       summary: summary.trim(),
       content: content.trim(),
       imageUrl: imageUrl.trim(),
+      imageHeight: imageHeight,
       images,
       tags,
       attributes,
@@ -339,6 +342,27 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                     />
                   </label>
                 </div>
+
+                {imageUrl && (
+                  <div className="flex items-center gap-2 pt-2 border-t border-[#383838]">
+                    <span className="text-xs font-semibold text-slate-400">Tinggi Gambar (px):</span>
+                    <input
+                      type="number"
+                      min={48}
+                      max={600}
+                      value={imageHeight || 120}
+                      onChange={(e) => setImageHeight(Number(e.target.value) || undefined)}
+                      className="w-20 bg-[#2c2c2c] border border-[#383838] rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-[#0d99ff] font-mono text-center"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setImageHeight(undefined)}
+                      className="text-[10px] text-slate-400 hover:text-white underline cursor-pointer"
+                    >
+                      Reset Default
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
