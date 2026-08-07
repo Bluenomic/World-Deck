@@ -59,6 +59,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
   const [categoriesHeight, setCategoriesHeight] = useState<number>(() => loadWorkspacePreferences().categoriesHeight);
   const [canvasesHeight, setCanvasesHeight] = useState<number>(() => loadWorkspacePreferences().canvasesHeight);
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => loadWorkspacePreferences().sidebarWidth);
+  const [isResizingWidth, setIsResizingWidth] = useState<boolean>(false);
 
   // Sidebar Context Menu State
   const [contextMenu, setContextMenu] = useState<{
@@ -115,25 +116,35 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
 
     let currentCat = startCatHeight;
     let currentCan = startCanHeight;
+    let rafId: number | null = null;
+
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaY = moveEvent.clientY - startY;
-      const deltaPercent = (deltaY / containerHeight) * 100;
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const deltaY = moveEvent.clientY - startY;
+        const deltaPercent = (deltaY / containerHeight) * 100;
 
-      if (divider === 'first') {
-        const newCatHeight = Math.max(15, Math.min(50, startCatHeight + deltaPercent));
-        currentCat = newCatHeight;
-        setCategoriesHeight(newCatHeight);
-      } else {
-        const newCanHeight = Math.max(15, Math.min(50, startCanHeight + deltaPercent));
-        if (startCatHeight + newCanHeight < 80) {
-          currentCan = newCanHeight;
-          setCanvasesHeight(newCanHeight);
+        if (divider === 'first') {
+          const newCatHeight = Math.max(15, Math.min(50, startCatHeight + deltaPercent));
+          currentCat = newCatHeight;
+          setCategoriesHeight(newCatHeight);
+        } else {
+          const newCanHeight = Math.max(15, Math.min(50, startCanHeight + deltaPercent));
+          if (startCatHeight + newCanHeight < 80) {
+            currentCan = newCanHeight;
+            setCanvasesHeight(newCanHeight);
+          }
         }
-      }
+      });
     };
 
     const handleMouseUp = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       saveWorkspacePreferences({
@@ -142,30 +153,42 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
       });
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mousemove', handleMouseMove, { passive: true });
     document.addEventListener('mouseup', handleMouseUp);
   };
 
   const handleMouseDownWidthResize = (e: React.MouseEvent) => {
     e.preventDefault();
+    setIsResizingWidth(true);
     const startX = e.clientX;
     const startWidth = sidebarWidth;
     let currentWidth = startWidth;
+    let rafId: number | null = null;
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const newWidth = Math.max(220, Math.min(500, startWidth + deltaX));
-      currentWidth = newWidth;
-      setSidebarWidth(newWidth);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const deltaX = moveEvent.clientX - startX;
+        const newWidth = Math.max(220, Math.min(500, startWidth + deltaX));
+        currentWidth = newWidth;
+        setSidebarWidth(newWidth);
+      });
     };
 
     const handleMouseUp = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setIsResizingWidth(false);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       saveWorkspacePreferences({ sidebarWidth: currentWidth });
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mousemove', handleMouseMove, { passive: true });
     document.addEventListener('mouseup', handleMouseUp);
   };
 
@@ -231,7 +254,9 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
       {/* Main Sidebar Drawer Panel */}
       <aside
         style={{ width: isOpen ? `${sidebarWidth}px` : '0px' }}
-        className={`h-full app-bg-secondary border-r app-border flex flex-col transition-all duration-200 ease-in-out relative z-20 shrink-0 select-none overflow-hidden ${
+        className={`h-full app-bg-secondary border-r app-border flex flex-col relative z-20 shrink-0 select-none overflow-hidden ${
+          isResizingWidth ? 'transition-none' : 'transition-[width] duration-200 ease-in-out'
+        } ${
           !isOpen ? 'border-none' : ''
         }`}
       >
