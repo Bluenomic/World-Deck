@@ -173,6 +173,16 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     }
   };
 
+  const isNewBlankCard = () => {
+    return (
+      !(card.title || '').trim() &&
+      !(card.summary || '').trim() &&
+      !(card.content || '').trim() &&
+      (!card.tags || card.tags.length === 0) &&
+      (!card.attributes || card.attributes.length === 0)
+    );
+  };
+
   const isDirty = () => {
     const titleChanged = title.trim() !== (card.title || '').trim();
     const subtitleChanged = subtitle.trim() !== (card.subtitle || '').trim();
@@ -197,7 +207,11 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
 
   const handleCloseRequest = () => {
     if (!isDirty()) {
-      onClose();
+      if (isNewBlankCard() && onDiscard) {
+        onDiscard(card.id);
+      } else {
+        onClose();
+      }
     } else {
       setShowExitConfirm(true);
     }
@@ -825,7 +839,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  if (onDiscard) {
+                  if (isNewBlankCard() && onDiscard) {
                     onDiscard(card.id);
                   } else {
                     onClose();
