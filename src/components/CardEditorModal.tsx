@@ -173,24 +173,33 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     }
   };
 
-  const isCardEmpty = () => {
+  const isDirty = () => {
+    const titleChanged = title.trim() !== (card.title || '').trim();
+    const subtitleChanged = subtitle.trim() !== (card.subtitle || '').trim();
+    const categoryChanged = category !== card.category;
+    const summaryChanged = summary.trim() !== (card.summary || '').trim();
+    const contentChanged = content.trim() !== (card.content || '').trim();
+    const imageUrlChanged = imageUrl.trim() !== (card.imageUrl || '').trim();
+    const tagsChanged = JSON.stringify(tags) !== JSON.stringify(card.tags || []);
+    const attributesChanged = JSON.stringify(attributes) !== JSON.stringify(card.attributes || []);
+
     return (
-      !title.trim() &&
-      !subtitle.trim() &&
-      !summary.trim() &&
-      !content.trim() &&
-      !imageUrl.trim() &&
-      attributes.length === 0 &&
-      tags.length === 0
+      titleChanged ||
+      subtitleChanged ||
+      categoryChanged ||
+      summaryChanged ||
+      contentChanged ||
+      imageUrlChanged ||
+      tagsChanged ||
+      attributesChanged
     );
   };
 
   const handleCloseRequest = () => {
-    if (isCardEmpty()) {
-      setShowExitConfirm(true);
-    } else {
-      handleSubmit();
+    if (!isDirty()) {
       onClose();
+    } else {
+      setShowExitConfirm(true);
     }
   };
 
@@ -784,56 +793,53 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
         </form>
       </div>
 
+      {/* Exit Confirmation Dialog for Unsaved Changes */}
       {showExitConfirm && (
-        <div 
-          className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-[60] cursor-default backdrop-animate-appear"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="bg-[#2c2c2c] border border-[#383838] rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-5 modal-animate-appear text-center">
-            <div className="mx-auto w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-[200]">
+          <div className="bg-[#1e1e1e] border border-[#383838] w-full max-w-sm rounded-2xl p-5 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
               <Icons.AlertTriangle size={24} />
             </div>
             <div className="space-y-1.5">
-              <h4 className="text-base font-bold text-white">
-                {language === 'en' ? 'Save or Discard Card?' : 'Simpan atau Buang Kartu?'}
+              <h4 className="text-sm font-bold text-white">
+                {language === 'en' ? 'Unsaved Changes' : 'Ada Perubahan Belum Disimpan'}
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
                 {language === 'en'
-                  ? 'This new card is empty. Do you want to discard it or save it as an empty card?'
-                  : 'Kartu baru ini masih kosong. Apakah Anda ingin membuang kartu ini atau tetap menyimpannya di canvas?'}
+                  ? 'You have unsaved changes in this card. Would you like to save or discard them?'
+                  : 'Anda memiliki perubahan pada kartu ini yang belum disimpan. Apakah Anda ingin menyimpan atau membuangnya?'}
               </p>
             </div>
-            <div className="flex flex-col gap-2.5 pt-2">
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  handleSubmit();
+                  onClose();
+                }}
+                className="w-full py-2.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b87e0] text-white text-xs font-bold shadow-md transition-colors cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Icons.Save size={14} />
+                <span>{language === 'en' ? 'Save & Close' : 'Simpan & Tutup'}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   if (onDiscard) {
                     onDiscard(card.id);
                   } else {
-                    onDelete(card.id);
+                    onClose();
                   }
                 }}
-                className="w-full py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md transition-colors"
+                className="w-full py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2"
               >
-                {t.common.delete}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onSave({
-                    ...card,
-                    title: t.common.untitled,
-                    updatedAt: Date.now(),
-                  });
-                }}
-                className="w-full py-2 rounded-xl bg-[#1e1e1e] border border-[#383838] hover:bg-[#383838] text-white text-xs font-bold transition-colors"
-              >
-                {language === 'en' ? 'Save Empty Card' : 'Simpan Kartu Kosong'}
+                <Icons.Trash2 size={14} />
+                <span>{language === 'en' ? 'Discard Changes' : 'Buang Perubahan'}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setShowExitConfirm(false)}
-                className="w-full py-2 rounded-xl text-xs text-slate-400 hover:text-white font-bold transition-colors"
+                className="w-full py-2 rounded-xl text-xs text-slate-400 hover:text-white font-bold transition-colors cursor-pointer"
               >
                 {t.common.cancel}
               </button>

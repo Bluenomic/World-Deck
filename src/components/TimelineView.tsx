@@ -160,9 +160,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     targetTrack?: TimelineTrack;
     clickWorldX?: number;
     clickNodeId?: string;
+    selectedNode?: SimpleTimelineNode;
     selectedBranch?: TimelineBranch;
     isAbove?: boolean;
     clickOrderPosition?: number;
+    showMoveSubmenu?: boolean;
   } | null>(null);
 
   // Notice Modal State
@@ -417,14 +419,45 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   };
 
   const handleMouseDownBg = (e: React.MouseEvent) => {
-    if (e.button === 0 && (e.target === containerRef.current || (e.target as HTMLElement).id === 'timeline-center-bg')) {
-      if (draftBranch && hoverTrackId && hoverWorldX !== null) {
-        handleCompleteBranch(hoverTrackId, hoverWorldX);
+    if (e.button === 0) {
+      if (draftBranch) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        let trackId = hoverTrackId;
+        let worldX = hoverWorldX;
+
+        if (!trackId || worldX === null) {
+          if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const viewportHeight = rect.height;
+            const mouseY = e.clientY - rect.top;
+            worldX = Math.round(e.clientX - rect.left - scrollX);
+
+            for (const track of sortedTracks) {
+              const trackY = getTrackCenterY(track.id, viewportHeight);
+              if (Math.abs(mouseY - trackY) <= 45) {
+                trackId = track.id;
+                break;
+              }
+            }
+          }
+        }
+
+        if (trackId && worldX !== null) {
+          const nearNode = nodes.find((n) => n.trackId === trackId && Math.abs(n.x - worldX!) <= 24);
+          handleCompleteBranch(trackId, worldX, nearNode?.id);
+        } else {
+          setDraftBranch(null);
+        }
         return;
       }
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - scrollX, y: e.clientY - scrollY });
-      setReaderNode(null);
+
+      if (e.target === containerRef.current || (e.target as HTMLElement).id === 'timeline-center-bg') {
+        setIsPanning(true);
+        setPanStart({ x: e.clientX - scrollX, y: e.clientY - scrollY });
+        setReaderNode(null);
+      }
     }
   };
 
@@ -501,12 +534,76 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     }
   };
 
+  const openContextMenu = (
+    clientX: number,
+    clientY: number,
+    data: Omit<NonNullable<typeof contextMenu>, 'x' | 'y'>
+  ) => {
+    const menuWidth = 250;
+    const menuHeight = 380;
+    const padding = 16;
+
+    let x = clientX;
+    let y = clientY;
+
+    if (x + menuWidth > window.innerWidth - padding) {
+      x = Math.max(padding, window.innerWidth - menuWidth - padding);
+    }
+    if (y + menuHeight > window.innerHeight - padding) {
+      y = Math.max(padding, window.innerHeight - menuHeight - padding);
+    }
+
+    setContextMenu({
+      x,
+      y,
+      ...data,
+    });
+  };
+
+  const handleRightClickNode = (node: SimpleTimelineNode, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const track = tracks.find((t) => t.id === node.trackId);
+    openContextMenu(e.clientX, e.clientY, {
+      selectedNode: node,
+      targetTrack: track,
+      clickWorldX: node.x,
+      clickNodeId: node.id,
+    });
+  };
+
+  const handleMoveNodeToTrack = (nodeId: string, targetTrackId: string) => {
+    setNodes((prev) =>
+      prev.map((n) => (n.id === nodeId ? { ...n, trackId: targetTrackId } : n))
+    );
+  };
+
+  const handleAutoSpaceTrack = (trackId: string) => {
+    setNodes((prev) => {
+      const trackNodes = prev.filter((n) => n.trackId === trackId).sort((a, b) => a.x - b.x);
+      if (trackNodes.length <= 1) return prev;
+
+      const firstX = trackNodes[0].x;
+      const spacing = MIN_EVENT_GAP;
+      const updatedMap = new Map<string, number>();
+
+      trackNodes.forEach((node, idx) => {
+        updatedMap.set(node.id, firstX + idx * spacing);
+      });
+
+      return prev.map((n) => (updatedMap.has(n.id) ? { ...n, x: updatedMap.get(n.id)! } : n));
+    });
+  };
+
+  const handleResetCamera = () => {
+    setScrollX(100);
+    setScrollY(0);
+  };
+
   const handleRightClickBranch = (branch: TimelineBranch, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
+    openContextMenu(e.clientX, e.clientY, {
       selectedBranch: branch,
     });
   };
@@ -544,15 +641,53 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     if (targetTrack) {
       const nearNode = nodes.find((n) => n.trackId === targetTrack!.id && Math.abs(n.x - worldX) <= 24);
 
-      setContextMenu({
-        x: e.clientX,
-        y: e.clientY,
-        targetTrack,
-        clickWorldX: worldX,
-        clickNodeId: nearNode?.id,
-      });
+      if (nearNode) {
+        openContextMenu(e.clientX, e.clientY, {
+          selectedNode: nearNode,
+          targetTrack,
+          clickWorldX: nearNode.x,
+          clickNodeId: nearNode.id,
+        });
+      } else {
+        openContextMenu(e.clientX, e.clientY, {
+          targetTrack,
+          clickWorldX: worldX,
+        });
+      }
     } else {
-      setContextMenu(null);
+      // Empty Canvas Context Menu: calculate order based on cursor Y relative to all tracks
+      let clickOrderPosition = 0;
+
+      if (sortedTracks.length === 0) {
+        clickOrderPosition = 0;
+      } else if (sortedTracks.length === 1) {
+        const singleY = getTrackCenterY(sortedTracks[0].id, viewportHeight);
+        clickOrderPosition = mouseY < singleY ? sortedTracks[0].order - 1 : sortedTracks[0].order + 1;
+      } else {
+        const topY = getTrackCenterY(sortedTracks[0].id, viewportHeight);
+        const bottomY = getTrackCenterY(sortedTracks[sortedTracks.length - 1].id, viewportHeight);
+
+        if (mouseY < topY) {
+          clickOrderPosition = sortedTracks[0].order - 1;
+        } else if (mouseY > bottomY) {
+          clickOrderPosition = sortedTracks[sortedTracks.length - 1].order + 1;
+        } else {
+          for (let i = 0; i < sortedTracks.length - 1; i++) {
+            const upperY = getTrackCenterY(sortedTracks[i].id, viewportHeight);
+            const lowerY = getTrackCenterY(sortedTracks[i + 1].id, viewportHeight);
+
+            if (mouseY >= upperY && mouseY <= lowerY) {
+              clickOrderPosition = (sortedTracks[i].order + sortedTracks[i + 1].order) / 2;
+              break;
+            }
+          }
+        }
+      }
+
+      openContextMenu(e.clientX, e.clientY, {
+        clickWorldX: worldX,
+        clickOrderPosition,
+      });
     }
   };
 
@@ -734,7 +869,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           onMouseUp={handleMouseUp}
           onWheel={handleWheel}
           onContextMenu={handleContextMenu}
-          className="flex-1 w-full h-full relative overflow-hidden cursor-grab active:cursor-grabbing transition-colors duration-200 app-bg-main"
+          className={`flex-1 w-full h-full relative overflow-hidden transition-colors duration-200 app-bg-main ${
+            draftBranch ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'
+          }`}
         >
           {/* Active Branch Helper Banner */}
           {draftBranch && (
@@ -816,114 +953,115 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               </marker>
             </defs>
 
-            {/* Render Permanent Branches */}
-            {branches.map((branch) => {
-              const sourceTrackY = getTrackCenterY(branch.sourceTrackId, viewportHeight);
-              const targetTrackY = getTrackCenterY(branch.targetTrackId, viewportHeight);
+            {/* GPU Translated SVG World Content */}
+            <g style={{ transform: `translateX(${scrollX}px)` }}>
+              {/* Render Permanent Branches */}
+              {branches.map((branch) => {
+                const sourceTrackY = getTrackCenterY(branch.sourceTrackId, viewportHeight);
+                const targetTrackY = getTrackCenterY(branch.targetTrackId, viewportHeight);
 
-              const startX = branch.sourceX + scrollX;
-              const startY = sourceTrackY;
-              const endX = branch.targetX + scrollX;
-              const endY = targetTrackY;
+                const startX = branch.sourceX;
+                const startY = sourceTrackY;
+                const endX = branch.targetX;
+                const endY = targetTrackY;
 
-              const isSameTrack = branch.sourceTrackId === branch.targetTrackId;
+                const isSameTrack = branch.sourceTrackId === branch.targetTrackId;
 
-              let pathD = '';
-              if (isSameTrack) {
-                const isLoop = branch.targetX < branch.sourceX;
-                const loopOffset = isLoop ? -110 : 110;
+                let pathD = '';
+                if (isSameTrack) {
+                  const isLoop = branch.targetX < branch.sourceX;
+                  const loopOffset = isLoop ? -110 : 110;
+                  const midX = (startX + endX) / 2;
+                  const cpY = startY + loopOffset;
+                  pathD = `M ${startX} ${startY} Q ${midX} ${cpY} ${endX} ${endY}`;
+                } else {
+                  const dx = (endX - startX) * 0.45;
+                  pathD = `M ${startX} ${startY} C ${startX + dx} ${startY}, ${endX - dx} ${endY}, ${endX} ${endY}`;
+                }
+
                 const midX = (startX + endX) / 2;
-                const cpY = startY + loopOffset;
-                pathD = `M ${startX} ${startY} Q ${midX} ${cpY} ${endX} ${endY}`;
-              } else {
-                const dx = (endX - startX) * 0.45;
-                pathD = `M ${startX} ${startY} C ${startX + dx} ${startY}, ${endX - dx} ${endY}, ${endX} ${endY}`;
-              }
+                const midY =
+                  (startY + endY) / 2 + (isSameTrack ? (branch.targetX < branch.sourceX ? -60 : 60) : 0);
 
-              const midX = (startX + endX) / 2;
-              const midY =
-                (startY + endY) / 2 + (isSameTrack ? (branch.targetX < branch.sourceX ? -60 : 60) : 0);
-
-              return (
-                <g
-                  key={branch.id}
-                  className="group cursor-pointer pointer-events-auto"
-                  onContextMenu={(e) => handleRightClickBranch(branch, e)}
-                >
-                  {/* Thick Hover Click Target */}
-                  <path
-                    d={pathD}
-                    fill="none"
-                    stroke="var(--text-muted)"
-                    strokeWidth={12}
-                    strokeOpacity={0.01}
-                    className="group-hover:stroke-opacity-20 transition-all cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRightClickBranch(branch, e);
-                    }}
-                  />
-                  {/* Visible Thicker Dashed Branch Line */}
-                  <path
-                    d={pathD}
-                    fill="none"
-                    stroke="var(--line-stroke-highlight)"
-                    strokeWidth={3}
-                    strokeDasharray="6 4"
-                    strokeLinecap="round"
-                    markerEnd="url(#branch-arrow)"
-                    className="group-hover:stroke-[var(--accent)] transition-all"
-                  />
-                  {/* Floating Branch Badge */}
-                  <g style={{ transform: `translate(${midX}px, ${midY}px)` }}>
-                    <rect
-                      x="-70"
-                      y="-11"
-                      width="140"
-                      height="22"
-                      rx="6"
-                      fill="var(--bg-secondary)"
-                      stroke="var(--border)"
-                      strokeWidth="1"
+                return (
+                  <g
+                    key={branch.id}
+                    className="group cursor-pointer pointer-events-auto"
+                    onContextMenu={(e) => handleRightClickBranch(branch, e)}
+                  >
+                    {/* Thick Hover Click Target */}
+                    <path
+                      d={pathD}
+                      fill="none"
+                      stroke="var(--text-muted)"
+                      strokeWidth={14}
+                      strokeOpacity={0.01}
+                      className="group-hover:stroke-opacity-20 transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRightClickBranch(branch, e);
+                      }}
                     />
-                    <text
-                      x="0"
-                      y="4"
-                      fill="var(--text-primary)"
-                      fontSize="9"
-                      fontWeight="800"
-                      textAnchor="middle"
-                      className="select-none font-mono uppercase tracking-tight"
-                    >
-                      {branch.label}
-                    </text>
+                    {/* Visible Thicker Dashed Branch Line */}
+                    <path
+                      d={pathD}
+                      fill="none"
+                      stroke="var(--line-stroke-highlight)"
+                      strokeWidth={3}
+                      strokeDasharray="6 4"
+                      strokeLinecap="round"
+                      markerEnd="url(#branch-arrow)"
+                      className="group-hover:stroke-[var(--accent)] transition-colors"
+                    />
+                    {/* Floating Branch Badge */}
+                    <g style={{ transform: `translate(${midX}px, ${midY}px)` }}>
+                      <rect
+                        x="-70"
+                        y="-11"
+                        width="140"
+                        height="22"
+                        rx="6"
+                        fill="var(--bg-secondary)"
+                        stroke="var(--border)"
+                        strokeWidth="1"
+                      />
+                      <text
+                        x="0"
+                        y="4"
+                        fill="var(--text-primary)"
+                        fontSize="9"
+                        fontWeight="800"
+                        textAnchor="middle"
+                        className="select-none font-mono uppercase tracking-tight"
+                      >
+                        {branch.label}
+                      </text>
+                    </g>
                   </g>
+                );
+              })}
+
+              {/* Active Draft Branch Cable Following Cursor */}
+              {draftBranch && (
+                <g className="pointer-events-none">
+                  <path
+                    d={`M ${draftBranch.sourceX} ${getTrackCenterY(draftBranch.sourceTrackId, viewportHeight)} L ${mouseWorldPos.x} ${mouseWorldPos.y}`}
+                    fill="none"
+                    stroke="var(--accent)"
+                    strokeWidth={3}
+                    strokeDasharray="5 5"
+                    className="animate-pulse"
+                  />
+                  <circle
+                    cx={mouseWorldPos.x}
+                    cy={mouseWorldPos.y}
+                    r={6}
+                    fill="var(--accent)"
+                    className="animate-ping"
+                  />
                 </g>
-              );
-            })}
+              )}
 
-            {/* Active Draft Branch Cable Following Cursor */}
-            {draftBranch && (
-              <g className="pointer-events-none">
-                <path
-                  d={`M ${draftBranch.sourceX + scrollX} ${getTrackCenterY(draftBranch.sourceTrackId, viewportHeight)} L ${mouseWorldPos.x + scrollX} ${mouseWorldPos.y}`}
-                  fill="none"
-                  stroke="var(--accent)"
-                  strokeWidth={3}
-                  strokeDasharray="5 5"
-                  className="animate-pulse"
-                />
-                <circle
-                  cx={mouseWorldPos.x + scrollX}
-                  cy={mouseWorldPos.y}
-                  r={6}
-                  fill="var(--accent)"
-                  className="animate-ping"
-                />
-              </g>
-            )}
-
-            <g transform={`translate(${scrollX}, 0)`}>
               {sortedTracks.map((track) => {
                 const trackY = getTrackCenterY(track.id, viewportHeight);
                 const isMain = isMainTrack(track);
@@ -975,7 +1113,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           </svg>
 
           {/* Floating Hover (+) Button on Target Track Axis Line */}
-          {hoverTrackId !== null && hoverWorldX !== null && !isPanning && !draggingNodeId && (
+          {hoverTrackId !== null && hoverWorldX !== null && !isPanning && !draggingNodeId && !draftBranch && (
             <div
               onClick={() => {
                 setEditingNode(null);
@@ -1001,7 +1139,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
           {/* Render Timeline Nodes grouped by Track */}
           <div
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-0 pointer-events-none z-20"
             style={{ transform: `translateX(${scrollX}px)` }}
           >
             {nodes.map((node, index) => {
@@ -1022,6 +1160,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   key={node.id}
                   className="absolute pointer-events-auto"
                   style={{ left: `${node.x}px`, top: `${trackY}px` }}
+                  onContextMenu={(e) => handleRightClickNode(node, e)}
                 >
                   {/* Stem Line connected to Track Horizontal Line */}
                   <div
@@ -1043,6 +1182,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     onMouseDown={(e) => handleStartDragNode(node, e)}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (draftBranch) {
+                        handleCompleteBranch(node.trackId, node.x, node.id);
+                        return;
+                      }
                       setSelectedNode(node);
                     }}
                     onDoubleClick={(e) => {
@@ -1070,6 +1213,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   <div
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (draftBranch) {
+                        handleCompleteBranch(node.trackId, node.x, node.id);
+                        return;
+                      }
                       setSelectedNode(node);
                     }}
                     onDoubleClick={(e) => {
@@ -1143,13 +1290,121 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           </div>
         </div>
 
-        {/* Dynamic Context Menu (Parallel Timelines & Branches) */}
+        {/* Dynamic Context Menu (Event Nodes, Parallel Timelines, Branches & Canvas) */}
         {contextMenu && (
           <div
             style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
-            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-56 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-700/50"
+            className="fixed app-bg-secondary border app-border rounded-xl shadow-2xl py-1.5 w-60 z-[100] text-xs app-text-main animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-700/50 max-h-[80vh] overflow-y-auto custom-scrollbar"
           >
-            {contextMenu.selectedBranch ? (
+            {contextMenu.selectedNode ? (
+              <>
+                <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate flex items-center justify-between">
+                  <span className="truncate">📌 {contextMenu.selectedNode.title}</span>
+                  <span className="text-[9px] font-mono opacity-60">Node</span>
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingNode(contextMenu.selectedNode!);
+                      setTargetTrackId(contextMenu.selectedNode!.trackId);
+                      setModalX(contextMenu.selectedNode!.x);
+                      setShowNodeModal(true);
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                  >
+                    <Icons.Edit3 size={14} className="text-blue-400" />
+                    <span>{t.timeline.editEvent}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedNode(contextMenu.selectedNode!);
+                      setReaderNode(contextMenu.selectedNode!);
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                  >
+                    <Icons.Eye size={14} className="text-purple-400" />
+                    <span>{t.timeline.viewEventDetails}</span>
+                  </button>
+
+                  {contextMenu.selectedNode.cardId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetCard = cards.find((c) => c.id === contextMenu.selectedNode!.cardId);
+                        if (targetCard) onCardClick(targetCard);
+                        setContextMenu(null);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                    >
+                      <Icons.BookOpen size={14} className="text-emerald-400" />
+                      <span>{t.timeline.openCard}</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftBranch({
+                        sourceTrackId: contextMenu.selectedNode!.trackId,
+                        sourceX: contextMenu.selectedNode!.x,
+                        sourceNodeId: contextMenu.selectedNode!.id,
+                      });
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                  >
+                    <Icons.GitBranch size={14} className="text-amber-400" />
+                    <span>{t.timeline.createTimeBranch}</span>
+                  </button>
+                </div>
+
+                {/* Move to another track option */}
+                {sortedTracks.length > 1 && (
+                  <div className="py-1">
+                    <div className="px-3 py-1 text-[10px] app-text-muted font-semibold uppercase">
+                      {t.timeline.moveToTrack}
+                    </div>
+                    {sortedTracks.map((tr) => {
+                      if (tr.id === contextMenu.selectedNode!.trackId) return null;
+                      return (
+                        <button
+                          key={tr.id}
+                          type="button"
+                          onClick={() => {
+                            handleMoveNodeToTrack(contextMenu.selectedNode!.id, tr.id);
+                            setContextMenu(null);
+                          }}
+                          className="w-full px-4 py-1.5 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-xs font-medium app-text-main cursor-pointer"
+                        >
+                          <Icons.ArrowRight size={12} className="text-slate-400" />
+                          <span className="truncate">{getTrackName(tr)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleDeleteNode(contextMenu.selectedNode!.id);
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
+                  >
+                    <Icons.Trash2 size={14} />
+                    <span>{t.timeline.deleteEvent}</span>
+                  </button>
+                </div>
+              </>
+            ) : contextMenu.selectedBranch ? (
               <>
                 <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
                   🔀 {contextMenu.selectedBranch.label || t.timeline.timeBranch}
@@ -1189,6 +1444,23 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               <>
                 <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
                   🕒 {getTrackName(contextMenu.targetTrack)}
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingNode(null);
+                      setTargetTrackId(contextMenu.targetTrack!.id);
+                      setModalX(contextMenu.clickWorldX || 100);
+                      setShowNodeModal(true);
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
+                  >
+                    <Icons.Plus size={14} />
+                    <span>{t.timeline.addEventHere}</span>
+                  </button>
                 </div>
 
                 {/* Branching Actions */}
@@ -1243,6 +1515,18 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 )}
 
                 <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleAutoSpaceTrack(contextMenu.targetTrack!.id);
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-medium app-text-main cursor-pointer"
+                  >
+                    <Icons.AlignJustify size={14} className="text-amber-400" />
+                    <span>{t.timeline.autoSpaceEvents}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -1304,10 +1588,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               </>
             ) : (
               <>
-                <div className="px-3 py-1.5 text-[10px] app-text-muted font-semibold uppercase tracking-wider select-none">
-                  {t.timeline.timelineActions}
-                </div>
-
                 <div className="py-1">
                   <button
                     type="button"
@@ -1319,10 +1599,36 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     }}
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
                   >
-                    <Icons.Plus size={14} />
-                    <span>
-                      {contextMenu.isAbove ? t.timeline.createParallelAbove : t.timeline.createParallelBelow}
-                    </span>
+                    <Icons.PlusSquare size={14} />
+                    <span>{t.timeline.addParallelHere}</span>
+                  </button>
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleResetCamera();
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
+                  >
+                    <Icons.Compass size={14} className="text-blue-400" />
+                    <span>{t.timeline.resetCamera}</span>
+                  </button>
+                </div>
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleClearAll();
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
+                  >
+                    <Icons.Trash2 size={14} />
+                    <span>{t.timeline.totalClear}</span>
                   </button>
                 </div>
               </>
@@ -1567,21 +1873,46 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   );
 };
 
-// Simple Event Modal Component
+// Simple Event Modal Component (Minimalist & Sleek)
 const SimpleNodeModal: React.FC<{
   node: SimpleTimelineNode | null;
   cards: WorldCard[];
   onSave: (data: { title: string; dateLabel?: string; description?: string; cardId?: string }) => void;
   onClose: () => void;
 }> = ({ node, cards, onSave, onClose }) => {
-  const { t, getCategoryLabel } = useLanguage();
+  const { language, t, getCategoryLabel } = useLanguage();
   const [title, setTitle] = useState(node?.title || '');
   const [dateLabel, setDateLabel] = useState(node?.dateLabel || '');
   const [description, setDescription] = useState(node?.description || '');
   const [cardId, setCardId] = useState<string>(node?.cardId || '');
+  const [cardSearch, setCardSearch] = useState('');
+  const [showCardDropdown, setShowCardDropdown] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const isDirty = () => {
+    const initialTitle = node?.title || '';
+    const initialDateLabel = node?.dateLabel || '';
+    const initialDescription = node?.description || '';
+    const initialCardId = node?.cardId || '';
+
+    return (
+      title.trim() !== initialTitle.trim() ||
+      dateLabel.trim() !== initialDateLabel.trim() ||
+      description.trim() !== initialDescription.trim() ||
+      cardId !== initialCardId
+    );
+  };
+
+  const handleCloseRequest = () => {
+    if (!isDirty()) {
+      onClose();
+    } else {
+      setShowExitConfirm(true);
+    }
+  };
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!title.trim()) return;
     onSave({
       title: title.trim(),
@@ -1592,87 +1923,257 @@ const SimpleNodeModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-md app-bg-secondary border app-border rounded-2xl p-5 shadow-2xl app-text-main modal-animate-appear">
-        <div className="flex items-center justify-between mb-4 border-b app-border pb-3">
-          <h3 className="text-sm font-bold flex items-center gap-2 app-text-main">
-            <Icons.Clock size={16} className="app-accent-text" />
-            <span>{node ? t.timeline.editEventTitle : t.timeline.addEventTitle}</span>
-          </h3>
-          <button type="button" onClick={onClose} className="p-1 rounded-lg app-text-muted hover:app-text-main hover:app-bg-hover">
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150 cursor-pointer"
+      onClick={handleCloseRequest}
+    >
+      <div
+        className="w-full max-w-lg app-bg-secondary border app-border rounded-3xl p-6 shadow-2xl app-text-main modal-animate-appear divide-y divide-slate-800/40 cursor-default relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl app-accent-bg/10 border border-[var(--accent)]/30 flex items-center justify-center app-accent-text shadow-inner">
+              <Icons.Sparkles size={18} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold app-text-main tracking-tight">
+                {node ? t.timeline.editEventTitle : t.timeline.addEventTitle}
+              </h3>
+              <p className="text-[11px] app-text-muted">
+                {node ? 'Perbarui informasi titik garis waktu' : 'Tambahkan titik peristiwa baru pada garis waktu'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleCloseRequest}
+            className="w-8 h-8 rounded-xl app-bg-main border app-border flex items-center justify-center text-slate-400 hover:text-white hover:app-bg-hover transition-colors cursor-pointer"
+          >
             <Icons.X size={16} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          <div>
-            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">{t.timeline.eventTitleLabel}</label>
-            <input
-              type="text"
-              required
-              placeholder={t.timeline.eventTitlePlaceholder}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] font-medium"
-            />
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="pt-4 space-y-4 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <Icons.FileText size={12} className="text-blue-400" />
+                <span>{t.timeline.eventTitleLabel}</span>
+              </label>
+              <input
+                type="text"
+                required
+                autoFocus
+                placeholder={t.timeline.eventTitlePlaceholder}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] font-medium text-xs shadow-inner transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <Icons.Tag size={12} className="text-amber-400" />
+                <span>{t.timeline.timeMarkerLabel}</span>
+              </label>
+              <input
+                type="text"
+                placeholder={t.timeline.timeMarkerPlaceholder}
+                value={dateLabel}
+                onChange={(e) => setDateLabel(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] text-xs shadow-inner font-mono transition-all"
+              />
+            </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">{t.timeline.timeMarkerLabel}</label>
-            <input
-              type="text"
-              placeholder={t.timeline.timeMarkerPlaceholder}
-              value={dateLabel}
-              onChange={(e) => setDateLabel(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)]"
-            />
+            <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <Icons.Link size={12} className="text-emerald-400" />
+              <span>{t.timeline.linkCardLabel}</span>
+            </label>
+
+            {(() => {
+              const selectedCard = cards.find((c) => c.id === cardId);
+              const filteredCards = cards.filter((c) => {
+                if (!cardSearch.trim()) return true;
+                const query = cardSearch.toLowerCase();
+                const cardTitle = (c.title || '').toLowerCase();
+                const categoryLabel = (getCategoryLabel(c.category) || '').toLowerCase();
+                return cardTitle.includes(query) || categoryLabel.includes(query);
+              });
+
+              if (selectedCard) {
+                return (
+                  <div className="flex items-center justify-between px-3.5 py-2 rounded-xl app-bg-main border border-[var(--accent)]/50 app-text-main text-xs shadow-inner">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase app-accent-bg text-white shrink-0">
+                        {getCategoryLabel(selectedCard.category)}
+                      </span>
+                      <span className="font-semibold truncate">{selectedCard.title || t.common.untitled}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCardId('');
+                        setCardSearch('');
+                      }}
+                      className="p-1 rounded-lg app-text-muted hover:text-rose-400 hover:app-bg-hover transition-colors cursor-pointer"
+                      title="Hapus Tautan Kartu"
+                    >
+                      <Icons.X size={14} />
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="relative">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Ketik untuk mencari kartu (karakter, lokasi, faksi...)"
+                      value={cardSearch}
+                      onFocus={() => setShowCardDropdown(true)}
+                      onChange={(e) => {
+                        setCardSearch(e.target.value);
+                        setShowCardDropdown(true);
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] text-xs pr-8 shadow-inner transition-all"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none app-text-muted">
+                      <Icons.Search size={14} />
+                    </div>
+                  </div>
+
+                  {/* Dropdown Suggestions */}
+                  {showCardDropdown && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowCardDropdown(false)}
+                      />
+                      <div className="absolute left-0 right-0 top-full mt-1.5 app-bg-secondary border app-border rounded-2xl shadow-2xl z-50 max-h-48 overflow-y-auto custom-scrollbar divide-y divide-slate-800/40 text-xs">
+                        {filteredCards.length > 0 ? (
+                          filteredCards.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setCardId(c.id);
+                                setCardSearch('');
+                                setShowCardDropdown(false);
+                              }}
+                              className="w-full px-3.5 py-2 text-left hover:app-bg-hover flex items-center justify-between gap-2 transition-colors cursor-pointer group"
+                            >
+                              <span className="font-medium app-text-main group-hover:app-accent-text truncate">
+                                {c.title || t.common.untitled}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[9px] font-mono uppercase app-bg-main app-text-muted border app-border">
+                                {getCategoryLabel(c.category)}
+                              </span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3.5 py-3 text-center text-xs app-text-muted">
+                            Tidak ada kartu yang cocok
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">{t.timeline.linkCardLabel}</label>
-            <select
-              value={cardId}
-              onChange={(e) => setCardId(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)]"
-            >
-              <option value="">{t.timeline.noCardOption}</option>
-              {cards.map((c) => (
-                <option key={c.id} value={c.id}>
-                  [{getCategoryLabel(c.category)}] {c.title || t.common.untitled}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">{t.timeline.briefDescLabel}</label>
+            <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <Icons.AlignLeft size={12} className="text-purple-400" />
+              <span>{t.timeline.briefDescLabel}</span>
+            </label>
             <textarea
               rows={3}
               placeholder={t.timeline.briefDescPlaceholder}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] resize-none"
+              className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] resize-none text-xs shadow-inner leading-relaxed transition-all"
             />
           </div>
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          {/* Footer Actions */}
+          <div className="pt-3 flex items-center justify-end gap-2.5">
             <button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl app-bg-main app-text-main border app-border font-semibold hover:app-bg-hover transition-colors"
+              onClick={handleCloseRequest}
+              className="px-4 py-2.5 rounded-xl app-bg-main app-text-muted hover:app-text-main border app-border text-xs font-semibold hover:app-bg-hover transition-all cursor-pointer"
             >
               {t.common.cancel}
             </button>
             <button
-              type="button"
-              onClick={handleSubmit}
-              className="px-4 py-2 rounded-xl app-accent-bg text-white font-bold hover:opacity-90 cursor-pointer transition-all shadow-md"
+              type="submit"
+              className="px-5 py-2.5 rounded-xl app-accent-bg text-white text-xs font-bold shadow-lg shadow-[var(--accent)]/20 hover:opacity-95 active:scale-95 transition-all cursor-pointer flex items-center gap-2"
             >
-              {t.timeline.saveEvent}
+              <Icons.Check size={14} />
+              <span>{t.timeline.saveEvent}</span>
             </button>
           </div>
         </form>
       </div>
+
+      {/* Exit Confirmation Dialog */}
+      {showExitConfirm && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[160] p-4 animate-in fade-in duration-150 cursor-default"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="w-full max-w-sm app-bg-secondary border app-border rounded-3xl p-5 shadow-2xl app-text-main text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
+              <Icons.AlertTriangle size={24} />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold app-text-main">
+                {language === 'en' ? 'Unsaved Changes' : 'Ada Perubahan Belum Disimpan'}
+              </h4>
+              <p className="text-xs app-text-muted mt-1 leading-relaxed">
+                {language === 'en'
+                  ? 'You have unsaved changes in this event. Do you want to save or discard them?'
+                  : 'Anda memiliki perubahan pada peristiwa ini yang belum disimpan. Apakah Anda ingin menyimpan atau membuangnya?'}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  handleSubmit(e);
+                  onClose();
+                }}
+                className="w-full py-2.5 rounded-xl app-accent-bg text-white text-xs font-bold shadow-md hover:opacity-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Icons.Save size={14} />
+                <span>{language === 'en' ? 'Save & Close' : 'Simpan & Tutup'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Icons.Trash2 size={14} />
+                <span>{language === 'en' ? 'Discard Changes' : 'Buang Perubahan'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowExitConfirm(false)}
+                className="w-full py-2 rounded-xl text-xs app-text-muted hover:app-text-main font-semibold transition-all cursor-pointer"
+              >
+                {t.common.cancel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
