@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { WorldCard, CardConnection, TimelineBranch } from '../types';
 import { generateId } from '../utils/helpers';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -22,6 +22,8 @@ interface SimpleTimelineNode {
   dateLabel?: string;
   description?: string;
   cardId?: string;
+  images?: string[];
+  imageUrl?: string;
 }
 
 interface TimelineViewProps {
@@ -200,6 +202,33 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const [editingNode, setEditingNode] = useState<SimpleTimelineNode | null>(null);
   const [selectedNode, setSelectedNode] = useState<SimpleTimelineNode | null>(null);
   const [readerNode, setReaderNode] = useState<SimpleTimelineNode | null>(null);
+  const [previewEventImageIndex, setPreviewEventImageIndex] = useState<number | null>(null);
+
+  const readerImages: string[] = useMemo(() => {
+    if (!readerNode) return [];
+    if (readerNode.images && readerNode.images.length > 0) {
+      return readerNode.images;
+    }
+    return readerNode.imageUrl ? [readerNode.imageUrl] : [];
+  }, [readerNode]);
+
+  // Keyboard navigation for Event Image Lightbox Modal
+  useEffect(() => {
+    if (previewEventImageIndex === null || readerImages.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        setPreviewEventImageIndex((prev) => (prev === null || prev <= 0 ? readerImages.length - 1 : prev - 1));
+      } else if (e.key === 'ArrowRight') {
+        setPreviewEventImageIndex((prev) => (prev === null || prev >= readerImages.length - 1 ? 0 : prev + 1));
+      } else if (e.key === 'Escape') {
+        setPreviewEventImageIndex(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewEventImageIndex, readerImages]);
 
   // Custom Delete Modal Target State
   const [deleteTarget, setDeleteTarget] = useState<TimelineDeleteTarget | null>(null);
@@ -700,7 +729,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   };
 
   // Save Event Node
-  const handleSaveNode = (data: { title: string; dateLabel?: string; description?: string; cardId?: string }) => {
+  const handleSaveNode = (data: {
+    title: string;
+    dateLabel?: string;
+    description?: string;
+    cardId?: string;
+    images?: string[];
+    imageUrl?: string;
+  }) => {
     if (editingNode) {
       setNodes((prev) => {
         const updated = prev.map((n) => (n.id === editingNode.id ? { ...n, ...data } : n));
@@ -1236,6 +1272,23 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     }}
                     title={t.timeline.nodeCardTooltip}
                   >
+                    {/* Compact Event Image Thumbnail Banner */}
+                    {(node.imageUrl || (node.images && node.images.length > 0)) && (
+                      <div className="relative h-16 w-full rounded-xl overflow-hidden mb-2 border app-border bg-black/40 group-hover:border-[var(--accent)]/50 transition-colors">
+                        <img
+                          src={node.imageUrl || node.images?.[0]}
+                          alt={node.title}
+                          className="w-full h-full object-cover select-none pointer-events-none"
+                        />
+                        {node.images && node.images.length > 1 && (
+                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-xs text-[9px] font-mono font-bold text-white flex items-center gap-1 shadow-sm">
+                            <Icons.Image size={10} />
+                            <span>+{node.images.length - 1}</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Header Label */}
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded app-bg-main app-text-muted border app-border truncate">
@@ -1669,6 +1722,34 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 </div>
               )}
 
+              {/* Event Image Gallery */}
+              {readerImages.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-[11px] font-bold app-text-muted uppercase tracking-wider">
+                    {t.cardReader.imageGallery} ({readerImages.length})
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {readerImages.map((img, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setPreviewEventImageIndex(idx)}
+                        className="relative rounded-xl overflow-hidden border app-border aspect-video bg-black/40 cursor-pointer group hover:border-[var(--accent)] transition-all shadow-md"
+                        title="Klik untuk memperbesar gambar"
+                      >
+                        <img
+                          src={img}
+                          alt={`Event image ${idx + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                          <Icons.Maximize2 size={16} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Linked Card Information */}
               <div>
                 <h4 className="text-[11px] font-bold app-text-muted uppercase tracking-wider mb-2">
@@ -1869,6 +1950,71 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         config={noticeModal}
         onClose={() => setNoticeModal(null)}
       />
+
+      {/* Fullscreen Carousel Lightbox Preview Modal for Event Images */}
+      {previewEventImageIndex !== null && readerImages.length > 0 && (
+        <div
+          className="fixed inset-0 z-[250] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200 select-none cursor-pointer"
+          onClick={() => setPreviewEventImageIndex(null)}
+        >
+          {/* Top Bar: Counter & Close */}
+          <div className="absolute top-4 left-4 right-4 flex items-center justify-between text-white z-20">
+            <span className="text-xs font-mono font-bold bg-white/10 px-3.5 py-1.5 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
+              {previewEventImageIndex + 1} / {readerImages.length}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPreviewEventImageIndex(null)}
+              className="p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors cursor-pointer backdrop-blur-md"
+              title="Tutup Preview (Escape)"
+            >
+              <Icons.X size={20} />
+            </button>
+          </div>
+
+          {/* Left Arrow (Looping) */}
+          {readerImages.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreviewEventImageIndex((prev) => (prev === null || prev <= 0 ? readerImages.length - 1 : prev - 1));
+              }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white bg-black/60 hover:bg-black/90 border border-white/20 rounded-full transition-all cursor-pointer z-30 hover:scale-110 shadow-2xl"
+              title="Gambar Sebelumnya (Panah Kiri)"
+            >
+              <Icons.ChevronLeft size={24} />
+            </button>
+          )}
+
+          {/* Main Image */}
+          <div
+            className="relative max-w-5xl max-h-[85vh] flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={readerImages[previewEventImageIndex]}
+              alt={`Preview ${previewEventImageIndex + 1}`}
+              className="max-w-full max-h-[82vh] object-contain rounded-2xl border border-white/10 shadow-2xl transition-all"
+            />
+          </div>
+
+          {/* Right Arrow (Looping) */}
+          {readerImages.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreviewEventImageIndex((prev) => (prev === null || prev >= readerImages.length - 1 ? 0 : prev + 1));
+              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white bg-black/60 hover:bg-black/90 border border-white/20 rounded-full transition-all cursor-pointer z-30 hover:scale-110 shadow-2xl"
+              title="Gambar Selanjutnya (Panah Kanan)"
+            >
+              <Icons.ChevronRight size={24} />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -1877,7 +2023,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 const SimpleNodeModal: React.FC<{
   node: SimpleTimelineNode | null;
   cards: WorldCard[];
-  onSave: (data: { title: string; dateLabel?: string; description?: string; cardId?: string }) => void;
+  onSave: (data: {
+    title: string;
+    dateLabel?: string;
+    description?: string;
+    cardId?: string;
+    images?: string[];
+    imageUrl?: string;
+  }) => void;
   onClose: () => void;
 }> = ({ node, cards, onSave, onClose }) => {
   const { language, t, getCategoryLabel } = useLanguage();
@@ -1889,17 +2042,46 @@ const SimpleNodeModal: React.FC<{
   const [showCardDropdown, setShowCardDropdown] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+  const [images, setImages] = useState<string[]>(() => {
+    const existing = node?.images ? [...node.images] : [];
+    if (node?.imageUrl && !existing.includes(node.imageUrl)) {
+      existing.unshift(node.imageUrl);
+    }
+    return existing;
+  });
+  const [imageUrl, setImageUrl] = useState<string>(node?.imageUrl || (node?.images?.[0] || ''));
+
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const res = ev.target?.result as string;
+      if (res) {
+        setImages((prev) => (prev.includes(res) ? prev : [...prev, res]));
+        if (!imageUrl) setImageUrl(res);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   const isDirty = () => {
     const initialTitle = node?.title || '';
     const initialDateLabel = node?.dateLabel || '';
     const initialDescription = node?.description || '';
     const initialCardId = node?.cardId || '';
+    const initialImages = JSON.stringify(node?.images || (node?.imageUrl ? [node.imageUrl] : []));
+    const currentImages = JSON.stringify(images);
+    const initialCover = node?.imageUrl || (node?.images?.[0] || '');
 
     return (
       title.trim() !== initialTitle.trim() ||
       dateLabel.trim() !== initialDateLabel.trim() ||
       description.trim() !== initialDescription.trim() ||
-      cardId !== initialCardId
+      cardId !== initialCardId ||
+      currentImages !== initialImages ||
+      imageUrl !== initialCover
     );
   };
 
@@ -1919,6 +2101,8 @@ const SimpleNodeModal: React.FC<{
       dateLabel: dateLabel.trim() || t.timeline.defaultEra,
       description: description.trim(),
       cardId: cardId || undefined,
+      images,
+      imageUrl: imageUrl || (images[0] || undefined),
     });
   };
 
@@ -2087,6 +2271,71 @@ const SimpleNodeModal: React.FC<{
                 </div>
               );
             })()}
+          </div>
+
+          {/* Gambar Peristiwa / Image Gallery Section */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold app-text-muted uppercase tracking-wider flex items-center gap-1">
+                <Icons.Image size={12} className="text-cyan-400" />
+                <span>Gambar Peristiwa ({images.length})</span>
+              </label>
+              <label className="px-2.5 py-1 rounded-lg app-accent-bg/20 app-accent-text border border-[var(--accent)]/30 text-[11px] font-bold hover:app-bg-hover transition-all cursor-pointer flex items-center gap-1">
+                <Icons.Plus size={12} />
+                <span>+ Upload Gambar</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {images.length > 0 && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1">
+                {images.map((imgSrc, idx) => {
+                  const isCover = imageUrl === imgSrc;
+                  return (
+                    <div
+                      key={idx}
+                      className={`relative rounded-xl overflow-hidden border aspect-video group bg-black/40 ${
+                        isCover ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/40' : 'app-border'
+                      }`}
+                    >
+                      <img src={imgSrc} alt={`Event ${idx + 1}`} className="w-full h-full object-cover" />
+                      {isCover && (
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-[var(--accent)] text-white text-[8px] font-bold">
+                          Cover
+                        </span>
+                      )}
+                      <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 p-1">
+                        {!isCover && (
+                          <button
+                            type="button"
+                            onClick={() => setImageUrl(imgSrc)}
+                            className="px-1.5 py-1 rounded bg-[var(--accent)] text-white text-[9px] font-bold hover:opacity-90 cursor-pointer"
+                          >
+                            Cover
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = images.filter((img) => img !== imgSrc);
+                            setImages(next);
+                            if (imageUrl === imgSrc) setImageUrl(next[0] || '');
+                          }}
+                          className="p-1 rounded bg-rose-600 text-white hover:bg-rose-500 cursor-pointer"
+                        >
+                          <Icons.Trash2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div>
