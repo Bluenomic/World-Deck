@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { CardConnection, WorldCard, ConnectionDirection } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 interface ConnectionModalProps {
@@ -21,6 +22,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
   onDelete,
   onClose,
 }) => {
+  const { language, t } = useLanguage();
   const [label, setLabel] = useState(connection.label || '');
   const [description, setDescription] = useState(connection.description || '');
   const [direction, setDirection] = useState<ConnectionDirection>(connection.direction || 'directed');
@@ -47,7 +49,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
       sourceId,
       targetId,
       direction,
-      label: label.trim() || 'Terhubung',
+      label: label.trim() || (language === 'en' ? 'Connected' : 'Terhubung'),
       description: description.trim(),
     });
   };
@@ -66,7 +68,9 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
         <div className="px-5 py-3.5 app-bg-main border-b app-border flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icons.GitCommit size={16} className="app-accent-text" />
-            <h3 className="text-sm font-bold app-text-main">Edit Relasi Hubungan</h3>
+            <h3 className="text-sm font-bold app-text-main">
+              {language === 'en' ? 'Edit Connection Line' : 'Edit Relasi Hubungan'}
+            </h3>
           </div>
           <button
             type="button"
@@ -83,9 +87,11 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
           {/* Card Endpoints Summary & Interactive Center Arrow Button */}
           <div className="p-3.5 rounded-xl app-bg-main border app-border flex items-center justify-between gap-3 text-xs">
             <div className="space-y-0.5 flex-1 min-w-0">
-              <span className="text-[10px] app-text-muted uppercase tracking-wider font-semibold">Asal</span>
+              <span className="text-[10px] app-text-muted uppercase tracking-wider font-semibold">
+                {language === 'en' ? 'Source' : 'Asal'}
+              </span>
               <p className="font-bold app-text-main truncate" title={currentSourceCard?.title}>
-                {currentSourceCard ? currentSourceCard.title : 'Kartu Asal'}
+                {currentSourceCard ? currentSourceCard.title : (language === 'en' ? 'Source Card' : 'Kartu Asal')}
               </p>
             </div>
 
@@ -94,7 +100,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
               type="button"
               onClick={handleToggleDirectionArrow}
               className="p-2 rounded-xl app-bg-secondary border app-border hover:border-blue-500/70 hover:app-bg-hover app-text-main shrink-0 transition-all hover:scale-110 active:scale-95 cursor-pointer shadow-xs"
-              title="Klik untuk membalikkan arah panah (Asal ⇄ Tujuan)"
+              title={language === 'en' ? 'Click to swap direction' : 'Klik untuk membalikkan arah panah'}
             >
               {direction === 'directed' && <Icons.ArrowRight size={18} className="app-accent-text" />}
               {direction === 'bidirectional' && <Icons.ArrowLeftRight size={18} className="app-accent-text" />}
@@ -102,9 +108,11 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
             </button>
 
             <div className="space-y-0.5 flex-1 min-w-0 text-right">
-              <span className="text-[10px] app-text-muted uppercase tracking-wider font-semibold">Tujuan</span>
+              <span className="text-[10px] app-text-muted uppercase tracking-wider font-semibold">
+                {language === 'en' ? 'Target' : 'Tujuan'}
+              </span>
               <p className="font-bold app-text-main truncate" title={currentTargetCard?.title}>
-                {currentTargetCard ? currentTargetCard.title : 'Kartu Tujuan'}
+                {currentTargetCard ? currentTargetCard.title : (language === 'en' ? 'Target Card' : 'Kartu Tujuan')}
               </p>
             </div>
           </div>
@@ -112,7 +120,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
           {/* Connection Direction Selector */}
           <div>
             <label className="block text-xs font-semibold app-text-muted mb-1.5">
-              Jenis Arah Relasi
+              {language === 'en' ? 'Direction Type' : 'Jenis Arah Relasi'}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {/* Satu Arah */}
@@ -124,10 +132,9 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     ? 'app-accent-bg text-white border-transparent shadow-sm font-semibold'
                     : 'app-bg-main app-border app-text-muted hover:app-text-main hover:app-bg-hover'
                 }`}
-                title="Pilih Satu Arah"
               >
                 <Icons.ArrowRight size={14} />
-                <span>Satu Arah</span>
+                <span>{language === 'en' ? 'Directed' : 'Satu Arah'}</span>
               </button>
 
               {/* Dua Arah */}
@@ -139,10 +146,9 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     ? 'app-accent-bg text-white border-transparent shadow-sm font-semibold'
                     : 'app-bg-main app-border app-text-muted hover:app-text-main hover:app-bg-hover'
                 }`}
-                title="Pilih Dua Arah"
               >
                 <Icons.ArrowLeftRight size={14} />
-                <span>Dua Arah</span>
+                <span>{language === 'en' ? 'Bidirectional' : 'Dua Arah'}</span>
               </button>
 
               {/* Tanpa Panah */}
@@ -154,37 +160,36 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     ? 'app-accent-bg text-white border-transparent shadow-sm font-semibold'
                     : 'app-bg-main app-border app-text-muted hover:app-text-main hover:app-bg-hover'
                 }`}
-                title="Pilih Tanpa Panah"
               >
                 <Icons.Minus size={14} />
-                <span>Tanpa Panah</span>
+                <span>{language === 'en' ? 'Undirected' : 'Tanpa Panah'}</span>
               </button>
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold app-text-muted mb-1">
-              Label Hubungan (mis. Pemimpin, Musuh, Terletak Di) *
+              {language === 'en' ? 'Relation Label *' : 'Label Hubungan *'}
             </label>
             <input
               type="text"
               required
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder="Masukkan label..."
+              placeholder={language === 'en' ? 'Enter label...' : 'Masukkan label...'}
               className="w-full app-bg-main border app-border rounded-lg px-3 py-2 text-xs app-text-main focus:outline-none focus:border-blue-500"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold app-text-muted mb-1">
-              Deskripsi Hubungan (Opsional)
+              {language === 'en' ? 'Description (Optional)' : 'Deskripsi Hubungan (Opsional)'}
             </label>
             <textarea
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Penjelasan detail sejarah hubungan..."
+              placeholder={language === 'en' ? 'History or explanation...' : 'Penjelasan detail sejarah hubungan...'}
               className="w-full app-bg-main border app-border rounded-lg p-2.5 text-xs app-text-main focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -193,24 +198,24 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
             <button
               type="button"
               onClick={() => onDelete(connection.id)}
-              className="px-3 py-1.5 rounded-lg text-rose-400 hover:bg-rose-950/40 text-xs font-medium"
+              className="px-3 py-1.5 rounded-lg text-rose-400 hover:bg-rose-950/40 text-xs font-medium cursor-pointer"
             >
-              Hapus Hubungan
+              {language === 'en' ? 'Delete Relation' : 'Hapus Hubungan'}
             </button>
 
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3.5 py-1.5 rounded-lg border app-border app-text-muted text-xs font-semibold"
+                className="px-3.5 py-1.5 rounded-lg border app-border app-text-muted text-xs font-semibold cursor-pointer"
               >
-                Batal
+                {t.common.cancel}
               </button>
               <button
                 type="submit"
                 className="px-4 py-1.5 rounded-lg app-accent-bg text-white text-xs font-semibold cursor-pointer"
               >
-                Simpan
+                {t.common.save}
               </button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import type { WorldCard, WorldDeck, CardCategory } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 
@@ -37,6 +38,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onOpenCardFullPage,
   onDeleteCardsRequest,
 }) => {
+  const { language, t, getCategoryLabel } = useLanguage();
   const [activeTab, setActiveTab] = useState<'all' | 'decks' | 'cards'>('all');
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
 
@@ -663,7 +665,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               ? 'text-amber-400 bg-amber-400/10 opacity-100'
               : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-amber-400'
           }`}
-          title={pinnedDeckIds.has(deck.id) ? 'Lepas Sematan' : 'Sematkan ke Atas'}
+          title={pinnedDeckIds.has(deck.id) ? t.library.unpin : t.library.pin}
         >
           <Icons.Pin size={13} className={pinnedDeckIds.has(deck.id) ? 'fill-amber-400' : ''} />
         </button>
@@ -673,7 +675,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           <div className="absolute inset-0 bg-blue-950/85 backdrop-blur-xs z-30 rounded-2xl flex flex-col items-center justify-center p-3 text-center space-y-1.5 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
             <Icons.Layers size={32} className="text-blue-300 animate-bounce" />
             <span className="text-xs font-bold text-white drop-shadow">
-              Lepaskan Kartu di Sini
+              {t.library.dropCardHere}
             </span>
           </div>
         )}
@@ -683,7 +685,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           <div className="absolute inset-0 bg-emerald-950/90 backdrop-blur-xs z-30 rounded-2xl flex flex-col items-center justify-center p-3 text-center space-y-1 animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
             <Icons.CheckCircle2 size={32} className="text-emerald-400 animate-bounce" />
             <span className="text-xs font-bold text-emerald-300 drop-shadow">
-              Kartu Berhasil Dimasukkan!
+              {t.library.cardAddedSuccess}
             </span>
           </div>
         )}
@@ -725,7 +727,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         return <IconComp size={10} style={{ color: cfg.color || '#3b82f6' }} />;
                       })()}
                       <span className="text-[9px] font-bold app-text-main truncate">
-                        {c.title || 'Kartu'}
+                        {c.title || t.common.untitled}
                       </span>
                     </div>
 
@@ -742,7 +744,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     ) : (
                       <div className="p-1.5 flex-1 flex flex-col justify-between app-bg-main">
                         <p className="text-[8.5px] app-text-muted line-clamp-4 leading-tight">
-                          {c.summary || 'Kartu deck...'}
+                          {c.summary || t.cardReader.noSummary}
                         </p>
                       </div>
                     )}
@@ -764,7 +766,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               {/* Card Silhouette 3 (Front Layer) */}
               <div className="absolute w-28 h-36 rounded-xl border-2 border-dashed border-slate-600/50 app-bg-main/60 flex flex-col items-center justify-center p-3 text-center text-slate-500 shadow-xs z-10 transition-transform group-hover:scale-105">
                 <Icons.Layers size={22} className="opacity-40 mb-1.5 app-accent-text" />
-                <span className="text-[10px] font-semibold app-text-muted">Deck Kosong</span>
+                <span className="text-[10px] font-semibold app-text-muted">{t.library.emptyDeck}</span>
               </div>
             </div>
           </div>
@@ -939,7 +941,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       ? 'text-amber-400 bg-amber-400/10 opacity-100'
                       : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-amber-400'
                   }`}
-                  title={pinnedCardIds.has(card.id) ? 'Lepas Sematan' : 'Sematkan ke Atas'}
+                  title={pinnedCardIds.has(card.id) ? t.library.unpin : t.library.pin}
                 >
                   <Icons.Pin size={12} className={pinnedCardIds.has(card.id) ? 'fill-amber-400' : ''} />
                 </button>
@@ -948,11 +950,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   style={{ color: cfg.color }}
                 >
                   <IconComp size={11} />
-                  <span>{cfg.label}</span>
+                  <span>{getCategoryLabel(card.category)}</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity" title="Geser kartu">
+              <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                 <Icons.GripHorizontal size={14} className="text-slate-400 cursor-grab" />
               </div>
             </div>
@@ -978,7 +980,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
               <div className="space-y-1">
                 <h3 className="text-xs font-bold app-text-main group-hover:text-blue-400 transition-colors">
-                  {card.title || 'Kartu Tanpa Judul'}
+                  {card.title || t.common.untitled}
                 </h3>
                 {card.subtitle && (
                   <p className="text-[11px] app-text-muted">
@@ -986,7 +988,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   </p>
                 )}
                 <p className="text-[11px] app-text-muted line-clamp-2 leading-relaxed pt-1">
-                  {card.summary || 'Belum ada ringkasan...'}
+                  {card.summary || t.cardReader.noSummary}
                 </p>
               </div>
 
@@ -1005,7 +1007,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     <span className="truncate max-w-[90px]">{assignedDeck.name}</span>
                   </span>
                 ) : (
-                  <span className="text-[10px] app-text-muted italic">Mandiri</span>
+                  <span className="text-[10px] app-text-muted italic">{t.library.standalone}</span>
                 )}
 
                 {card.tags && card.tags.length > 0 && (
@@ -1155,7 +1157,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             className={`p-1 rounded-md transition-colors cursor-pointer shrink-0 ${
               isPinned ? 'text-amber-400 bg-amber-400/10' : 'text-slate-500 opacity-30 group-hover:opacity-100 hover:text-amber-400'
             }`}
-            title={isPinned ? 'Lepas Sematan' : 'Sematkan ke Atas'}
+            title={isPinned ? t.library.unpin : t.library.pin}
           >
             <Icons.Pin size={13} className={isPinned ? 'fill-amber-400' : ''} />
           </button>
@@ -1187,16 +1189,16 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             style={{ color: cfg.color }}
           >
             <IconComp size={11} />
-            <span>{cfg.label}</span>
+            <span>{getCategoryLabel(card.category)}</span>
           </div>
 
           {/* Title & Summary */}
           <div className="truncate">
             <h4 className="text-xs font-bold text-white group-hover:text-[#0d99ff] transition-colors truncate">
-              {card.title || 'Kartu Tanpa Judul'}
+              {card.title || t.common.untitled}
             </h4>
             <p className="text-[10px] text-slate-400 truncate max-w-[300px] md:max-w-[450px]">
-              {card.summary || card.subtitle || 'Belum ada ringkasan...'}
+              {card.summary || card.subtitle || t.cardReader.noSummary}
             </p>
           </div>
         </div>
@@ -1216,7 +1218,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               <span className="truncate max-w-[90px]">{assignedDeck.name}</span>
             </span>
           ) : (
-            <span className="text-[10px] text-slate-500 italic shrink-0 hidden sm:inline">Mandiri</span>
+            <span className="text-[10px] text-slate-500 italic shrink-0 hidden sm:inline">{t.library.standalone}</span>
           )}
 
           {/* Tags */}
@@ -1232,7 +1234,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
           {/* Date */}
           <span className="text-[10px] font-mono text-slate-400 hidden md:inline shrink-0">
-            {new Date(card.updatedAt || Date.now()).toLocaleDateString('id-ID', {
+            {new Date(card.updatedAt || Date.now()).toLocaleDateString(language === 'en' ? 'en-US' : 'id-ID', {
               day: 'numeric',
               month: 'short',
             })}
@@ -1327,11 +1329,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveDeckId(null)}
-                title="Kembali ke Galeri Utama"
+                title={t.library.mainLibrary}
                 className="p-2 rounded-xl bg-[#1e1e1e] hover:bg-[#383838] border border-[#383838] text-slate-200 hover:text-white flex items-center gap-1.5 font-semibold transition-all cursor-pointer"
               >
                 <Icons.ArrowLeft size={16} className="text-[#0d99ff]" />
-                <span>Galeri Utama</span>
+                <span>{t.library.mainLibrary}</span>
               </button>
 
               <div className="h-5 w-px bg-[#383838]" />
@@ -1345,7 +1347,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   {activeDeck.name}
                 </h2>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#1e1e1e] border border-[#383838] text-[#0d99ff] font-bold shrink-0">
-                  {cards.filter((c) => c.deckId === activeDeck.id || (activeDeck.cardIds || []).includes(c.id)).length} Kartu
+                  {cards.filter((c) => c.deckId === activeDeck.id || (activeDeck.cardIds || []).includes(c.id)).length} {t.library.cards}
                 </span>
               </div>
             </div>
@@ -1357,7 +1359,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 className="px-3 py-1.5 rounded-xl bg-[#1e1e1e] hover:bg-[#383838] border border-[#383838] text-slate-200 hover:text-white font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <Icons.Edit3 size={14} className="text-amber-400" />
-                <span className="hidden sm:inline">Edit Deck</span>
+                <span className="hidden sm:inline">{t.library.editDeck}</span>
               </button>
 
               <button
@@ -1366,7 +1368,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 className="px-3.5 py-1.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
               >
                 <Icons.Plus size={15} />
-                <span>+ Kartu ke Deck</span>
+                <span>{t.library.addCardToDeck}</span>
               </button>
             </div>
           </div>
@@ -1385,7 +1387,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       : 'text-slate-300 hover:text-white hover:bg-[#2c2c2c]/50'
                   }`}
                 >
-                  Semua ({decks.length + cards.length})
+                  {t.library.all} ({decks.length + cards.length})
                 </button>
                 <button
                   type="button"
@@ -1397,7 +1399,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   }`}
                 >
                   <Icons.SquareStack size={14} className={activeTab === 'decks' ? 'text-purple-400' : 'text-slate-400'} />
-                  <span>Deck ({decks.length})</span>
+                  <span>{t.library.decks} ({decks.length})</span>
                 </button>
                 <button
                   type="button"
@@ -1409,7 +1411,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   }`}
                 >
                   <Icons.FileText size={14} className={activeTab === 'cards' ? 'text-[#0d99ff]' : 'text-slate-400'} />
-                  <span>Kartu ({cards.length})</span>
+                  <span>{t.library.cards} ({cards.length})</span>
                 </button>
               </div>
 
@@ -1425,7 +1427,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         ? 'bg-[#2c2c2c] text-white shadow-xs'
                         : 'text-slate-400 hover:text-white'
                     }`}
-                    title="Tampilan Grid Kartu"
+                    title={t.library.cardGrid}
                   >
                     <Icons.LayoutGrid size={15} />
                   </button>
@@ -1437,7 +1439,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         ? 'bg-[#2c2c2c] text-white shadow-xs'
                         : 'text-slate-400 hover:text-white'
                     }`}
-                    title="Tampilan Tabel/List Ringkas"
+                    title={t.library.compactTable}
                   >
                     <Icons.List size={15} />
                   </button>
@@ -1449,10 +1451,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   onChange={(e) => setSortBy(e.target.value as any)}
                   className="px-2.5 py-1.5 rounded-xl bg-[#1e1e1e] border border-[#383838] text-slate-200 text-xs font-semibold cursor-pointer outline-none"
                 >
-                  <option value="custom">Urutan Manual</option>
-                  <option value="updated">Terakhir Diubah</option>
-                  <option value="created">Tanggal Dibuat</option>
-                  <option value="title">Judul (A-Z)</option>
+                  <option value="custom">{t.library.manualOrder}</option>
+                  <option value="updated">{t.library.lastUpdated}</option>
+                  <option value="created">{t.library.dateCreated}</option>
+                  <option value="title">{t.library.titleAZ}</option>
                 </select>
 
                 {/* Quick Create Action Buttons */}
@@ -1462,7 +1464,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   className="px-3 py-1.5 rounded-xl bg-[#1e1e1e] hover:bg-[#383838] border border-[#383838] text-purple-400 hover:text-purple-300 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Icons.FolderPlus size={14} />
-                  <span className="hidden sm:inline">+ Deck</span>
+                  <span className="hidden sm:inline">{t.library.newDeck}</span>
                 </button>
 
                 <button
@@ -1471,7 +1473,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   className="px-3.5 py-1.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                 >
                   <Icons.Plus size={15} />
-                  <span>+ Kartu</span>
+                  <span>{t.library.newCard}</span>
                 </button>
               </div>
             </div>
@@ -1491,7 +1493,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       : 'bg-[#2c2c2c] border border-[#383838] text-slate-300 hover:text-white'
                   }`}
                 >
-                  Semua Tag
+                  {t.library.allTags}
                 </button>
                 {allUniqueTags.map((tag) => (
                   <button
@@ -1542,13 +1544,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             {activeDeckId ? (
               <>
                 <Icons.SquareStack size={56} className="mx-auto text-slate-500/50 stroke-[1.5]" />
-                <p className="text-sm font-medium text-slate-400">Tidak ada kartu di deck ini</p>
+                <p className="text-sm font-medium text-slate-400">{t.library.noCardsInDeck}</p>
               </>
             ) : (
               <>
                 <Icons.FileText size={56} className="mx-auto text-slate-500/50 stroke-[1.5]" />
-                <p className="text-sm font-medium text-slate-400">Tidak ada item atau kartu ditemukan dalam galeri ini</p>
-                <p className="text-xs text-slate-500">Klik kanan di area kosong untuk membuat kartu atau deck baru.</p>
+                <p className="text-sm font-medium text-slate-400">{t.library.noItemsFound}</p>
+                <p className="text-xs text-slate-500">{t.library.rightClickHint}</p>
               </>
             )}
           </div>
@@ -1568,7 +1570,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   </h4>
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#1e1e1e] border border-[#383838] text-purple-300 font-bold">
-                  {cards.filter((c) => c.deckId === deck.id || (deck.cardIds || []).includes(c.id)).length} Kartu
+                  {cards.filter((c) => c.deckId === deck.id || (deck.cardIds || []).includes(c.id)).length} {t.library.cards}
                 </span>
               </div>
             ))}
@@ -1599,7 +1601,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[90] bg-[#2c2c2c] border border-[#383838] rounded-2xl shadow-2xl px-5 py-2.5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 duration-200 select-none text-xs text-white backdrop-blur-md">
             <div className="flex items-center gap-2 font-bold text-white">
               <Icons.CheckSquare size={16} className="text-[#0d99ff]" />
-              <span>{selectedCardIds.size} kartu dipilih</span>
+              <span>{selectedCardIds.size} {t.library.cardsSelected}</span>
             </div>
 
             <div className="h-4 w-px bg-[#383838]" />
@@ -1616,7 +1618,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               }}
               className="px-2.5 py-1 rounded-lg hover:bg-[#383838] text-slate-300 hover:text-white font-semibold transition-colors cursor-pointer"
             >
-              {selectedCardIds.size === displayCards.length ? 'Batal Semua' : 'Pilih Semua'}
+              {selectedCardIds.size === displayCards.length ? t.library.clearSelection : t.library.selectAll}
             </button>
 
             {/* Batch Pin */}
@@ -1632,7 +1634,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               className="px-2.5 py-1 rounded-lg hover:bg-[#383838] text-amber-400 hover:text-amber-300 font-semibold transition-colors flex items-center gap-1 cursor-pointer"
             >
               <Icons.Pin size={13} />
-              <span>Sematkan</span>
+              <span>{t.library.pin}</span>
             </button>
 
             {/* Batch Delete */}
@@ -1646,7 +1648,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               className="px-2.5 py-1 rounded-lg hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 font-semibold transition-colors flex items-center gap-1 cursor-pointer"
             >
               <Icons.Trash2 size={13} />
-              <span>Hapus</span>
+              <span>{t.common.delete}</span>
             </button>
 
             <button
@@ -1656,7 +1658,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 setIsSelectionMode(false);
               }}
               className="p-1 rounded-lg hover:bg-[#383838] text-slate-400 hover:text-white transition-colors cursor-pointer"
-              title="Batal Mode Seleksi"
+              title={t.library.clearSelection}
             >
               <Icons.X size={15} />
             </button>
@@ -1694,7 +1696,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
                   >
                     <Icons.FolderOpen size={14} />
-                    <span>Buka Deck</span>
+                    <span>{t.library.openDeck}</span>
                   </button>
 
                   <button
@@ -1706,7 +1708,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-slate-200 cursor-pointer"
                   >
                     <Icons.Edit3 size={14} />
-                    <span>Ganti Nama & Warna Deck</span>
+                    <span>{t.library.editDeck}</span>
                   </button>
 
                   <button
@@ -1718,7 +1720,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-amber-400 cursor-pointer"
                   >
                     <Icons.Pin size={14} className={pinnedDeckIds.has(contextMenu.targetDeck!.id) ? 'fill-amber-400' : ''} />
-                    <span>{pinnedDeckIds.has(contextMenu.targetDeck!.id) ? 'Buka Sematan Deck' : 'Sematkan Deck ke Atas'}</span>
+                    <span>{pinnedDeckIds.has(contextMenu.targetDeck!.id) ? t.library.unpin : t.library.pin}</span>
                   </button>
 
                   <button
@@ -1730,7 +1732,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-purple-400 cursor-pointer"
                   >
                     <Icons.Plus size={14} />
-                    <span>+ Buat Kartu dalam Deck Ini</span>
+                    <span>{t.library.addCardToDeck}</span>
                   </button>
                 </div>
 
@@ -1744,14 +1746,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-rose-500/20 flex items-center gap-2 transition-colors text-rose-400 font-medium cursor-pointer"
                   >
                     <Icons.Trash2 size={14} />
-                    <span>Hapus Deck</span>
+                    <span>{t.library.deleteDeck}</span>
                   </button>
                 </div>
               </>
             ) : contextMenu.targetCard ? (
               <>
                 <div className="px-3 py-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider select-none truncate">
-                  📄 {contextMenu.targetCard.title || 'Kartu Tanpa Judul'}
+                  📄 {contextMenu.targetCard.title || t.common.untitled}
                 </div>
 
                 <div className="py-1 space-y-0.5">
@@ -1764,7 +1766,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
                   >
                     <Icons.Maximize2 size={14} />
-                    <span>Buka Kartu Fullscreen</span>
+                    <span>{t.library.openFullscreen}</span>
                   </button>
 
                   <button
@@ -1776,7 +1778,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-slate-200 cursor-pointer"
                   >
                     <Icons.Edit3 size={14} />
-                    <span>Edit Kartu</span>
+                    <span>{t.sidebar.editCard}</span>
                   </button>
 
                   <button
@@ -1788,7 +1790,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-amber-400 cursor-pointer"
                   >
                     <Icons.Pin size={14} className={pinnedCardIds.has(contextMenu.targetCard!.id) ? 'fill-amber-400' : ''} />
-                    <span>{pinnedCardIds.has(contextMenu.targetCard!.id) ? 'Buka Sematan Kartu' : 'Sematkan Kartu ke Atas'}</span>
+                    <span>{pinnedCardIds.has(contextMenu.targetCard!.id) ? t.library.unpin : t.library.pin}</span>
                   </button>
 
                   <button
@@ -1800,7 +1802,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-slate-300 cursor-pointer"
                   >
                     <Icons.Copy size={14} />
-                    <span>Salin Judul & Ringkasan</span>
+                    <span>{t.library.copyTitleSummary}</span>
                   </button>
                 </div>
 
@@ -1808,7 +1810,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 {decks.length > 0 && (
                   <div className="py-1">
                     <div className="px-3 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                      Pindahkan ke Deck:
+                      {t.library.moveToDeck}
                     </div>
                     <button
                       type="button"
@@ -1819,7 +1821,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-slate-300 flex items-center gap-2 transition-colors text-[11px]"
                     >
                       <Icons.FileText size={12} />
-                      <span>Mandiri (Tanpa Deck)</span>
+                      <span>{t.library.standalone}</span>
                     </button>
                     {decks.map((d) => (
                       <button
@@ -1853,7 +1855,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-rose-500/20 flex items-center gap-2 transition-colors text-rose-400 font-medium cursor-pointer"
                   >
                     <Icons.Trash2 size={14} />
-                    <span>Hapus Kartu</span>
+                    <span>{t.common.delete}</span>
                   </button>
                 </div>
               </>
@@ -1869,7 +1871,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
                   >
                     <Icons.Plus size={14} strokeWidth={2.5} />
-                    <span>Buat Kartu Baru</span>
+                    <span>{t.sidebar.createNewCard}</span>
                   </button>
 
                   <button
@@ -1881,7 +1883,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-bold text-purple-400 cursor-pointer"
                   >
                     <Icons.FolderPlus size={14} />
-                    <span>Buat Deck Baru</span>
+                    <span>{t.library.newDeck}</span>
                   </button>
 
                   <button
@@ -1894,14 +1896,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-slate-200 cursor-pointer"
                   >
                     <Icons.CheckSquare size={14} />
-                    <span>Pilih Semua Kartu</span>
+                    <span>{t.library.selectAll}</span>
                   </button>
                 </div>
 
                 {/* Quick Sort Submenu */}
                 <div className="py-1">
                   <div className="px-3 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                    Urutkan Berdasarkan:
+                    {t.library.sortMode}
                   </div>
                   <button
                     type="button"
@@ -1911,7 +1913,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     }}
                     className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-slate-200 flex items-center justify-between text-[11px]"
                   >
-                    <span>Terakhir Diubah</span>
+                    <span>{t.library.lastUpdated}</span>
                     {sortBy === 'updated' && <Icons.Check size={12} className="text-[#0d99ff]" />}
                   </button>
                   <button
@@ -1922,7 +1924,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     }}
                     className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-slate-200 flex items-center justify-between text-[11px]"
                   >
-                    <span>Tanggal Dibuat</span>
+                    <span>{t.library.dateCreated}</span>
                     {sortBy === 'created' && <Icons.Check size={12} className="text-[#0d99ff]" />}
                   </button>
                   <button
@@ -1933,7 +1935,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     }}
                     className="w-full px-3 py-1.5 text-left hover:bg-[#383838] text-slate-200 flex items-center justify-between text-[11px]"
                   >
-                    <span>Judul (A-Z)</span>
+                    <span>{t.library.titleAZ}</span>
                     {sortBy === 'title' && <Icons.Check size={12} className="text-[#0d99ff]" />}
                   </button>
                 </div>
@@ -1941,7 +1943,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 {/* Layout Mode Submenu */}
                 <div className="py-1">
                   <div className="px-3 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                    Mode Tampilan:
+                    {t.library.viewMode}
                   </div>
                   <button
                     type="button"
@@ -1953,7 +1955,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   >
                     <div className="flex items-center gap-2">
                       <Icons.LayoutGrid size={12} />
-                      <span>Grid Kartu</span>
+                      <span>{t.library.cardGrid}</span>
                     </div>
                     {viewLayout === 'grid' && <Icons.Check size={12} className="text-[#0d99ff]" />}
                   </button>
@@ -1967,7 +1969,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   >
                     <div className="flex items-center gap-2">
                       <Icons.List size={12} />
-                      <span>Tabel / List Ringkas</span>
+                      <span>{t.library.compactTable}</span>
                     </div>
                     {viewLayout === 'list' && <Icons.Check size={12} className="text-[#0d99ff]" />}
                   </button>
@@ -2045,16 +2047,16 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       style={{ color: cfg.color }}
                     >
                       <IconComp size={11} />
-                      <span>{cfg.label}</span>
+                      <span>{getCategoryLabel(dragCard.category)}</span>
                     </div>
 
                     {/* Title */}
                     <div className="truncate">
                       <h4 className="text-xs font-bold text-white truncate">
-                        {dragCard.title || 'Kartu Tanpa Judul'}
+                        {dragCard.title || t.common.untitled}
                       </h4>
                       <p className="text-[10px] text-slate-400 truncate max-w-[180px]">
-                        {dragCard.summary || 'Belum ada ringkasan...'}
+                        {dragCard.summary || t.cardReader.noSummary}
                       </p>
                     </div>
                   </div>
@@ -2085,7 +2087,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     style={{ color: cfg.color }}
                   >
                     <IconComp size={11} />
-                    <span>{cfg.label}</span>
+                    <span>{getCategoryLabel(dragCard.category)}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Icons.GripHorizontal size={14} className="app-text-muted" />
@@ -2110,13 +2112,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
                   <div className="space-y-1">
                     <h3 className="text-xs font-bold app-text-main">
-                      {dragCard.title || 'Kartu Tanpa Judul'}
+                      {dragCard.title || t.common.untitled}
                     </h3>
                     {dragCard.subtitle && (
                       <p className="text-[11px] app-text-muted">{dragCard.subtitle}</p>
                     )}
                     <p className="text-[11px] app-text-muted line-clamp-2 leading-relaxed pt-1">
-                      {dragCard.summary || 'Belum ada ringkasan...'}
+                      {dragCard.summary || t.cardReader.noSummary}
                     </p>
                   </div>
 
@@ -2134,7 +2136,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         <span className="truncate max-w-[90px]">{assignedDeck.name}</span>
                       </span>
                     ) : (
-                      <span className="text-[10px] app-text-muted italic">Mandiri</span>
+                      <span className="text-[10px] app-text-muted italic">{t.library.standalone}</span>
                     )}
 
                     {dragCard.tags && dragCard.tags.length > 0 && (

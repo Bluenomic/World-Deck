@@ -1,5 +1,6 @@
 import React from 'react';
 import type { WorldCard, CardConnection } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 interface RelationListViewProps {
@@ -17,6 +18,8 @@ export const RelationListView: React.FC<RelationListViewProps> = ({
   onDeleteConnection,
   onNavigateToCard,
 }) => {
+  const { language, t, getCategoryLabel } = useLanguage();
+
   return (
     <div className="flex-1 app-bg-main p-6 overflow-y-auto app-text-main transition-colors">
       <div className="max-w-5xl mx-auto space-y-5">
@@ -25,26 +28,30 @@ export const RelationListView: React.FC<RelationListViewProps> = ({
         <div className="border-b app-border pb-3">
           <h2 className="text-lg font-bold app-text-main flex items-center gap-2">
             <Icons.GitCommit className="app-accent-text" size={20} />
-            <span>Notion Table View (Relasi Hubungan)</span>
+            <span>{language === 'en' ? 'Card Relationship Table View' : 'Tabel Relasi Hubungan Kartu'}</span>
           </h2>
           <p className="text-xs app-text-muted">
-            Daftar tabel database hubungan spasial antar halaman kartu.
+            {language === 'en'
+              ? 'Database table listing spatial connections between card pages.'
+              : 'Daftar tabel database hubungan spasial antar halaman kartu.'}
           </p>
         </div>
 
         {connections.length === 0 ? (
           <div className="text-center py-16 app-bg-secondary rounded-xl border app-border app-text-muted text-xs">
-            Belum ada hubungan kartu. Tarik garis penghubung antar kartu pada Canvas.
+            {language === 'en'
+              ? 'No card connections yet. Drag connecting lines between cards on the Canvas.'
+              : 'Belum ada hubungan kartu. Tarik garis penghubung antar kartu pada Canvas.'}
           </div>
         ) : (
           <div className="app-bg-secondary border app-border rounded-xl overflow-hidden shadow-md">
             <table className="w-full text-left text-xs app-text-main">
               <thead className="app-bg-main app-text-muted uppercase font-mono text-[10px] border-b app-border">
                 <tr>
-                  <th className="p-3">Halaman Asal (Source)</th>
-                  <th className="p-3">Label Hubungan</th>
-                  <th className="p-3">Halaman Tujuan (Target)</th>
-                  <th className="p-3 text-right">Aksi</th>
+                  <th className="p-3">{language === 'en' ? 'Source Card' : 'Halaman Asal (Source)'}</th>
+                  <th className="p-3">{language === 'en' ? 'Relationship Label' : 'Label Hubungan'}</th>
+                  <th className="p-3">{language === 'en' ? 'Target Card' : 'Halaman Tujuan (Target)'}</th>
+                  <th className="p-3 text-right">{t.common.actions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y app-border">
@@ -63,9 +70,9 @@ export const RelationListView: React.FC<RelationListViewProps> = ({
                           className="font-medium app-text-main hover:app-accent-text transition-colors flex items-center gap-1.5 text-left"
                         >
                           <Icons.FileText size={13} className="app-text-muted" />
-                          <span>{sourceCard.title}</span>
+                          <span>{sourceCard.title || t.common.untitled}</span>
                           <span className="text-[10px] app-text-muted">
-                            ({sourceCard.category})
+                            ({getCategoryLabel(sourceCard.category)})
                           </span>
                         </button>
                       </td>
@@ -83,9 +90,9 @@ export const RelationListView: React.FC<RelationListViewProps> = ({
                           className="font-medium app-text-main hover:app-accent-text transition-colors flex items-center gap-1.5 text-left"
                         >
                           <Icons.FileText size={13} className="app-text-muted" />
-                          <span>{targetCard.title}</span>
+                          <span>{targetCard.title || t.common.untitled}</span>
                           <span className="text-[10px] app-text-muted">
-                            ({targetCard.category})
+                            ({getCategoryLabel(targetCard.category)})
                           </span>
                         </button>
                       </td>
@@ -96,14 +103,14 @@ export const RelationListView: React.FC<RelationListViewProps> = ({
                           onClick={() => onEditConnection(conn)}
                           className="px-2.5 py-1 rounded app-bg-main app-text-main border app-border text-[11px]"
                         >
-                          Edit
+                          {t.common.edit}
                         </button>
                         <button
                           type="button"
                           onClick={() => onDeleteConnection(conn.id)}
                           className="px-2.5 py-1 rounded bg-rose-950/40 hover:bg-rose-900 text-rose-300 border border-rose-900/40 text-[11px]"
                         >
-                          Hapus
+                          {t.common.delete}
                         </button>
                       </td>
                     </tr>

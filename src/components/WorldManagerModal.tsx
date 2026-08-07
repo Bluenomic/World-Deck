@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import type { WorldProject } from '../types';
 import { generateId, downloadProjectJson } from '../utils/helpers';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 interface WorldManagerModalProps {
@@ -26,6 +27,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
   onClose,
   onImportWorld,
 }) => {
+  const { language, t } = useLanguage();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingWorldId, setEditingWorldId] = useState<string | null>(null);
 
@@ -60,7 +62,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
       id: generateId('world'),
       name: nameInput.trim(),
       description: descInput.trim(),
-      author: authorInput.trim() || 'Penulis',
+      author: authorInput.trim() || (language === 'en' ? 'Author' : 'Penulis'),
       version: '1.0.0',
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -102,7 +104,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
         <div className="px-6 py-4 bg-[#1e1e1e] border-b border-[#383838] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <Icons.FolderGit2 size={18} className="text-[#0d99ff]" />
-            <h2 className="text-sm font-extrabold text-white tracking-tight">Pengelola Workspace</h2>
+            <h2 className="text-sm font-extrabold text-white tracking-tight">{t.worldManager.title}</h2>
             <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#2c2c2c] text-slate-400 border border-[#383838]">
               {worlds.length}
             </span>
@@ -119,17 +121,17 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
               }`}
             >
               <Icons.Plus size={14} strokeWidth={2.5} />
-              <span>Workspace Baru</span>
+              <span>{t.worldManager.createWorld}</span>
             </button>
 
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#2c2c2c] hover:bg-[#383838] text-slate-300 hover:text-white border border-[#383838] transition-all flex items-center gap-1.5 cursor-pointer"
-              title="Impor file .json workspace"
+              title={t.worldManager.importWorld}
             >
               <Icons.Upload size={13} />
-              <span className="hidden sm:inline">Impor JSON</span>
+              <span className="hidden sm:inline">{t.worldManager.importWorld}</span>
             </button>
 
             <div className="h-4 w-px bg-[#383838] mx-0.5" />
@@ -138,7 +140,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
               type="button"
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#383838] transition-colors cursor-pointer"
-              title="Tutup Modal"
+              title={t.common.close}
             >
               <Icons.X size={18} />
             </button>
@@ -157,49 +159,49 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
               <div className="flex items-center justify-between border-b border-[#383838] pb-2">
                 <span className="text-xs font-bold text-[#0d99ff] uppercase tracking-wider flex items-center gap-1.5">
                   <Icons.PlusCircle size={14} />
-                  <span>Buat Workspace Baru</span>
+                  <span>{t.worldManager.createWorld}</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowCreateForm(false)}
                   className="text-xs text-slate-400 hover:text-white cursor-pointer"
                 >
-                  Batal
+                  {t.common.cancel}
                 </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nama Workspace *</label>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">{t.worldManager.worldName} *</label>
                   <input
                     type="text"
                     required
                     value={nameInput}
                     onChange={(e) => setNameInput(e.target.value)}
-                    placeholder="Nama workspace..."
+                    placeholder={t.worldManager.worldName}
                     className="w-full bg-[#1e1e1e] border border-[#383838] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Penulis</label>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">{t.worldManager.author}</label>
                   <input
                     type="text"
                     value={authorInput}
                     onChange={(e) => setAuthorInput(e.target.value)}
-                    placeholder="Nama Penulis..."
+                    placeholder={t.worldManager.author}
                     className="w-full bg-[#1e1e1e] border border-[#383838] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">Deskripsi Singkat (Opsional)</label>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">{t.worldManager.description}</label>
                 <textarea
                   rows={2}
                   value={descInput}
                   onChange={(e) => setDescInput(e.target.value)}
-                  placeholder="Ringkasan konsep workspace..."
+                  placeholder={t.worldManager.description}
                   className="w-full bg-[#1e1e1e] border border-[#383838] rounded-lg p-2 text-xs text-white focus:outline-none focus:border-[#0d99ff] leading-relaxed resize-none"
                 />
               </div>
@@ -210,13 +212,13 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                   onClick={() => setShowCreateForm(false)}
                   className="px-3 py-1.5 rounded-lg border border-[#383838] bg-[#1e1e1e] hover:bg-[#383838] text-xs font-semibold text-slate-300 cursor-pointer"
                 >
-                  Batal
+                  {t.common.cancel}
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-1.5 rounded-lg bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold shadow-md cursor-pointer active:scale-95 transition-all"
                 >
-                  Simpan & Buka
+                  {t.common.save}
                 </button>
               </div>
             </form>
@@ -237,19 +239,19 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                   >
                     <div className="flex items-center justify-between border-b border-[#383838] pb-2">
                       <span className="text-xs font-bold text-[#0d99ff] uppercase tracking-wider">
-                        Edit Workspace
+                        {t.worldManager.editWorld}
                       </span>
                       <button
                         type="button"
                         onClick={() => setEditingWorldId(null)}
                         className="text-xs text-slate-400 hover:text-white cursor-pointer"
                       >
-                        Batal
+                        {t.common.cancel}
                       </button>
                     </div>
 
                     <div>
-                      <label className="block text-[11px] text-slate-400 mb-1">Nama Workspace</label>
+                      <label className="block text-[11px] text-slate-400 mb-1">{t.worldManager.worldName}</label>
                       <input
                         type="text"
                         required
@@ -260,7 +262,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] text-slate-400 mb-1">Penulis</label>
+                      <label className="block text-[11px] text-slate-400 mb-1">{t.worldManager.author}</label>
                       <input
                         type="text"
                         value={authorInput}
@@ -270,7 +272,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] text-slate-400 mb-1">Deskripsi</label>
+                      <label className="block text-[11px] text-slate-400 mb-1">{t.worldManager.description}</label>
                       <textarea
                         rows={2}
                         value={descInput}
@@ -285,13 +287,13 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                         onClick={() => setEditingWorldId(null)}
                         className="px-3 py-1 rounded-lg border border-[#383838] bg-[#1e1e1e] text-xs font-semibold text-slate-300 cursor-pointer"
                       >
-                        Batal
+                        {t.common.cancel}
                       </button>
                       <button
                         type="submit"
                         className="px-4 py-1 rounded-lg bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold shadow-md cursor-pointer"
                       >
-                        Simpan
+                        {t.common.save}
                       </button>
                     </div>
                   </form>
@@ -322,11 +324,11 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
 
                       {isActive ? (
                         <span className="px-2 py-0.5 rounded-full bg-[#0d99ff]/15 border border-[#0d99ff]/30 text-[#0d99ff] text-[9px] font-bold shrink-0">
-                          Aktif
+                          {t.common.active}
                         </span>
                       ) : (
                         <span className="text-[10px] text-slate-500 font-mono shrink-0">
-                          {w.author || 'Penulis'}
+                          {w.author || (language === 'en' ? 'Author' : 'Penulis')}
                         </span>
                       )}
                     </div>
@@ -338,9 +340,9 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                     )}
 
                     <div className="flex items-center gap-3 text-[10px] font-mono text-slate-400 pt-1">
-                      <span>🎴 {w.cards ? w.cards.length : 0} kartu</span>
+                      <span>🎴 {w.cards ? w.cards.length : 0} {t.library.cards}</span>
                       <span>•</span>
-                      <span>🔗 {w.connections ? w.connections.length : 0} relasi</span>
+                      <span>🔗 {w.connections ? w.connections.length : 0} {t.cardReader.connections}</span>
                     </div>
                   </div>
 
@@ -354,7 +356,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                           handleStartEdit(w);
                         }}
                         className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
-                        title="Edit Info Workspace"
+                        title={t.worldManager.editWorld}
                       >
                         <Icons.Edit3 size={13} />
                       </button>
@@ -366,7 +368,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                           onDuplicateWorld(w.id);
                         }}
                         className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
-                        title="Duplikat Workspace"
+                        title={t.worldManager.duplicateWorld}
                       >
                         <Icons.Copy size={13} />
                       </button>
@@ -378,7 +380,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                           downloadProjectJson(w);
                         }}
                         className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
-                        title="Ekspor File JSON"
+                        title={t.worldManager.exportJson}
                       >
                         <Icons.Download size={13} />
                       </button>
@@ -391,7 +393,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
                             onDeleteWorld(w.id);
                           }}
                           className="p-1 rounded text-rose-400 hover:text-rose-300 hover:bg-rose-500/15 transition-colors cursor-pointer"
-                          title="Hapus Workspace"
+                          title={t.worldManager.deleteWorld}
                         >
                           <Icons.Trash2 size={13} />
                         </button>
@@ -400,11 +402,11 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
 
                     {!isActive ? (
                       <span className="px-3 py-1 rounded-lg bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold transition-all shadow-xs">
-                        Buka
+                        {t.worldManager.openWorld}
                       </span>
                     ) : (
                       <span className="text-[10px] text-slate-400 font-semibold px-2 py-0.5 rounded bg-[#1e1e1e] border border-[#383838]">
-                        Sedang Dibuka
+                        {t.common.active}
                       </span>
                     )}
                   </div>

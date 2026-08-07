@@ -4,6 +4,7 @@ import { WorldCardNode } from './WorldCardNode';
 import { AddCardFromGalleryModal } from './AddCardFromGalleryModal';
 import { getBezierPath } from '../utils/helpers';
 import { loadCanvasViewport, saveCanvasViewport } from '../utils/storage';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 interface CanvasProps {
@@ -67,6 +68,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onUndo,
   onRedo,
 }) => {
+  const { language, t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
   const targetCanvasId = activeCanvasId || 'default';
   
@@ -1011,9 +1013,9 @@ export const Canvas: React.FC<CanvasProps> = ({
               alt="World Deck Logo"
               className="w-14 h-14 object-contain rounded-2xl shadow-md mx-auto"
             />
-            <h3 className="text-base font-bold app-text-main">Canvas Worldbuilding Masih Kosong</h3>
+            <h3 className="text-base font-bold app-text-main">{t.canvas.emptyCanvasTitle}</h3>
             <p className="text-xs app-text-muted leading-relaxed">
-              Mulailah membuat halaman kartu untuk karakter, faksi, lokasi, lore, item, atau peristiwa timeline.
+              {t.canvas.emptyCanvasDesc}
             </p>
             <button
               type="button"
@@ -1021,7 +1023,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               className="px-4 py-2 app-accent-bg text-white rounded-lg text-xs font-semibold shadow-md flex items-center justify-center gap-1.5 mx-auto"
             >
               <Icons.Plus size={15} />
-              <span>+ Buat Kartu Pertama</span>
+              <span>+ {t.canvas.addCard}</span>
             </button>
           </div>
         </div>
@@ -1041,7 +1043,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                   ? 'text-slate-300 hover:text-white hover:bg-[#383838] cursor-pointer active:scale-95'
                   : 'text-slate-600 opacity-40 cursor-not-allowed'
               }`}
-              title="Undo / Batal Perubahan (Ctrl + Z)"
+              title="Undo (Ctrl + Z)"
             >
               <Icons.Undo2 size={15} />
             </button>
@@ -1054,7 +1056,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                   ? 'text-slate-300 hover:text-white hover:bg-[#383838] cursor-pointer active:scale-95'
                   : 'text-slate-600 opacity-40 cursor-not-allowed'
               }`}
-              title="Redo / Ulangi Perubahan (Ctrl + Y)"
+              title="Redo (Ctrl + Y)"
             >
               <Icons.Redo2 size={15} />
             </button>
@@ -1086,7 +1088,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               ? 'bg-[#0d99ff] text-white shadow-sm font-bold'
               : 'text-slate-400 hover:text-white hover:bg-[#383838]'
           }`}
-          title="Pan Hand Tool (Spasi + Drag)"
+          title="Pan Hand Tool (Space + Drag)"
         >
           <Icons.Hand size={15} />
         </button>
@@ -1098,10 +1100,10 @@ export const Canvas: React.FC<CanvasProps> = ({
           type="button"
           onClick={() => onAddCardAtPosition(400, 300)}
           className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-[#383838] transition-all cursor-pointer flex items-center gap-1.5"
-          title="Tambah Kartu Baru"
+          title={t.canvas.addCard}
         >
           <Icons.Plus size={15} className="text-[#0d99ff]" />
-          <span className="hidden sm:inline text-xs font-semibold">Kartu</span>
+          <span className="hidden sm:inline text-xs font-semibold">{t.library.cards}</span>
         </button>
 
         <div className="w-[1px] h-4 bg-[#383838] mx-0.5" />
@@ -1111,11 +1113,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           type="button"
           onClick={handleCenterViewport}
           className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-[#383838] transition-all cursor-pointer flex items-center gap-1.5"
-          title={
-            selectedCardIds.length > 0 || selectedCardId
-              ? 'Tengahkan Viewport ke Kartu Terpilih'
-              : 'Tengahkan Viewport ke Seluruh Kartu Workspace'
-          }
+          title={t.sidebar.focusOnCanvas}
         >
           <Icons.Focus size={15} className="text-purple-400" />
           <span className="hidden sm:inline text-xs font-semibold">Focus</span>
@@ -1129,7 +1127,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             type="button"
             onClick={() => handleZoom(-0.15)}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
-            title="Zoom Out (-)"
+            title={t.canvas.zoomOut}
           >
             <Icons.ZoomOut size={14} />
           </button>
@@ -1140,7 +1138,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             type="button"
             onClick={() => handleZoom(0.15)}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
-            title="Zoom In (+)"
+            title={t.canvas.zoomIn}
           >
             <Icons.ZoomIn size={14} />
           </button>
@@ -1165,7 +1163,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             {isMultiSelectActive ? (
               <>
                 <div className="px-3 py-1.5 text-[10px] text-[#0d99ff] font-extrabold uppercase tracking-wider select-none flex items-center justify-between bg-[#0d99ff]/10">
-                  <span>{selectedCardIds.length} Kartu Terpilih</span>
+                  <span>{selectedCardIds.length} {t.library.cardsSelected}</span>
                 </div>
 
                 <div className="py-1 space-y-0.5">
@@ -1178,7 +1176,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
                   >
                     <Icons.Maximize size={14} />
-                    <span>Fokus ke Kartu Terpilih (Fit View)</span>
+                    <span>{t.sidebar.focusOnCanvas}</span>
                   </button>
 
                   <button
@@ -1193,7 +1191,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-amber-400 cursor-pointer"
                   >
                     <Icons.MinusCircle size={14} />
-                    <span>Lepas Semua Kartu dari Kanvas</span>
+                    <span>{t.sidebar.removeFromCanvas}</span>
                   </button>
 
                   <button
@@ -1206,7 +1204,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-rose-400 cursor-pointer"
                   >
                     <Icons.Trash2 size={14} />
-                    <span>Hapus Semua Kartu Permanen</span>
+                    <span>{t.sidebar.deletePermanently}</span>
                   </button>
                 </div>
 
@@ -1220,7 +1218,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-slate-400 font-medium cursor-pointer"
                   >
                     <Icons.XCircle size={14} />
-                    <span>Batal Pilih (Deselect)</span>
+                    <span>{t.library.clearSelection}</span>
                   </button>
                 </div>
               </>
@@ -1228,7 +1226,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               /* CASE 2: SINGLE CARD CONTEXT MENU */
               <>
                 <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
-                  📄 {clickedCard.title || 'Kartu Tanpa Judul'}
+                  📄 {clickedCard.title || t.common.untitled}
                 </div>
 
                 <div className="py-1 space-y-0.5">
@@ -1245,7 +1243,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
                   >
                     <Icons.Maximize2 size={14} />
-                    <span>Buka Kartu Fullscreen</span>
+                    <span>{t.library.openFullscreen}</span>
                   </button>
 
                   <button
@@ -1261,14 +1259,14 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-slate-200 cursor-pointer"
                   >
                     <Icons.Edit3 size={14} />
-                    <span>Edit Kartu</span>
+                    <span>{t.sidebar.editCard}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => {
                       onAddCardAtPosition(clickedCard.x + 40, clickedCard.y + 40, {
-                        title: `${clickedCard.title || 'Kartu'} (Salinan)`,
+                        title: `${clickedCard.title || t.library.cards} (${language === 'en' ? 'Copy' : 'Salinan'})`,
                         subtitle: clickedCard.subtitle,
                         category: clickedCard.category,
                         summary: clickedCard.summary,
@@ -1282,7 +1280,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
                   >
                     <Icons.Copy size={14} />
-                    <span>Duplikat Kartu</span>
+                    <span>{t.sidebar.duplicateCanvas.replace('Canvas', 'Card')}</span>
                   </button>
 
                   <button
@@ -1295,7 +1293,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-purple-400 cursor-pointer"
                   >
                     <Icons.GitCommit size={14} />
-                    <span>Tarik Garis Hubungan</span>
+                    <span>{t.canvas.connectMode}</span>
                   </button>
                 </div>
 
@@ -1311,7 +1309,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-amber-400 font-medium cursor-pointer"
                   >
                     <Icons.MinusCircle size={14} />
-                    <span>Lepas dari Kanvas</span>
+                    <span>{t.sidebar.removeFromCanvas}</span>
                   </button>
 
                   <button
@@ -1323,7 +1321,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
                   >
                     <Icons.Trash2 size={14} />
-                    <span>Hapus Kartu Permanen</span>
+                    <span>{t.sidebar.deletePermanently}</span>
                   </button>
                 </div>
               </>
@@ -1340,7 +1338,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
                   >
                     <Icons.Plus size={14} strokeWidth={2.5} />
-                    <span>Tambah Kartu Baru</span>
+                    <span>{t.sidebar.createNewCard}</span>
                   </button>
 
                   <button
@@ -1353,7 +1351,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-[#0d99ff] cursor-pointer"
                   >
                     <Icons.FolderPlus size={14} strokeWidth={2.5} />
-                    <span>Tambah Kartu dari Galeri</span>
+                    <span>{t.library.addCardToCanvas}</span>
                   </button>
                 </div>
 
@@ -1367,7 +1365,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-slate-200 cursor-pointer font-medium"
                   >
                     <Icons.Maximize size={14} className="text-[#0d99ff]" />
-                    <span>Fokus Semua Kartu (Fit View)</span>
+                    <span>{t.sidebar.focusOnCanvas}</span>
                   </button>
 
                   <button
@@ -1379,7 +1377,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-slate-200 cursor-pointer font-medium"
                   >
                     <Icons.RotateCcw size={14} className="text-amber-400" />
-                    <span>Reset Zoom (100%)</span>
+                    <span>{t.canvas.resetZoom} (100%)</span>
                   </button>
 
                   <button
@@ -1391,7 +1389,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-slate-200 cursor-pointer font-medium"
                   >
                     <Icons.Focus size={14} className="app-text-muted" />
-                    <span>Tengahkan Layar</span>
+                    <span>{t.sidebar.focusOnCanvas}</span>
                   </button>
 
                   <button
@@ -1403,7 +1401,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-slate-200 cursor-pointer font-medium"
                   >
                     <Icons.Hand size={14} className="app-text-muted" />
-                    <span>{isSpacePressed ? 'Matikan Mode Pan' : 'Aktifkan Mode Pan'}</span>
+                    <span>{isSpacePressed ? (language === 'en' ? 'Disable Pan Mode' : 'Matikan Mode Pan') : (language === 'en' ? 'Enable Pan Mode' : 'Aktifkan Mode Pan')}</span>
                   </button>
                 </div>
               </>

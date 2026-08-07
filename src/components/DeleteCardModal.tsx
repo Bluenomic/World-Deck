@@ -1,5 +1,6 @@
 import React from 'react';
 import type { WorldCard } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 interface DeleteCardModalProps {
@@ -17,6 +18,7 @@ export const DeleteCardModal: React.FC<DeleteCardModalProps> = ({
   onRemoveFromCanvas,
   onPermanentDelete,
 }) => {
+  const { language, t, getCategoryLabel } = useLanguage();
   const count = cardsToDelete.length;
   const hasCanvasCards = cardsToDelete.some((c) => !!c.canvasId);
 
@@ -64,10 +66,10 @@ export const DeleteCardModal: React.FC<DeleteCardModalProps> = ({
           </div>
           <div>
             <h3 className="text-base font-bold app-text-main">
-              Opsi Penghapusan Kartu ({count})
+              {language === 'en' ? `Card Deletion Options (${count})` : `Opsi Penghapusan Kartu (${count})`}
             </h3>
             <p className="text-xs app-text-muted">
-              Pilih tingkat penghapusan yang ingin Anda terapkan.
+              {language === 'en' ? 'Select the level of deletion you want to apply.' : 'Pilih tingkat penghapusan yang ingin Anda terapkan.'}
             </p>
           </div>
         </div>
@@ -82,14 +84,14 @@ export const DeleteCardModal: React.FC<DeleteCardModalProps> = ({
               >
                 <div className="flex items-center gap-2 truncate pr-2">
                   <span className="font-semibold app-text-main truncate">
-                    {card.title || 'Kartu Tanpa Judul'}
+                    {card.title || t.common.untitled}
                   </span>
                   {card.subtitle && (
                     <span className="text-[10px] app-text-muted truncate">({card.subtitle})</span>
                   )}
                 </div>
                 <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-mono app-accent-bg text-white shrink-0">
-                  {card.category}
+                  {getCategoryLabel(card.category)}
                 </span>
               </div>
             ))}
@@ -113,17 +115,19 @@ export const DeleteCardModal: React.FC<DeleteCardModalProps> = ({
               <div className="flex-1">
                 <h4 className="text-xs font-bold app-text-main group-hover:text-amber-400 transition-colors flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <span>Lepas dari Kanvas Ini Saja</span>
+                    <span>{t.sidebar.removeFromCanvas}</span>
                     <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
-                      Tekan Enter ↵
+                      {language === 'en' ? 'Press Enter ↵' : 'Tekan Enter ↵'}
                     </span>
                   </span>
                   <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                    Disimpan di Galeri
+                    {language === 'en' ? 'Kept in Library' : 'Disimpan di Galeri'}
                   </span>
                 </h4>
                 <p className="text-[11px] app-text-muted mt-0.5">
-                  Kartu dilepas dari tampilan kanvas aktif ini, namun tetap utuh tersimpan di Galeri proyek.
+                  {language === 'en'
+                    ? 'Card is removed from active canvas view, but remains safely stored in project Library.'
+                    : 'Kartu dilepas dari tampilan kanvas aktif ini, namun tetap utuh tersimpan di Galeri proyek.'}
                 </p>
               </div>
             </button>
@@ -142,13 +146,15 @@ export const DeleteCardModal: React.FC<DeleteCardModalProps> = ({
             </div>
             <div className="flex-1">
               <h4 className="text-xs font-bold app-text-main group-hover:text-rose-400 transition-colors flex items-center justify-between">
-                <span>Hapus Permanen dari Proyek</span>
+                <span>{t.sidebar.deletePermanently}</span>
                 <span className="text-[10px] font-semibold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30">
-                  Hapus Total
+                  {language === 'en' ? 'Total Delete' : 'Hapus Total'}
                 </span>
               </h4>
               <p className="text-[11px] app-text-muted mt-0.5">
-                Kartu dan seluruh relasi koneksi terkait akan dihapus permanen dari Galeri & seluruh proyek.
+                {language === 'en'
+                  ? 'Card and all related connections will be permanently deleted from Library & entire project.'
+                  : 'Kartu dan seluruh relasi koneksi terkait akan dihapus permanen dari Galeri & seluruh proyek.'}
               </p>
             </div>
           </button>
@@ -161,7 +167,7 @@ export const DeleteCardModal: React.FC<DeleteCardModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 rounded-xl text-xs font-semibold app-text-muted hover:app-text-main app-bg-main border app-border transition-colors cursor-pointer"
           >
-            Batal
+            {t.common.cancel}
           </button>
         </div>
       </div>

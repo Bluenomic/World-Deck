@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { WorldCard, CardConnection, TimelineBranch } from '../types';
 import { generateId } from '../utils/helpers';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 import { TimelineDeleteModal } from './TimelineDeleteModal';
 import type { TimelineDeleteTarget } from './TimelineDeleteModal';
@@ -97,6 +98,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   onCardClick,
   activeWorldId = 'default',
 }) => {
+  const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
   const storageKey = `worlddeck_timeline_v4_${activeWorldId}`;
 
@@ -107,7 +109,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       if (saved) return JSON.parse(saved);
     } catch (e) {}
     return [
-      { id: 'track_main', name: 'GARIS WAKTU UTAMA', order: 0 },
+      { id: 'track_main', name: t.timeline.mainTimeline, order: 0 },
     ];
   });
 
@@ -173,7 +175,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       description,
       isAlertOnly: true,
       variant: 'warning',
-      confirmLabel: 'Mengerti',
+      confirmLabel: t.common.understood,
       onConfirm: () => setNoticeModal(null),
     });
   };
@@ -270,6 +272,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const getTrackCenterY = (trackId: string, viewportHeight: number) => {
     const trackRelY = relativeYMap[trackId] ?? 0;
     return viewportHeight / 2 + scrollY + (trackRelY - stackCenter);
+  };
+
+  const getTrackName = (track: TimelineTrack) => {
+    if (track.id === 'track_main' || track.name === 'GARIS WAKTU UTAMA' || track.name === 'MAIN TIMELINE') {
+      return t.timeline.mainTimeline;
+    }
+    return track.name;
   };
 
   // Global Window Mouse Move & Mouse Up Listener for Dragging Nodes Smoothly
@@ -454,15 +463,15 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       return;
     }
 
-    let label = 'Percabangan Waktu';
+    let label = t.timeline.timeBranch;
     if (draftBranch.sourceTrackId === targetTrackId) {
       if (targetX < draftBranch.sourceX) {
-        label = 'Loop Waktu (Masa Lalu)';
+        label = t.timeline.timeLoopPast;
       } else {
-        label = 'Lompatan Masa Depan';
+        label = t.timeline.futureJump;
       }
     } else {
-      label = 'Garis Waktu Alternatif';
+      label = t.timeline.altTimeline;
     }
 
     const newBranch: TimelineBranch = {
@@ -486,8 +495,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       setDeleteTarget({
         type: 'branch',
         id: branchToDelete.id,
-        title: branchToDelete.label || 'Percabangan Waktu',
-        subtitle: 'Hubungan Waktu',
+        title: branchToDelete.label || t.timeline.timeBranch,
+        subtitle: t.timeline.timeConnection,
       });
     }
   };
@@ -505,7 +514,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const handleSaveBranchModal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingBranch) return;
-    const cleanLabel = tempBranchLabel.trim() || 'Percabangan Waktu';
+    const cleanLabel = tempBranchLabel.trim() || t.timeline.timeBranch;
     setBranches((prev) =>
       prev.map((b) => (b.id === editingBranch.id ? { ...b, label: cleanLabel } : b))
     );
@@ -586,7 +595,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         type: 'node',
         id: nodeToDelete.id,
         title: nodeToDelete.title,
-        subtitle: nodeToDelete.dateLabel || 'Kejadian Waktu',
+        subtitle: nodeToDelete.dateLabel || t.timeline.timeEvent,
       });
     }
   };
@@ -619,7 +628,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const handleAddParallelTrack = (orderPos: number) => {
     setEditingTrack(null);
     setNewTrackOrderPosition(orderPos);
-    setTempTrackName(`GARIS WAKTU PARALEL ${tracks.length}`);
+    setTempTrackName(`${t.timeline.parallelTimeline} ${tracks.length}`);
     setShowTrackModal(true);
   };
 
@@ -627,11 +636,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const handleDeleteTrack = (trackId: string) => {
     const trackToDelete = tracks.find((t) => t.id === trackId);
     if (!trackToDelete || isMainTrack(trackToDelete)) {
-      showNotice('Garis Waktu Dilindungi', 'Garis waktu utama dilindungi dan tidak dapat dihapus.');
+      showNotice(t.timeline.protectedTitle, t.timeline.protectedDesc);
       return;
     }
     if (tracks.length <= 1) {
-      showNotice('Garis Waktu Terakhir', 'Tidak dapat menghapus garis waktu terakhir.');
+      showNotice(t.timeline.lastTimelineTitle, t.timeline.lastTimelineDesc);
       return;
     }
 
@@ -639,8 +648,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     setDeleteTarget({
       type: 'track',
       id: trackToDelete.id,
-      title: trackToDelete.name,
-      subtitle: 'Garis Waktu Paralel',
+      title: getTrackName(trackToDelete),
+      subtitle: t.timeline.parallelTimeline,
       itemCount: count,
     });
   };
@@ -648,7 +657,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   // Save Track Name or New Track
   const handleSaveTrackModal = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanName = tempTrackName.trim().toUpperCase() || 'GARIS WAKTU PARALEL';
+    const cleanName = tempTrackName.trim().toUpperCase() || t.timeline.parallelTimeline;
 
     if (editingTrack) {
       setTracks((prev) => prev.map((t) => (t.id === editingTrack.id ? { ...t, name: cleanName } : t)));
@@ -668,8 +677,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const handleClearAll = () => {
     setDeleteTarget({
       type: 'clear_all',
-      title: 'Seluruh Kejadian Garis Waktu',
-      subtitle: 'Pembersihan Total',
+      title: t.timeline.allTimelineEvents,
+      subtitle: t.timeline.totalClear,
       itemCount: nodes.length,
     });
   };
@@ -731,7 +740,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           {draftBranch && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-cyan-900/90 border border-cyan-500/60 text-cyan-100 px-4 py-2 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3 text-xs font-semibold animate-in zoom-in-95 duration-200 pointer-events-auto">
               <Icons.GitBranch size={16} className="text-cyan-300 animate-pulse" />
-              <span>Modus Percabangan: Klik titik/garis tujuan untuk menyambungkan (Esc untuk batal)</span>
+              <span>{t.timeline.branchModeBanner}</span>
               <button
                 type="button"
                 onClick={() => setDraftBranch(null)}
@@ -779,11 +788,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 >
                   {isMain ? (
                     <span className="px-2.5 py-1 rounded-lg app-bg-secondary border border-[var(--accent)] text-[10px] font-mono font-bold app-accent-text shadow-md backdrop-blur-xs uppercase tracking-wider">
-                      [UTAMA] {track.name}
+                      {t.timeline.mainTag} {getTrackName(track)}
                     </span>
                   ) : (
                     <span className="px-2.5 py-1 rounded-lg app-bg-secondary border app-border text-[10px] font-mono font-bold app-text-main shadow-sm backdrop-blur-xs uppercase tracking-wider">
-                      {track.name}
+                      {getTrackName(track)}
                     </span>
                   )}
                 </div>
@@ -955,7 +964,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                           textAnchor="middle"
                           className="uppercase select-none font-mono"
                         >
-                          {track.name}
+                          {getTrackName(track)}
                         </text>
                       );
                     })}
@@ -983,7 +992,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               <button
                 type="button"
                 className="w-8 h-8 rounded-full app-bg-secondary hover:app-accent-bg app-text-main hover:text-white border app-border flex items-center justify-center shadow-lg hover:scale-125 active:scale-95 transition-all ring-4 ring-[var(--accent)]/20 cursor-pointer"
-                title="Klik untuk menambah kejadian di posisi ini"
+                title={t.timeline.addEventTooltip}
               >
                 <Icons.Plus size={18} />
               </button>
@@ -1048,7 +1057,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                         ? 'app-bg-main border-2 border-[var(--accent)] ring-2 ring-[var(--accent)]/30 hover:scale-125'
                         : 'app-bg-secondary border-2 border-[var(--border-light)] hover:border-[var(--accent)] hover:scale-125 hover:ring-4 hover:ring-[var(--accent)]/30'
                     }`}
-                    title="Klik untuk memilih, double-click untuk membuka detail, drag untuk menggeser"
+                    title={t.timeline.nodeTooltip}
                   >
                     <div
                       className={`w-3 h-3 rounded-full pointer-events-none ${
@@ -1078,12 +1087,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     style={{
                       top: isUpper ? `-${stemHeight + 10}px` : `${stemHeight + 10}px`,
                     }}
-                    title="Double-click untuk membuka detail kejadian"
+                    title={t.timeline.nodeCardTooltip}
                   >
                     {/* Header Label */}
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded app-bg-main app-text-muted border app-border truncate">
-                        {node.dateLabel || 'Kejadian'}
+                        {node.dateLabel || t.timeline.eventDefaultTag}
                       </span>
                     </div>
 
@@ -1111,7 +1120,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                           setShowNodeModal(true);
                         }}
                         className="p-1 rounded-md app-text-muted hover:app-text-main hover:app-bg-hover transition-colors"
-                        title="Edit Kejadian"
+                        title={t.timeline.editEvent}
                       >
                         <Icons.Edit2 size={12} />
                       </button>
@@ -1122,7 +1131,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                           handleDeleteNode(node.id);
                         }}
                         className="p-1 rounded-md text-rose-500 hover:bg-rose-500/10 transition-colors"
-                        title="Hapus Kejadian"
+                        title={t.timeline.deleteEvent}
                       >
                         <Icons.Trash2 size={12} />
                       </button>
@@ -1143,7 +1152,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             {contextMenu.selectedBranch ? (
               <>
                 <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
-                  🔀 {contextMenu.selectedBranch.label || 'Percabangan'}
+                  🔀 {contextMenu.selectedBranch.label || t.timeline.timeBranch}
                 </div>
 
                 <div className="py-1">
@@ -1151,14 +1160,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     type="button"
                     onClick={() => {
                       setEditingBranch(contextMenu.selectedBranch!);
-                      setTempBranchLabel(contextMenu.selectedBranch!.label || 'Percabangan Waktu');
+                      setTempBranchLabel(contextMenu.selectedBranch!.label || t.timeline.timeBranch);
                       setShowBranchModal(true);
                       setContextMenu(null);
                     }}
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
                   >
                     <Icons.Edit3 size={14} />
-                    <span>Ubah Nama Percabangan</span>
+                    <span>{t.timeline.renameBranch}</span>
                   </button>
                 </div>
 
@@ -1172,14 +1181,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
                   >
                     <Icons.Trash2 size={14} />
-                    <span>Hapus Percabangan Waktu</span>
+                    <span>{t.timeline.deleteTimeBranch}</span>
                   </button>
                 </div>
               </>
             ) : contextMenu.targetTrack ? (
               <>
                 <div className="px-3 py-1.5 text-[10px] app-text-muted font-bold uppercase tracking-wider select-none truncate">
-                  🕒 {contextMenu.targetTrack.name}
+                  🕒 {getTrackName(contextMenu.targetTrack)}
                 </div>
 
                 {/* Branching Actions */}
@@ -1198,7 +1207,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-blue-400 cursor-pointer"
                     >
                       <Icons.GitCommit size={14} />
-                      <span>Sambungkan Percabangan Di Sini</span>
+                      <span>{t.timeline.connectBranchHere}</span>
                     </button>
 
                     <button
@@ -1210,7 +1219,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors app-text-muted font-medium cursor-pointer"
                     >
                       <Icons.X size={14} />
-                      <span>Batal Buat Percabangan</span>
+                      <span>{t.timeline.cancelBranching}</span>
                     </button>
                   </div>
                 ) : (
@@ -1228,7 +1237,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
                     >
                       <Icons.GitBranch size={14} />
-                      <span>Buat Percabangan Waktu</span>
+                      <span>{t.timeline.createTimeBranch}</span>
                     </button>
                   </div>
                 )}
@@ -1245,7 +1254,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold app-text-main cursor-pointer"
                   >
                     <Icons.Edit3 size={14} />
-                    <span>Ubah Nama ({contextMenu.targetTrack.name})</span>
+                    <span>{t.timeline.rename} ({getTrackName(contextMenu.targetTrack)})</span>
                   </button>
                 </div>
 
@@ -1260,7 +1269,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
                   >
                     <Icons.Plus size={14} />
-                    <span>+ Garis Waktu Paralel di Atas</span>
+                    <span>{t.timeline.addParallelAbove}</span>
                   </button>
 
                   <button
@@ -1273,7 +1282,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
                   >
                     <Icons.Plus size={14} />
-                    <span>+ Garis Waktu Paralel di Bawah</span>
+                    <span>{t.timeline.addParallelBelow}</span>
                   </button>
                 </div>
 
@@ -1288,7 +1297,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-rose-500 font-medium cursor-pointer"
                     >
                       <Icons.Trash2 size={14} />
-                      <span>Hapus Garis Waktu ({contextMenu.targetTrack.name})</span>
+                      <span>{t.timeline.deleteTimeline} ({getTrackName(contextMenu.targetTrack)})</span>
                     </button>
                   </div>
                 )}
@@ -1296,7 +1305,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             ) : (
               <>
                 <div className="px-3 py-1.5 text-[10px] app-text-muted font-semibold uppercase tracking-wider select-none">
-                  Aksi Timeline
+                  {t.timeline.timelineActions}
                 </div>
 
                 <div className="py-1">
@@ -1312,7 +1321,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   >
                     <Icons.Plus size={14} />
                     <span>
-                      + Buat Garis Waktu Paralel ({contextMenu.isAbove ? 'di Atas' : 'di Bawah'})
+                      {contextMenu.isAbove ? t.timeline.createParallelAbove : t.timeline.createParallelBelow}
                     </span>
                   </button>
                 </div>
@@ -1327,7 +1336,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             <div className="p-4 border-b app-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Icons.Clock size={16} className="app-accent-text" />
-                <h3 className="text-xs font-bold uppercase tracking-wider app-text-main">Detail Kejadian</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider app-text-main">{t.timeline.eventDetails}</h3>
               </div>
               <button
                 type="button"
@@ -1341,7 +1350,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider app-text-muted app-bg-main px-2 py-0.5 rounded border app-border">
-                  {readerNode.dateLabel || 'Garis Waktu'}
+                  {readerNode.dateLabel || t.timeline.mainTrack}
                 </span>
                 <h2 className="text-base font-bold app-text-main mt-2 leading-tight">
                   {readerNode.title}
@@ -1357,7 +1366,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               {/* Linked Card Information */}
               <div>
                 <h4 className="text-[11px] font-bold app-text-muted uppercase tracking-wider mb-2">
-                  Kartu Database Terhubung
+                  {t.timeline.linkedCardHeader}
                 </h4>
                 {linkedCardForReader ? (
                   <div
@@ -1376,7 +1385,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   </div>
                 ) : (
                   <div className="p-3 rounded-xl app-bg-main border app-border text-center app-text-muted text-xs">
-                    Belum ada kartu terhubung.
+                    {t.timeline.noLinkedCard}
                   </div>
                 )}
               </div>
@@ -1394,7 +1403,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 className="flex-1 py-2 rounded-xl app-bg-main border app-border hover:app-bg-hover text-xs font-semibold app-text-main flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
               >
                 <Icons.Edit2 size={13} />
-                <span>Edit Kejadian</span>
+                <span>{t.timeline.editEvent}</span>
               </button>
               <button
                 type="button"
@@ -1428,7 +1437,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             <div className="flex items-center justify-between mb-4 border-b app-border pb-3">
               <h3 className="text-sm font-bold flex items-center gap-2 app-text-main">
                 <Icons.Edit3 size={16} className="app-text-muted" />
-                <span>{editingTrack ? 'Ubah Nama Garis Waktu' : 'Garis Waktu Paralel Baru'}</span>
+                <span>{editingTrack ? t.timeline.renameTimelineTitle : t.timeline.newParallelTimelineTitle}</span>
               </h3>
               <button
                 type="button"
@@ -1446,12 +1455,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             <form onSubmit={handleSaveTrackModal} className="space-y-3 text-xs">
               <div>
                 <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">
-                  Nama Garis Waktu
+                  {t.timeline.timelineNameLabel}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: KERAJAAN UTARA, KISAH HERO..."
+                  placeholder={t.timeline.timelineNamePlaceholder}
                   value={tempTrackName}
                   onChange={(e) => setTempTrackName(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] font-mono text-xs uppercase"
@@ -1468,13 +1477,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   }}
                   className="px-4 py-2 rounded-xl app-bg-main app-text-main border app-border font-semibold hover:app-bg-hover transition-colors"
                 >
-                  Batal
+                  {t.common.cancel}
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 rounded-xl app-accent-bg text-white font-bold hover:opacity-90 cursor-pointer transition-all shadow-md"
                 >
-                  Simpan
+                  {t.common.save}
                 </button>
               </div>
             </form>
@@ -1489,7 +1498,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             <div className="flex items-center justify-between mb-4 border-b app-border pb-3">
               <h3 className="text-sm font-bold flex items-center gap-2 app-text-main">
                 <Icons.GitBranch size={16} className="app-text-muted" />
-                <span>Ubah Nama Percabangan Waktu</span>
+                <span>{t.timeline.renameBranchTitle}</span>
               </h3>
               <button
                 type="button"
@@ -1506,12 +1515,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             <form onSubmit={handleSaveBranchModal} className="space-y-3 text-xs">
               <div>
                 <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">
-                  Nama / Label Percabangan
+                  {t.timeline.branchLabel}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Loop Masa Lalu, Timeline Alternatif Alpha..."
+                  placeholder={t.timeline.branchLabelPlaceholder}
                   value={tempBranchLabel}
                   onChange={(e) => setTempBranchLabel(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] font-mono text-xs"
@@ -1527,13 +1536,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   }}
                   className="px-4 py-2 rounded-xl app-bg-main app-text-main border app-border font-semibold hover:app-bg-hover transition-colors"
                 >
-                  Batal
+                  {t.common.cancel}
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 rounded-xl app-accent-bg text-white font-bold hover:opacity-90 cursor-pointer transition-all shadow-md"
                 >
-                  Simpan
+                  {t.common.save}
                 </button>
               </div>
             </form>
@@ -1565,6 +1574,7 @@ const SimpleNodeModal: React.FC<{
   onSave: (data: { title: string; dateLabel?: string; description?: string; cardId?: string }) => void;
   onClose: () => void;
 }> = ({ node, cards, onSave, onClose }) => {
+  const { t, getCategoryLabel } = useLanguage();
   const [title, setTitle] = useState(node?.title || '');
   const [dateLabel, setDateLabel] = useState(node?.dateLabel || '');
   const [description, setDescription] = useState(node?.description || '');
@@ -1575,7 +1585,7 @@ const SimpleNodeModal: React.FC<{
     if (!title.trim()) return;
     onSave({
       title: title.trim(),
-      dateLabel: dateLabel.trim() || 'Masa Bebas',
+      dateLabel: dateLabel.trim() || t.timeline.defaultEra,
       description: description.trim(),
       cardId: cardId || undefined,
     });
@@ -1587,7 +1597,7 @@ const SimpleNodeModal: React.FC<{
         <div className="flex items-center justify-between mb-4 border-b app-border pb-3">
           <h3 className="text-sm font-bold flex items-center gap-2 app-text-main">
             <Icons.Clock size={16} className="app-accent-text" />
-            <span>{node ? 'Ubah Kejadian Waktu' : 'Tambah Kejadian Baru'}</span>
+            <span>{node ? t.timeline.editEventTitle : t.timeline.addEventTitle}</span>
           </h3>
           <button type="button" onClick={onClose} className="p-1 rounded-lg app-text-muted hover:app-text-main hover:app-bg-hover">
             <Icons.X size={16} />
@@ -1596,11 +1606,11 @@ const SimpleNodeModal: React.FC<{
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           <div>
-            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">Judul Peristiwa / Kejadian</label>
+            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">{t.timeline.eventTitleLabel}</label>
             <input
               type="text"
               required
-              placeholder="Contoh: Perang Saudara / Penemuan Sihir..."
+              placeholder={t.timeline.eventTitlePlaceholder}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] font-medium"
@@ -1608,10 +1618,10 @@ const SimpleNodeModal: React.FC<{
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">Penanda Waktu / Era (Bebas / Relatif)</label>
+            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">{t.timeline.timeMarkerLabel}</label>
             <input
               type="text"
-              placeholder="Contoh: Era Kegelapan, 50 Thn Pasca Perang..."
+              placeholder={t.timeline.timeMarkerPlaceholder}
               value={dateLabel}
               onChange={(e) => setDateLabel(e.target.value)}
               className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)]"
@@ -1619,26 +1629,26 @@ const SimpleNodeModal: React.FC<{
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">Hubungkan ke Kartu (Opsional)</label>
+            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">{t.timeline.linkCardLabel}</label>
             <select
               value={cardId}
               onChange={(e) => setCardId(e.target.value)}
               className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)]"
             >
-              <option value="">-- Tidak Ada Kartu --</option>
+              <option value="">{t.timeline.noCardOption}</option>
               {cards.map((c) => (
                 <option key={c.id} value={c.id}>
-                  [{c.category}] {c.title}
+                  [{getCategoryLabel(c.category)}] {c.title || t.common.untitled}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">Deskripsi Ringkas</label>
+            <label className="block text-[11px] font-bold app-text-muted uppercase mb-1">{t.timeline.briefDescLabel}</label>
             <textarea
               rows={3}
-              placeholder="Penjelasan ringkas mengenai peristiwa ini..."
+              placeholder={t.timeline.briefDescPlaceholder}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3 py-2 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] resize-none"
@@ -1651,14 +1661,14 @@ const SimpleNodeModal: React.FC<{
               onClick={onClose}
               className="px-4 py-2 rounded-xl app-bg-main app-text-main border app-border font-semibold hover:app-bg-hover transition-colors"
             >
-              Batal
+              {t.common.cancel}
             </button>
             <button
               type="button"
               onClick={handleSubmit}
               className="px-4 py-2 rounded-xl app-accent-bg text-white font-bold hover:opacity-90 cursor-pointer transition-all shadow-md"
             >
-              Simpan Kejadian
+              {t.timeline.saveEvent}
             </button>
           </div>
         </form>

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 export interface ConfirmModalConfig {
@@ -19,6 +20,7 @@ interface ConfirmModalProps {
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({ config, onClose }) => {
+  const { language, t } = useLanguage();
   useEffect(() => {
     if (!config || !config.isOpen) return;
 
@@ -103,7 +105,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({ config, onClose }) =
               }}
               className="px-4 py-2 rounded-xl text-xs font-semibold app-text-muted hover:app-text-main app-bg-main border app-border transition-colors cursor-pointer"
             >
-              {config.cancelLabel || 'Batal'}
+              {config.cancelLabel || t.common.cancel}
             </button>
           )}
 
@@ -115,7 +117,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({ config, onClose }) =
             }}
             className={`px-5 py-2 rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 ${iconConfig.btn}`}
           >
-            <span>{config.confirmLabel || (isAlert ? 'Mengerti' : 'Konfirmasi')}</span>
+            <span>{config.confirmLabel || (isAlert ? (language === 'en' ? 'Got it' : 'Mengerti') : (language === 'en' ? 'Confirm' : 'Konfirmasi'))}</span>
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { WorldCard, CardConnection, WorldDeck } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import { parseMentions } from '../utils/helpers';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 interface CardReaderSidebarProps {
@@ -27,6 +28,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
   onSelectCard,
   initialFullPage = false,
 }) => {
+  const { language, t, getCategoryLabel } = useLanguage();
   const [isExpanded, setIsExpanded] = useState<boolean>(initialFullPage);
   const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
   const [displayedCard, setDisplayedCard] = useState<WorldCard | null>(card);
@@ -102,7 +104,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
   // Format date helper
   const formatDate = (timestamp?: number) => {
     if (!timestamp) return '-';
-    return new Date(timestamp).toLocaleDateString('id-ID', {
+    return new Date(timestamp).toLocaleDateString(language === 'en' ? 'en-US' : 'id-ID', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -117,7 +119,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
       <div className={`flex flex-col md:flex-row gap-5 items-start justify-between ${getStaggerClass(2)}`}>
         <div className="flex-1 space-y-2.5">
           <h1 className="text-2xl font-extrabold app-text-main leading-tight tracking-tight">
-            {activeCard.title || 'Kartu Tanpa Judul'}
+            {activeCard.title || t.common.untitled}
           </h1>
 
           {activeCard.subtitle && (
@@ -133,7 +135,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
             </p>
           ) : (
             <p className="text-xs app-text-muted italic">
-              Belum ada ringkasan intro untuk kartu ini...
+              {t.cardReader.noSummary}
             </p>
           )}
         </div>
@@ -146,7 +148,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
               setPreviewImageIndex(idx !== -1 ? idx : 0);
             }}
             className="w-full md:w-36 h-48 rounded-xl overflow-hidden border app-border shadow-lg shrink-0 relative bg-slate-900/40 cursor-zoom-in group/img transition-transform hover:scale-[1.02]"
-            title="Klik untuk memperbesar gambar"
+            title={t.cardReader.zoomImage}
           >
             <img
               src={activeCard.imageUrl}
@@ -156,7 +158,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
             />
             <div className="absolute inset-0 bg-black/35 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-bold gap-1">
               <Icons.ZoomIn size={14} />
-              <span>Perbesar</span>
+              <span>{t.cardReader.zoomImage}</span>
             </div>
           </div>
         )}
@@ -167,7 +169,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
         <div className={`space-y-2 ${getStaggerClass(3)}`}>
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
             <Icons.Sliders size={14} />
-            <span>Atribut & Properti Utama</span>
+            <span>{t.cardReader.attributes}</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1.5 py-1">
@@ -189,7 +191,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
         <div className={`space-y-2.5 pt-2 border-t app-border ${getStaggerClass(4)}`}>
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
             <Icons.BookOpen size={14} />
-            <span>Catatan Lengkap & Detail Lore</span>
+            <span>{t.cardReader.content}</span>
           </div>
 
           <div className="text-xs app-text-main leading-relaxed whitespace-pre-wrap font-sans space-y-2 py-1">
@@ -217,7 +219,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
         <div className={`space-y-2 pt-2 border-t app-border ${getStaggerClass(4)}`}>
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
             <Icons.Tag size={14} />
-            <span>Tags</span>
+            <span>{t.common.tags}</span>
           </div>
 
           <div className="flex flex-wrap gap-1.5">
@@ -239,7 +241,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
               <Icons.GitCommit size={14} />
-              <span>Relasi & Hubungan ({relatedConnections.length})</span>
+              <span>{t.cardReader.connections} ({relatedConnections.length})</span>
             </div>
           </div>
 
@@ -260,10 +262,10 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded app-bg-main app-accent-text border app-border shrink-0">
-                      {conn.label || (isSource ? 'Menuju' : 'Berasal Dari')}
+                      {conn.label || (isSource ? (language === 'en' ? 'To' : 'Menuju') : (language === 'en' ? 'From' : 'Berasal Dari'))}
                     </span>
                     <span className="text-xs font-bold app-text-main truncate group-hover:text-blue-400 transition-colors">
-                      {otherCard.title || 'Kartu Tanpa Judul'}
+                      {otherCard.title || t.common.untitled}
                     </span>
                   </div>
 
@@ -274,7 +276,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
                       color: otherCfg.color,
                     }}
                   >
-                    {otherCfg.label}
+                    {getCategoryLabel(otherCard.category)}
                   </div>
                 </div>
               );
@@ -289,7 +291,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider app-accent-text">
               <Icons.Image size={14} />
-              <span>Galeri Gambar ({cardImages.length})</span>
+              <span>{t.cardReader.imageGallery} ({cardImages.length})</span>
             </div>
           </div>
 
@@ -322,8 +324,8 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
 
       {/* Section 7: Metadata & Timestamps */}
       <div className={`pt-4 border-t app-border text-[11px] app-text-muted flex items-center justify-between font-mono ${getStaggerClass(4)}`}>
-        <span>Dibuat: {formatDate(activeCard.createdAt)}</span>
-        <span>Diperbarui: {formatDate(activeCard.updatedAt)}</span>
+        <span>{t.common.created}: {formatDate(activeCard.createdAt)}</span>
+        <span>{t.common.updated}: {formatDate(activeCard.updatedAt)}</span>
       </div>
     </div>
   );
@@ -336,7 +338,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
           style={{ color: cfg.color }}
         >
           <IconComp size={14} />
-          <span>{cfg.label}</span>
+          <span>{getCategoryLabel(activeCard.category)}</span>
         </div>
 
         {assignedDeck && (
@@ -361,14 +363,14 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
           className="px-3 py-1.5 rounded-xl app-accent-bg text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
         >
           <Icons.Edit3 size={13} />
-          <span>Edit Kartu</span>
+          <span>{t.sidebar.editCard}</span>
         </button>
 
         <button
           type="button"
           onClick={() => setIsExpanded(!isExpanded)}
           className="p-1.5 rounded-xl app-text-muted hover:app-bg-hover hover:app-text-main transition-colors cursor-pointer border app-border"
-          title={isExpanded ? 'Kecilkan ke Sidebar' : 'Buka Kartu (Layar Penuh)'}
+          title={isExpanded ? (language === 'en' ? 'Minimize to Sidebar' : 'Kecilkan ke Sidebar') : t.library.openFullscreen}
         >
           {isExpanded ? <Icons.Minimize2 size={15} /> : <Icons.Maximize2 size={15} />}
         </button>
@@ -377,7 +379,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
           type="button"
           onClick={onClose}
           className="p-1.5 rounded-xl app-text-muted hover:app-bg-hover hover:app-text-main transition-colors cursor-pointer"
-          title="Tutup Panel Reader"
+          title={t.common.close}
         >
           <Icons.X size={18} />
         </button>

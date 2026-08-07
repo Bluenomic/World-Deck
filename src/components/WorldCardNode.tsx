@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import type { WorldCard } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 interface WorldCardNodeProps {
@@ -34,6 +35,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
   onUpdateDimensions,
   onUpdateImageHeight,
 }) => {
+  const { t, getCategoryLabel } = useLanguage();
   const nodeRef = useRef<HTMLDivElement>(null);
   const config = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
   const IconComponent = (Icons as any)[config.iconName] || Icons.HelpCircle || (() => null);
@@ -169,7 +171,6 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
                 className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity cursor-ns-resize flex items-center justify-center z-20 group/imghandle"
                 onMouseDown={handleImageResizeStart}
                 onTouchStart={handleImageResizeStart}
-                title="Tarik untuk mengubah tinggi/ukuran gambar kartu"
               >
                 <div className="w-12 h-1 rounded-full bg-white/70 group-hover/imghandle:bg-[#0d99ff] group-hover/imghandle:scale-x-125 transition-all shadow-md" />
               </div>
@@ -190,7 +191,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
             style={{ color: config.color }}
           >
             <IconComponent size={12} />
-            <span>{config.label}</span>
+            <span>{getCategoryLabel(card.category)}</span>
           </div>
 
           <div className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md app-bg-main app-text-muted border app-border font-mono">
@@ -204,7 +205,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
           <h3 className={`text-sm font-bold leading-snug line-clamp-1 transition-colors ${
             card.title ? 'app-text-main group-hover:text-blue-400' : 'app-text-muted opacity-60'
           }`}>
-            {card.title || 'Tanpa Judul'}
+            {card.title || t.common.untitled}
           </h3>
           {card.subtitle && !isCompact && (
             <p className="text-[11px] app-text-muted line-clamp-1 italic">
@@ -217,7 +218,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
         <p className={`text-[11px] leading-relaxed ${isCompact ? 'line-clamp-1' : isDetailed ? 'line-clamp-4' : 'line-clamp-2'} ${
           card.summary ? 'app-text-muted' : 'app-text-muted opacity-50'
         }`}>
-          {card.summary || 'Belum ada ringkasan.'}
+          {card.summary || t.cardReader.noSummary}
         </p>
 
         {/* Extended Details for Large / Expanded Card Size */}
@@ -227,7 +228,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
             {card.attributes && card.attributes.length > 0 && (
               <div className="pt-2 border-t app-border space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider app-accent-text block">
-                  Atribut Utama
+                  {t.cardReader.attributes}
                 </span>
                 <div className="grid grid-cols-1 gap-1">
                   {card.attributes.map((attr) => (
@@ -244,7 +245,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
             {card.content && (
               <div className="pt-2 border-t app-border space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider app-accent-text block">
-                  Catatan Lore
+                  {t.categories.lore}
                 </span>
                 <div className="text-[11px] app-bg-main p-2 rounded border app-border app-text-main leading-relaxed whitespace-pre-wrap font-sans max-h-40 overflow-y-auto custom-scrollbar">
                   {card.content}
@@ -289,7 +290,6 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
           className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-center justify-end p-1 text-slate-400 hover:text-blue-400 z-40 group-hover:opacity-100 opacity-40 transition-opacity"
           onMouseDown={handleResizeStart}
           onTouchStart={handleResizeStart}
-          title="Tarik untuk mengubah ukuran kartu"
         >
           <Icons.GripVertical size={13} className="rotate-45" />
         </div>
@@ -299,8 +299,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       {/* Right */}
       <button
         type="button"
-        title="Tarik koneksi (Kanan)"
-        className="connection-handle-trigger -right-5 top-1/2 -translate-y-1/2"
+        className="connection-handle-trigger -right-5 top-1/2 -translate-x-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();
           onStartConnection(card.id, e);
@@ -318,8 +317,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       {/* Left */}
       <button
         type="button"
-        title="Tarik koneksi (Kiri)"
-        className="connection-handle-trigger -left-5 top-1/2 -translate-y-1/2"
+        className="connection-handle-trigger -left-5 top-1/2 -translate-x-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();
           onStartConnection(card.id, e);
@@ -337,7 +335,6 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       {/* Top */}
       <button
         type="button"
-        title="Tarik koneksi (Atas)"
         className="connection-handle-trigger left-1/2 -top-5 -translate-x-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();
@@ -356,7 +353,6 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       {/* Bottom */}
       <button
         type="button"
-        title="Tarik koneksi (Bawah)"
         className="connection-handle-trigger left-1/2 -bottom-5 -translate-x-1/2"
         onMouseDown={(e) => {
           e.stopPropagation();

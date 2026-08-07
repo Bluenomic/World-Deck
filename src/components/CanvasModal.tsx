@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 interface CanvasModalProps {
@@ -16,10 +17,11 @@ export const CanvasModal: React.FC<CanvasModalProps> = ({
   onClose,
   onSubmit,
   title,
-  placeholder = 'Nama Kanvas...',
+  placeholder,
   initialValue = '',
   submitLabel,
 }) => {
+  const { language, t } = useLanguage();
   const [name, setName] = useState(initialValue);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ export const CanvasModal: React.FC<CanvasModalProps> = ({
           <div>
             <h3 className="text-sm font-bold app-text-main">{title}</h3>
             <p className="text-[10px] app-text-muted leading-tight mt-0.5">
-              Masukkan nama kanvas unik untuk ruang kerja Anda.
+              {language === 'en' ? 'Enter a unique canvas name for your workspace.' : 'Masukkan nama kanvas unik untuk ruang kerja Anda.'}
             </p>
           </div>
         </div>
@@ -64,7 +66,7 @@ export const CanvasModal: React.FC<CanvasModalProps> = ({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={placeholder}
+            placeholder={placeholder || (language === 'en' ? 'Canvas name...' : 'Nama Kanvas...')}
             className="w-full px-3.5 py-2.5 text-xs app-bg-main border app-border rounded-xl app-text-main placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
             autoFocus
             required
@@ -76,7 +78,7 @@ export const CanvasModal: React.FC<CanvasModalProps> = ({
               onClick={onClose}
               className="px-4 py-2 rounded-xl border app-border app-text-muted hover:app-text-main text-xs font-semibold cursor-pointer transition-colors"
             >
-              Batal
+              {t.common.cancel}
             </button>
             <button
               type="submit"

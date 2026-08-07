@@ -1,18 +1,40 @@
 import React, { useState } from 'react';
 import type { WorldCard, CardCategory, CustomAttribute, CardConnection } from '../types';
 import { CATEGORY_CONFIGS, PRIMARY_CATEGORIES } from '../data/categoryConfig';
-import { generateId, parseMentions } from '../utils/helpers';
+import { generateId } from '../utils/helpers';
 import { isTauriAvailable, saveImageAsset } from '../utils/tauriStorage';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
-const SUGGESTED_ATTRIBUTES_BY_CATEGORY: Record<string, string[]> = {
-  character: ['Umur', 'Peran', 'Senjata', 'Afiliasi', 'Status', 'Hobi', 'Tinggi Badan', 'Spesies'],
-  faction: ['Pemimpin', 'Markas Besar', 'Jumlah Anggota', 'Ideologi', 'Aliansi', 'Kekuatan Utama'],
-  location: ['Wilayah', 'Iklim', 'Populasi', 'Bahasa Utama', 'Tingkat Bahaya', 'Penguasa'],
-  lore: ['Asal Usul', 'Elemen', 'Periode Era', 'Dampak Utama', 'Tokoh Kunci'],
-  timeline: ['Tanggal / Era', 'Lokasi Kejadian', 'Pihak Terlibat', 'Hasil / Dampak', 'Tingkat Skala'],
-  item: ['Tipe Item', 'Pemilik', 'Kelangkaan', 'Efek / Sihir', 'Bahan Pembuatan'],
-  realm: ['Ibu Kota', 'Bentuk Pemerintahan', 'Mata Uang', 'Agama Mayoritas', 'Penguasa Utama'],
+const SUGGESTED_ATTRIBUTES_BY_CATEGORY: Record<string, { id: string[]; en: string[] }> = {
+  character: {
+    id: ['Umur', 'Peran', 'Senjata', 'Afiliasi', 'Status', 'Hobi', 'Tinggi Badan', 'Spesies'],
+    en: ['Age', 'Role', 'Weapon', 'Affiliation', 'Status', 'Hobby', 'Height', 'Species'],
+  },
+  faction: {
+    id: ['Pemimpin', 'Markas Besar', 'Jumlah Anggota', 'Ideologi', 'Aliansi', 'Kekuatan Utama'],
+    en: ['Leader', 'Headquarters', 'Member Count', 'Ideology', 'Alliance', 'Primary Strength'],
+  },
+  location: {
+    id: ['Wilayah', 'Iklim', 'Populasi', 'Bahasa Utama', 'Tingkat Bahaya', 'Penguasa'],
+    en: ['Region', 'Climate', 'Population', 'Primary Language', 'Danger Level', 'Ruler'],
+  },
+  lore: {
+    id: ['Asal Usul', 'Elemen', 'Periode Era', 'Dampak Utama', 'Tokoh Kunci'],
+    en: ['Origin', 'Element', 'Era Period', 'Primary Impact', 'Key Figure'],
+  },
+  timeline: {
+    id: ['Tanggal / Era', 'Lokasi Kejadian', 'Pihak Terlibat', 'Hasil / Dampak', 'Tingkat Skala'],
+    en: ['Date / Era', 'Location', 'Parties Involved', 'Outcome / Impact', 'Scale'],
+  },
+  item: {
+    id: ['Tipe Item', 'Pemilik', 'Kelangkaan', 'Efek / Sihir', 'Bahan Pembuatan'],
+    en: ['Item Type', 'Owner', 'Rarity', 'Effect / Magic', 'Crafting Material'],
+  },
+  realm: {
+    id: ['Ibu Kota', 'Bentuk Pemerintahan', 'Mata Uang', 'Agama Mayoritas', 'Penguasa Utama'],
+    en: ['Capital', 'Government Form', 'Currency', 'Majority Religion', 'Primary Ruler'],
+  },
 };
 
 interface CardEditorModalProps {
@@ -38,6 +60,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   onAddConnection,
   onDiscard,
 }) => {
+  const { language, t, getCategoryLabel } = useLanguage();
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [title, setTitle] = useState(card.title);
   const [subtitle, setSubtitle] = useState(card.subtitle || '');
@@ -60,7 +83,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   const [activeTab, setActiveTab] = useState<'content' | 'properties' | 'relations'>('content');
 
   const [targetCardId, setTargetCardId] = useState<string>('');
-  const [relationLabel, setRelationLabel] = useState<string>('Berhubungan Dengan');
+  const [relationLabel, setRelationLabel] = useState<string>(language === 'en' ? 'Related To' : 'Berhubungan Dengan');
 
   const handleAddTag = () => {
     if (newTagInput.trim() && !tags.includes(newTagInput.trim())) {
@@ -123,13 +146,13 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     }
   };
 
-  const [imageHeight, setImageHeight] = useState<number | undefined>(card.imageHeight);
+  const [imageHeight] = useState<number | undefined>(card.imageHeight);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     onSave({
       ...card,
-      title: title.trim() || 'Kartu Tanpa Judul',
+      title: title.trim() || t.common.untitled,
       subtitle: subtitle.trim(),
       category,
       summary: summary.trim(),
@@ -150,52 +173,50 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
     }
   };
 
-  const handleCloseRequest = () => {
-    const isOriginalEmpty =
-      !card.title &&
-      !card.subtitle &&
-      !card.summary &&
-      !card.content &&
-      !card.imageUrl &&
-      (!card.tags || card.tags.length === 0) &&
-      (!card.attributes || card.attributes.length === 0);
-
-    const isCurrentEmpty =
+  const isCardEmpty = () => {
+    return (
       !title.trim() &&
       !subtitle.trim() &&
       !summary.trim() &&
       !content.trim() &&
       !imageUrl.trim() &&
-      tags.length === 0 &&
-      attributes.length === 0;
+      attributes.length === 0 &&
+      tags.length === 0
+    );
+  };
 
-    if (isOriginalEmpty && isCurrentEmpty) {
+  const handleCloseRequest = () => {
+    if (isCardEmpty()) {
       setShowExitConfirm(true);
     } else {
+      handleSubmit();
       onClose();
     }
   };
 
-  const cardConnections = connections.filter(
+  const existingConnections = connections.filter(
     (c) => c.sourceId === card.id || c.targetId === card.id
   );
+
+  const suggestedAttributesList = SUGGESTED_ATTRIBUTES_BY_CATEGORY[category]
+    ? (language === 'en' ? SUGGESTED_ATTRIBUTES_BY_CATEGORY[category].en : SUGGESTED_ATTRIBUTES_BY_CATEGORY[category].id)
+    : [];
 
   const categoryConfig = CATEGORY_CONFIGS[category] || CATEGORY_CONFIGS.character;
   const CategoryIcon = (Icons as any)[categoryConfig.iconName] || Icons.HelpCircle;
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-6 backdrop-animate-appear select-none"
+      className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 md:p-6 z-[150] animate-in fade-in duration-200 select-none cursor-pointer"
       onClick={handleCloseRequest}
     >
       <div
-        className="bg-[#2c2c2c] border border-[#383838] w-full max-w-3xl max-h-[92vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white transition-colors modal-animate-appear cursor-default relative"
+        className="bg-[#1e1e1e] border border-[#383838] w-full max-w-4xl max-h-[92vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white transition-all cursor-default relative"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header Action Strip */}
-        <div className="px-5 py-3 bg-[#1e1e1e] border-b border-[#383838] flex items-center justify-between text-xs text-slate-300">
+        {/* Top Navigation Bar */}
+        <div className="px-6 py-3 border-b border-[#383838] bg-[#1e1e1e] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            {/* Custom Category Select Dropdown */}
             <div className="relative">
               <button
                 type="button"
@@ -203,7 +224,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 className="bg-[#2c2c2c] border border-[#383838] hover:border-[#0d99ff] rounded-lg px-2.5 py-1 flex items-center gap-2 text-xs font-bold text-white cursor-pointer transition-colors"
               >
                 <CategoryIcon size={14} style={{ color: categoryConfig.color }} className="shrink-0" />
-                <span>{categoryConfig.label}</span>
+                <span>{getCategoryLabel(category)}</span>
                 <Icons.ChevronDown size={12} className="text-slate-400 shrink-0 ml-0.5" />
               </button>
 
@@ -237,7 +258,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                         >
                           <div className="flex items-center gap-2">
                             <IconComp size={14} style={{ color: cfg.color }} className="shrink-0" />
-                            <span>{cfg.label}</span>
+                            <span>{getCategoryLabel(cat)}</span>
                           </div>
                           {isSelected && <Icons.Check size={13} className="text-[#0d99ff]" />}
                         </button>
@@ -249,7 +270,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             </div>
 
             <span className="text-slate-600">/</span>
-            <span className="text-white font-bold truncate max-w-[200px]">{title || 'Kartu Tanpa Judul'}</span>
+            <span className="text-white font-bold truncate max-w-[200px]">{title || t.common.untitled}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -258,7 +279,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
               onClick={() => onDelete(card.id)}
               className="px-2.5 py-1 rounded-lg text-rose-400 hover:bg-rose-500/10 font-semibold transition-colors cursor-pointer"
             >
-              Hapus
+              {t.common.delete}
             </button>
             <div className="h-4 w-px bg-[#383838]" />
             <button
@@ -281,14 +302,14 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 onClick={() => setShowCoverInput(true)}
                 className="px-3 py-1 bg-[#2c2c2c]/90 backdrop-blur-md rounded-lg text-xs text-white border border-[#383838] font-semibold hover:bg-[#383838]"
               >
-                Ubah Cover
+                {t.cardEditor.changeCover}
               </button>
               <button
                 type="button"
                 onClick={() => setImageUrl('')}
                 className="px-3 py-1 bg-rose-950/80 backdrop-blur-md rounded-lg text-xs text-rose-300 border border-rose-500/30 font-semibold hover:bg-rose-900"
               >
-                Hapus Cover
+                {t.cardEditor.removeCover}
               </button>
             </div>
           </div>
@@ -301,18 +322,18 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e1e1e] border border-[#383838] hover:border-[#0d99ff] transition-all font-semibold cursor-pointer"
               >
                 <Icons.Image size={14} className="text-[#0d99ff]" />
-                <span>+ Tambah Cover Gambar</span>
+                <span>+ {t.cardEditor.addCover}</span>
               </button>
             ) : (
               <div className="p-3 rounded-xl bg-[#1e1e1e] border border-[#383838] space-y-2 animate-in fade-in duration-100">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white">Atur Cover Gambar Halaman</span>
+                  <span className="text-xs font-bold text-white">{t.cardEditor.coverImage}</span>
                   <button
                     type="button"
                     onClick={() => setShowCoverInput(false)}
                     className="text-xs text-slate-400 hover:text-white"
                   >
-                    Tutup
+                    {t.common.close}
                   </button>
                 </div>
 
@@ -327,13 +348,13 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                         setImages((prev) => [...prev, val]);
                       }
                     }}
-                    placeholder="Tempel URL gambar (https://...)"
+                    placeholder="https://..."
                     className="flex-1 w-full bg-[#2c2c2c] border border-[#383838] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff] font-mono"
                   />
-                  <span className="text-xs text-slate-500">atau</span>
+                  <span className="text-xs text-slate-500">{t.cardEditor.or}</span>
                   <label className="px-3 py-1.5 rounded-lg bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold cursor-pointer flex items-center gap-1.5 shrink-0">
                     <Icons.Upload size={13} />
-                    <span>Unggah Berkas</span>
+                    <span>{t.cardEditor.uploadFile}</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -342,27 +363,6 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                     />
                   </label>
                 </div>
-
-                {imageUrl && (
-                  <div className="flex items-center gap-2 pt-2 border-t border-[#383838]">
-                    <span className="text-xs font-semibold text-slate-400">Tinggi Gambar (px):</span>
-                    <input
-                      type="number"
-                      min={48}
-                      max={600}
-                      value={imageHeight || 120}
-                      onChange={(e) => setImageHeight(Number(e.target.value) || undefined)}
-                      className="w-20 bg-[#2c2c2c] border border-[#383838] rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-[#0d99ff] font-mono text-center"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setImageHeight(undefined)}
-                      className="text-[10px] text-slate-400 hover:text-white underline cursor-pointer"
-                    >
-                      Reset Default
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -374,11 +374,11 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
                 <Icons.Image size={14} className="text-[#0d99ff]" />
-                <span>Galeri Gambar Kartu ({images.length})</span>
+                <span>{t.cardReader.imageGallery} ({images.length})</span>
               </div>
               <label className="px-2.5 py-1 rounded-lg bg-[#0d99ff]/20 text-[#0d99ff] border border-[#0d99ff]/30 text-xs font-bold hover:bg-[#0d99ff]/30 transition-all cursor-pointer flex items-center gap-1">
                 <Icons.Plus size={12} />
-                <span>+ Tambah Gambar</span>
+                <span>+ {t.cardEditor.addImage}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -390,7 +390,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
 
             {images.length === 0 ? (
               <p className="text-xs text-slate-500 text-center py-3 italic">
-                Belum ada gambar di galeri. Klik &quot;+ Tambah Gambar&quot; untuk mengunggah.
+                {t.cardEditor.noImages}
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
@@ -418,17 +418,17 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                             type="button"
                             onClick={() => handleSetThumbnail(imgSrc)}
                             className="px-2 py-1 rounded-lg bg-[#0d99ff] text-white text-[10px] font-bold hover:bg-[#0b85de] shadow-md flex items-center gap-1 cursor-pointer"
-                            title="Jadikan Thumbnail Utama"
+                            title={t.cardEditor.setThumbnail}
                           >
                             <Icons.Star size={11} />
-                            <span>Set Cover</span>
+                            <span>Cover</span>
                           </button>
                         )}
                         <button
                           type="button"
                           onClick={() => handleRemoveImage(imgSrc)}
                           className="p-1.5 rounded-lg bg-rose-600/80 text-white hover:bg-rose-600 shadow-md cursor-pointer"
-                          title="Hapus dari galeri"
+                          title={t.common.delete}
                         >
                           <Icons.Trash2 size={12} />
                         </button>
@@ -448,124 +448,111 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Judul Kartu / Halaman..."
-            className="w-full bg-transparent border-none text-2xl sm:text-3xl font-extrabold text-white placeholder:text-slate-600 focus:outline-none tracking-tight"
+            placeholder={t.cardEditor.titlePlaceholder}
+            className="w-full bg-transparent text-2xl md:text-3xl font-extrabold text-white placeholder-slate-600 focus:outline-none tracking-tight"
           />
           <input
             type="text"
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="Sub-judul / Gelar Singkat (opsional)..."
-            className="w-full bg-transparent border-none text-xs text-slate-400 placeholder:text-slate-600 focus:outline-none font-medium"
+            placeholder={t.cardEditor.subtitlePlaceholder}
+            className="w-full bg-transparent text-xs text-slate-300 italic placeholder-slate-600 focus:outline-none font-medium"
           />
         </div>
 
-        {/* Segmented Mode Tabs */}
-        <div className="flex border-b border-[#383838] bg-[#1e1e1e] px-6 gap-6 text-xs font-semibold text-slate-400">
+        {/* Tab Navigation Segment */}
+        <div className="px-6 border-b border-[#383838] flex items-center gap-2 text-xs font-semibold shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('content')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`py-2.5 px-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'content'
-                ? 'border-[#0d99ff] text-white font-bold'
-                : 'border-transparent hover:text-white'
+                ? 'border-[#0d99ff] text-[#0d99ff] font-bold'
+                : 'border-transparent text-slate-400 hover:text-white'
             }`}
           >
-            <Icons.FileText size={14} className={activeTab === 'content' ? 'text-[#0d99ff]' : ''} />
-            <span>Catatan Lore</span>
+            <Icons.FileText size={14} />
+            <span>{t.cardEditor.tabContent}</span>
           </button>
-
           <button
             type="button"
             onClick={() => setActiveTab('properties')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`py-2.5 px-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'properties'
-                ? 'border-[#0d99ff] text-white font-bold'
-                : 'border-transparent hover:text-white'
+                ? 'border-[#0d99ff] text-[#0d99ff] font-bold'
+                : 'border-transparent text-slate-400 hover:text-white'
             }`}
           >
-            <Icons.Sliders size={14} className={activeTab === 'properties' ? 'text-amber-400' : ''} />
-            <span>Properti Infobox ({attributes.length})</span>
+            <Icons.Sliders size={14} />
+            <span>{t.cardEditor.tabAttributes} ({attributes.length})</span>
           </button>
-
           <button
             type="button"
             onClick={() => setActiveTab('relations')}
-            className={`py-2.5 border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`py-2.5 px-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'relations'
-                ? 'border-[#0d99ff] text-white font-bold'
-                : 'border-transparent hover:text-white'
+                ? 'border-[#0d99ff] text-[#0d99ff] font-bold'
+                : 'border-transparent text-slate-400 hover:text-white'
             }`}
           >
-            <Icons.GitCommit size={14} className={activeTab === 'relations' ? 'text-purple-400' : ''} />
-            <span>Relasi Hubungan ({cardConnections.length})</span>
+            <Icons.GitCommit size={14} />
+            <span>{t.cardEditor.tabRelations} ({existingConnections.length})</span>
           </button>
         </div>
 
-        {/* Editor Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
-          
-          {/* TAB 1: CATATAN LORE */}
+        {/* Form Body Form / Tab Contents */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
           {activeTab === 'content' && (
-            <div className="space-y-4">
-              {/* Summary Input */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 block">Ringkasan Singkat (Summary)</label>
+            <div className="space-y-5 animate-in fade-in duration-150">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                  <span>{t.cardEditor.summary}</span>
+                  <span className="text-[10px] text-slate-500 font-normal">{t.cardEditor.summaryHint}</span>
+                </label>
                 <textarea
                   rows={2}
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
-                  placeholder="Ringkasan singkat 1-2 kalimat..."
-                  className="w-full bg-[#1e1e1e] border border-[#383838] rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0d99ff] leading-relaxed resize-none"
+                  placeholder={t.cardEditor.summaryHint}
+                  className="w-full bg-[#2c2c2c] border border-[#383838] rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0d99ff] leading-relaxed resize-none font-sans"
                 />
               </div>
 
-              {/* Main Content Markdown */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-400 block">
-                    Catatan Lore & Penjelasan Lengkap
-                  </label>
-                  <span className="text-[11px] text-slate-400 font-mono">Mentions: Ketik @JudulKartu</span>
-                </div>
-
+                <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                  <span>{t.cardEditor.loreNotes}</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Format Markdown & Mention Kartu @Judul</span>
+                </label>
                 <textarea
-                  rows={8}
+                  rows={10}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder="Tuliskan catatan lore, mitologi, sejarah, atau deskripsi lengkap di sini. Gunakan @JudulKartu untuk merujuk kartu lain..."
-                  className="w-full bg-[#1e1e1e] border border-[#383838] rounded-xl p-3.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0d99ff] leading-relaxed custom-scrollbar"
+                  placeholder={t.cardEditor.contentPlaceholder}
+                  className="w-full bg-[#2c2c2c] border border-[#383838] rounded-xl p-3.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#0d99ff] leading-relaxed resize-y font-sans custom-scrollbar"
                 />
-
-                {/* Live Mention Segment Preview */}
-                {content && (
-                  <div className="p-3 rounded-xl bg-[#1e1e1e] border border-[#383838] space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Preview Link Kartu:
-                    </span>
-                    <div className="text-xs text-slate-200 leading-relaxed">
-                      {parseMentions(content, allCards).map((seg, idx) =>
-                        seg.isMention && seg.cardId ? (
-                          <span
-                            key={idx}
-                            onClick={() => onNavigateToCard && onNavigateToCard(seg.cardId!)}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded bg-[#0d99ff]/15 text-[#0d99ff] border border-[#0d99ff]/30 font-semibold cursor-pointer hover:underline"
-                          >
-                            📄 {seg.text.substring(1)}
-                          </span>
-                        ) : (
-                          <span key={idx}>{seg.text}</span>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Tags Section */}
+              {/* Tags Input */}
               <div className="space-y-2 pt-2 border-t border-[#383838]">
-                <label className="text-xs font-semibold text-slate-400 block">Tag (#tag)</label>
-                <div className="flex gap-2">
+                <label className="text-xs font-bold text-slate-300">{t.common.tags}</label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-2.5 py-1 rounded-lg bg-[#2c2c2c] text-slate-300 border border-[#383838] text-xs font-medium flex items-center gap-1.5"
+                    >
+                      #{tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        className="hover:text-rose-400 cursor-pointer"
+                      >
+                        <Icons.X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={newTagInput}
@@ -576,99 +563,95 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                         handleAddTag();
                       }
                     }}
-                    placeholder="Ketik tag lalu tekan Enter..."
-                    className="flex-1 bg-[#1e1e1e] border border-[#383838] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
+                    placeholder={t.cardEditor.addTagPlaceholder}
+                    className="flex-1 bg-[#2c2c2c] border border-[#383838] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                   />
                   <button
                     type="button"
                     onClick={handleAddTag}
-                    className="px-3.5 py-1.5 bg-[#1e1e1e] hover:bg-[#383838] text-white border border-[#383838] rounded-lg text-xs font-bold cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-[#2c2c2c] hover:bg-[#383838] text-white text-xs font-bold border border-[#383838] transition-colors cursor-pointer"
                   >
-                    + Tag
+                    + {t.cardEditor.addTag}
                   </button>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2.5 py-1 rounded-full bg-[#1e1e1e] text-slate-300 border border-[#383838] text-xs font-semibold flex items-center gap-1.5"
-                    >
-                      #{tag}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTag(tag)}
-                        className="text-slate-400 hover:text-rose-400"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: PROPERTI INFOBOX */}
           {activeTab === 'properties' && (
-            <div className="space-y-4">
+            <div className="space-y-5 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Atribut Kustom (Infobox)</h4>
-                  <p className="text-xs text-slate-400">Daftar properti spesifik kategori (mis. Spesies, Afiliasi, Senjata).</p>
+                  <h4 className="text-xs font-bold text-white">{t.cardEditor.attributes}</h4>
+                  <p className="text-[11px] text-slate-400">{t.cardEditor.attributesDesc}</p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleAddAttribute('', '')}
-                  className="px-3 py-1.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  onClick={() => handleAddAttribute()}
+                  className="px-3 py-1.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold shadow-md transition-all flex items-center gap-1 cursor-pointer"
                 >
-                  <Icons.Plus size={14} />
-                  <span>+ Properti Baru</span>
+                  <Icons.Plus size={13} />
+                  <span>+ {t.cardEditor.addAttribute}</span>
                 </button>
               </div>
 
-              {attributes.length === 0 ? (
-                <div className="p-6 rounded-2xl bg-[#1e1e1e] border border-dashed border-[#383838] text-center space-y-3">
-                  <p className="text-xs text-slate-400">Belum ada atribut kustom ditambahkan.</p>
-                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Saran:</span>
-                    {(SUGGESTED_ATTRIBUTES_BY_CATEGORY[category] || []).map((suggKey) => (
-                      <button
-                        key={suggKey}
-                        type="button"
-                        onClick={() => handleAddAttribute(suggKey, '')}
-                        className="text-xs px-2.5 py-1 rounded-lg bg-[#2c2c2c] border border-[#383838] text-slate-200 font-semibold hover:border-[#0d99ff] hover:text-[#0d99ff] transition-all flex items-center gap-1 cursor-pointer"
-                      >
-                        <Icons.Plus size={11} className="text-[#0d99ff]" />
-                        <span>{suggKey}</span>
-                      </button>
-                    ))}
+              {/* Rekomendasi Atribut Kategori */}
+              {suggestedAttributesList.length > 0 && (
+                <div className="p-3 rounded-xl bg-[#1e1e1e] border border-[#383838] space-y-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    {t.cardEditor.suggestedAttributes} ({getCategoryLabel(category)}):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestedAttributesList.map((sugg) => {
+                      const isAdded = attributes.some((a) => a.key.toLowerCase() === sugg.toLowerCase());
+                      return (
+                        <button
+                          key={sugg}
+                          type="button"
+                          disabled={isAdded}
+                          onClick={() => handleAddAttribute(sugg, '')}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all cursor-pointer ${
+                            isAdded
+                              ? 'bg-[#2c2c2c] border-[#383838] text-slate-600 cursor-not-allowed'
+                              : 'bg-[#2c2c2c] border-[#383838] text-slate-300 hover:text-white hover:border-[#0d99ff]'
+                          }`}
+                        >
+                          + {sugg}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
+              )}
+
+              {/* Attribute List Table */}
+              {attributes.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-xs italic border border-dashed border-[#383838] rounded-xl">
+                  {t.cardEditor.noAttributes}
+                </div>
               ) : (
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   {attributes.map((attr) => (
-                    <div key={attr.id} className="flex items-center gap-2 bg-[#1e1e1e] p-2.5 rounded-xl border border-[#383838]">
+                    <div key={attr.id} className="flex items-center gap-2">
                       <input
                         type="text"
                         value={attr.key}
                         onChange={(e) => handleUpdateAttribute(attr.id, e.target.value, attr.value)}
-                        placeholder="Nama Properti (mis. Spesies)"
-                        className="w-1/3 bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff] font-semibold"
+                        placeholder={t.cardEditor.attributeNamePlaceholder}
+                        className="flex-1 bg-[#2c2c2c] border border-[#383838] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                       />
-                      <span className="text-slate-500 font-bold">:</span>
                       <input
                         type="text"
                         value={attr.value}
                         onChange={(e) => handleUpdateAttribute(attr.id, attr.key, e.target.value)}
-                        placeholder="Nilai (mis. Manusia)"
-                        className="flex-1 bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff] font-medium"
+                        placeholder={t.cardEditor.attributeValuePlaceholder}
+                        className="flex-1 bg-[#2c2c2c] border border-[#383838] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                       />
                       <button
                         type="button"
                         onClick={() => handleRemoveAttribute(attr.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-[#383838] transition-colors cursor-pointer"
-                        title="Hapus Properti"
+                        className="p-2 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                        title={t.common.delete}
                       >
                         <Icons.Trash2 size={14} />
                       </button>
@@ -679,70 +662,76 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: RELASI HUBUNGAN */}
           {activeTab === 'relations' && (
-            <div className="space-y-5">
+            <div className="space-y-5 animate-in fade-in duration-150">
+              {/* Form Tambah Relasi Garis */}
               <div className="p-4 rounded-xl bg-[#1e1e1e] border border-[#383838] space-y-3">
-                <h4 className="text-xs font-bold uppercase text-[#0d99ff]">
-                  Hubungkan dengan Halaman Kartu Lain
+                <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Icons.GitCommit size={14} className="text-[#0d99ff]" />
+                  <span>{t.cardEditor.addRelationTitle}</span>
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Pilih Kartu Target:</label>
+                    <label className="block text-[11px] text-slate-400 mb-1">{t.cardEditor.connectToTargetCard}</label>
                     <select
                       value={targetCardId}
                       onChange={(e) => setTargetCardId(e.target.value)}
-                      className="w-full bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
+                      className="w-full bg-[#2c2c2c] border border-[#383838] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                     >
-                      <option value="">-- Pilih Kartu --</option>
+                      <option value="">{t.cardEditor.selectCardPlaceholder}</option>
                       {allCards
                         .filter((c) => c.id !== card.id)
                         .map((c) => (
                           <option key={c.id} value={c.id}>
-                            [{c.category}] {c.title}
+                            [{getCategoryLabel(c.category)}] {c.title || t.common.untitled}
                           </option>
                         ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Label Hubungan:</label>
+                    <label className="block text-[11px] text-slate-400 mb-1">{t.cardEditor.relationLabelHeader}</label>
                     <input
                       type="text"
                       value={relationLabel}
                       onChange={(e) => setRelationLabel(e.target.value)}
-                      placeholder="mis. Musuh Bebentukan"
-                      className="w-full bg-[#2c2c2c] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
+                      placeholder={t.cardEditor.relationLabelPlaceholder}
+                      className="w-full bg-[#2c2c2c] border border-[#383838] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#0d99ff]"
                     />
                   </div>
+                </div>
 
-                  <div className="flex items-end">
-                    <button
-                      type="button"
-                      disabled={!targetCardId}
-                      onClick={handleCreateConnection}
-                      className="w-full py-1.5 bg-[#0d99ff] hover:bg-[#0b85de] disabled:opacity-40 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <Icons.Link size={14} />
-                      <span>Buat Hubungan</span>
-                    </button>
-                  </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    disabled={!targetCardId}
+                    onClick={handleCreateConnection}
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      targetCardId
+                        ? 'bg-[#0d99ff] hover:bg-[#0b85de] text-white cursor-pointer shadow-md'
+                        : 'bg-[#2c2c2c] text-slate-500 cursor-not-allowed border border-[#383838]'
+                    }`}
+                  >
+                    {t.cardEditor.createRelationButton}
+                  </button>
                 </div>
               </div>
 
-              <div>
-                <h4 className="text-xs font-bold uppercase text-slate-400 mb-2">
-                  Daftar Hubungan Aktif
-                </h4>
-                {cardConnections.length === 0 ? (
-                  <div className="text-center py-6 bg-[#1e1e1e] rounded-xl border border-[#383838] text-slate-400 text-xs">
-                    Kartu ini belum terhubung dengan kartu manapun.
-                  </div>
+              {/* Daftar Relasi Terpasang */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-white">{t.cardEditor.activeRelations}</h4>
+
+                {existingConnections.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic py-4 text-center border border-dashed border-[#383838] rounded-xl">
+                    {t.cardEditor.noRelations}
+                  </p>
                 ) : (
                   <div className="space-y-2">
-                    {cardConnections.map((conn) => {
-                      const otherId = conn.sourceId === card.id ? conn.targetId : conn.sourceId;
-                      const otherCard = allCards.find((c) => c.id === otherId);
+                    {existingConnections.map((conn) => {
+                      const isSource = conn.sourceId === card.id;
+                      const otherCardId = isSource ? conn.targetId : conn.sourceId;
+                      const otherCard = allCards.find((c) => c.id === otherCardId);
                       if (!otherCard) return null;
 
                       return (
@@ -755,7 +744,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                               {conn.label}
                             </span>
                             <span className="text-xs text-white font-semibold">
-                              → {otherCard.title}
+                              → {otherCard.title || t.common.untitled}
                             </span>
                           </div>
 
@@ -764,7 +753,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                             onClick={() => onNavigateToCard && onNavigateToCard(otherCard.id)}
                             className="px-2.5 py-1 rounded-lg bg-[#2c2c2c] hover:bg-[#383838] text-[#0d99ff] text-xs font-bold border border-[#383838] transition-colors cursor-pointer"
                           >
-                            Lihat di Canvas
+                            {t.sidebar.focusOnCanvas}
                           </button>
                         </div>
                       );
@@ -782,14 +771,14 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
               onClick={handleCloseRequest}
               className="px-4 py-2 rounded-xl border border-[#383838] bg-[#1e1e1e] hover:bg-[#383838] text-slate-300 text-xs font-bold transition-colors cursor-pointer"
             >
-              Batal
+              {t.common.cancel}
             </button>
             <button
               type="submit"
               className="px-5 py-2 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
             >
               <Icons.Save size={15} />
-              <span>Simpan Perubahan</span>
+              <span>{t.common.save}</span>
             </button>
           </div>
         </form>
@@ -805,9 +794,13 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
               <Icons.AlertTriangle size={24} />
             </div>
             <div className="space-y-1.5">
-              <h4 className="text-base font-bold text-white">Simpan atau Buang Kartu?</h4>
+              <h4 className="text-base font-bold text-white">
+                {language === 'en' ? 'Save or Discard Card?' : 'Simpan atau Buang Kartu?'}
+              </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Kartu baru ini masih kosong. Apakah Anda ingin membuang kartu ini atau tetap menyimpannya di canvas?
+                {language === 'en'
+                  ? 'This new card is empty. Do you want to discard it or save it as an empty card?'
+                  : 'Kartu baru ini masih kosong. Apakah Anda ingin membuang kartu ini atau tetap menyimpannya di canvas?'}
               </p>
             </div>
             <div className="flex flex-col gap-2.5 pt-2">
@@ -822,27 +815,27 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 }}
                 className="w-full py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md transition-colors"
               >
-                Hapus Kartu
+                {t.common.delete}
               </button>
               <button
                 type="button"
                 onClick={() => {
                   onSave({
                     ...card,
-                    title: 'Kartu Tanpa Judul',
+                    title: t.common.untitled,
                     updatedAt: Date.now(),
                   });
                 }}
                 className="w-full py-2 rounded-xl bg-[#1e1e1e] border border-[#383838] hover:bg-[#383838] text-white text-xs font-bold transition-colors"
               >
-                Simpan Kartu Kosong
+                {language === 'en' ? 'Save Empty Card' : 'Simpan Kartu Kosong'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowExitConfirm(false)}
                 className="w-full py-2 rounded-xl text-xs text-slate-400 hover:text-white font-bold transition-colors"
               >
-                Batal (Kembali Edit)
+                {t.common.cancel}
               </button>
             </div>
           </div>

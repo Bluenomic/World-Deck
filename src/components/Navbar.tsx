@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ViewMode, AppTheme } from '../types';
 import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 import {
   isTauriAvailable,
   minimizeTauriWindow,
@@ -24,11 +25,11 @@ interface NavbarProps {
   onChangeDirectory: () => void;
 }
 
-const VIEW_TABS: { id: ViewMode; label: string; icon: any }[] = [
-  { id: 'canvas', label: 'Canvas', icon: Icons.LayoutGrid },
-  { id: 'library', label: 'Galeri', icon: Icons.Library },
-  { id: 'timeline', label: 'Timeline', icon: Icons.Clock },
-  { id: 'documents', label: 'Dokumen', icon: Icons.BookOpen },
+const VIEW_TABS: { id: ViewMode; labelKey: 'canvas' | 'library' | 'timeline' | 'documents'; icon: any }[] = [
+  { id: 'canvas', labelKey: 'canvas', icon: Icons.LayoutGrid },
+  { id: 'library', labelKey: 'library', icon: Icons.Library },
+  { id: 'timeline', labelKey: 'timeline', icon: Icons.Clock },
+  { id: 'documents', labelKey: 'documents', icon: Icons.BookOpen },
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -45,6 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   localDirectoryName,
   onChangeDirectory,
 }) => {
+  const { language, setLanguage, t } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [inTauri, setInTauri] = useState(false);
@@ -116,7 +118,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           data-tauri-drag-region={false}
           onClick={onOpenWorldManager}
           className="w-7 h-7 shrink-0 rounded-lg bg-[#1e1e1e] hover:bg-[#383838] border border-[#383838] hover:border-[#0d99ff] flex items-center justify-center shadow-md transition-all cursor-pointer group"
-          title="Buka Pengelola Dunia & Workspace"
+          title={t.navbar.openWorldManager}
         >
           <img src="/wd-logo-circle.png" alt="WD Logo" className="w-5 h-5 object-contain rounded-full group-hover:scale-110 transition-transform" />
         </button>
@@ -126,7 +128,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           data-tauri-drag-region={false}
           onClick={onOpenWorldManager}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-200 hover:text-white hover:bg-[#383838] transition-all text-xs font-bold group cursor-pointer border border-transparent hover:border-[#383838]"
-          title="Buka Pengelola Workspace & Dunia"
+          title={t.navbar.openWorldManager}
         >
           <span className="truncate max-w-[140px] sm:max-w-[240px]">
             {projectName}
@@ -156,7 +158,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Icon size={13} className={isActive ? 'text-[#0d99ff]' : 'text-slate-300'} />
-              <span>{tab.label}</span>
+              <span>{t.navbar.tabs[tab.labelKey]}</span>
             </button>
           );
         })}
@@ -175,10 +177,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               setIsMenuOpen((prev) => !prev);
             }}
             className="px-2.5 py-1 rounded-lg text-slate-200 hover:text-white hover:bg-[#383838] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-[#383838] outline-none focus:outline-none select-none shadow-xs"
-            title="Opsi & Menu Proyek"
+            title={t.navbar.menuTitle}
           >
             <Icons.SlidersHorizontal size={13} className="text-[#0d99ff]" />
-            <span>Menu</span>
+            <span>{t.navbar.menu}</span>
             <Icons.ChevronDown size={12} className={`text-slate-400 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
@@ -208,7 +210,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }}
                     className="text-[10px] underline hover:text-white cursor-pointer shrink-0"
                   >
-                    Ubah
+                    {t.navbar.changeWorkspace}
                   </button>
                 </div>
               ) : (
@@ -221,7 +223,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full px-2.5 py-1.5 rounded-xl hover:bg-[#383838] flex items-center gap-2 transition-colors font-medium text-amber-400 cursor-pointer"
                 >
                   <Icons.FolderOpen size={14} />
-                  <span>Pilih Folder Workspace</span>
+                  <span>{t.navbar.selectWorkspace}</span>
                 </button>
               )}
 
@@ -238,7 +240,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full px-2.5 py-1.5 rounded-xl hover:bg-[#383838] flex items-center gap-2 text-slate-200 hover:text-white transition-colors cursor-pointer font-medium"
                 >
                   <Icons.Download size={14} className="text-[#0d99ff]" />
-                  <span>Ekspor Proyek (JSON)</span>
+                  <span>{t.navbar.exportProject}</span>
                 </button>
 
                 <button
@@ -250,7 +252,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full px-2.5 py-1.5 rounded-xl hover:bg-[#383838] flex items-center gap-2 text-slate-200 hover:text-white transition-colors cursor-pointer font-medium"
                 >
                   <Icons.Upload size={14} className="text-[#0d99ff]" />
-                  <span>Impor Proyek (JSON)</span>
+                  <span>{t.navbar.importProject}</span>
                 </button>
                 <input
                   ref={fileInputRef}
@@ -266,10 +268,47 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <div className="border-t border-[#383838]" />
 
+              {/* Language Switcher */}
+              <div className="p-1 space-y-1">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 flex items-center justify-between">
+                  <span>{t.navbar.appLanguage}</span>
+                  <Icons.Globe size={12} className="text-slate-400" />
+                </div>
+                <div className="grid grid-cols-2 gap-1 bg-[#1e1e1e] p-1 rounded-xl border border-[#383838]">
+                  <button
+                    type="button"
+                    onClick={() => setLanguage('id')}
+                    className={`px-2 py-1 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                      language === 'id'
+                        ? 'bg-[#0d99ff] text-white shadow-xs font-bold'
+                        : 'text-slate-300 hover:text-white hover:bg-[#383838]'
+                    }`}
+                  >
+                    <span className="text-[11px]">🇮🇩</span>
+                    <span>{t.navbar.langId}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLanguage('en')}
+                    className={`px-2 py-1 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                      language === 'en'
+                        ? 'bg-[#0d99ff] text-white shadow-xs font-bold'
+                        : 'text-slate-300 hover:text-white hover:bg-[#383838]'
+                    }`}
+                  >
+                    <span className="text-[11px]">🇬🇧</span>
+                    <span>{t.navbar.langEn}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t border-[#383838]" />
+
               {/* Theme Segmented Switcher */}
               <div className="p-1 space-y-1">
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 flex items-center justify-between">
-                  <span>Tema Aplikasi</span>
+                  <span>{t.navbar.appTheme}</span>
                   <Icons.Palette size={12} className="text-slate-400" />
                 </div>
                 <div className="grid grid-cols-2 gap-1 bg-[#1e1e1e] p-1 rounded-xl border border-[#383838]">
@@ -283,7 +322,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }`}
                   >
                     <Icons.Sun size={13} className={currentTheme === 'light' ? 'text-amber-300' : 'text-slate-400'} />
-                    <span>Terang</span>
+                    <span>{t.navbar.themeLight}</span>
                   </button>
 
                   <button
@@ -296,7 +335,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }`}
                   >
                     <Icons.Moon size={13} className={currentTheme === 'dark' ? 'text-blue-200' : 'text-slate-400'} />
-                    <span>Gelap</span>
+                    <span>{t.navbar.themeDark}</span>
                   </button>
                 </div>
               </div>
@@ -314,7 +353,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full px-2.5 py-1.5 rounded-xl hover:bg-[#383838] flex items-center gap-2 text-slate-200 hover:text-white transition-colors cursor-pointer font-medium"
                 >
                   <Icons.HelpCircle size={14} className="text-slate-400" />
-                  <span>Panduan Worldbuilding</span>
+                  <span>{t.navbar.worldGuide}</span>
                 </button>
 
                 <button
@@ -326,7 +365,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full px-2.5 py-1.5 rounded-xl hover:bg-[#383838] text-rose-400 flex items-center gap-2 transition-colors cursor-pointer font-medium"
                 >
                   <Icons.RotateCcw size={14} />
-                  <span>Bersihkan Workspace</span>
+                  <span>{t.navbar.clearWorkspace}</span>
                 </button>
               </div>
             </div>

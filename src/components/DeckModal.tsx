@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { WorldDeck } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 interface DeckModalProps {
@@ -25,6 +26,7 @@ export const DeckModal: React.FC<DeckModalProps> = ({
   deck,
   onSaveDeck,
 }) => {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#3b82f6');
@@ -66,10 +68,10 @@ export const DeckModal: React.FC<DeckModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold app-text-main">
-                {deck ? 'Edit Deck / Folder' : 'Buat Deck Baru'}
+                {deck ? t.modals.editDeck : t.modals.createDeck}
               </h3>
               <p className="text-[11px] app-text-muted">
-                Wadah untuk mengelompokkan kartu-kartu di galeri
+                {t.modals.deckDescPlaceholder}
               </p>
             </div>
           </div>
@@ -85,13 +87,13 @@ export const DeckModal: React.FC<DeckModalProps> = ({
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-bold app-text-main flex items-center gap-1.5">
-              <span>Nama Deck / Folder</span>
+              <span>{t.modals.deckName}</span>
               <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               required
-              placeholder="Contoh: faksi-faksi-kegelapan, Karakter Utama, dll."
+              placeholder={t.modals.deckNamePlaceholder}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3.5 py-2 text-xs rounded-xl app-bg-secondary border app-border focus:outline-none focus:border-blue-500 app-text-main font-medium"
@@ -100,10 +102,10 @@ export const DeckModal: React.FC<DeckModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold app-text-main">Deskripsi (Opsional)</label>
+            <label className="text-xs font-bold app-text-main">{t.modals.descriptionOpt}</label>
             <textarea
               rows={3}
-              placeholder="Catatan singkat tentang isi deck ini..."
+              placeholder={t.modals.deckDescPlaceholder}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3.5 py-2 text-xs rounded-xl app-bg-secondary border app-border focus:outline-none focus:border-blue-500 app-text-main font-medium resize-none"
@@ -111,7 +113,7 @@ export const DeckModal: React.FC<DeckModalProps> = ({
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-bold app-text-main">Warna Identitas Deck</label>
+            <label className="text-xs font-bold app-text-main">{t.modals.deckColor}</label>
             <div className="flex items-center gap-2">
               {COLOR_PRESETS.map((preset) => (
                 <button
@@ -137,7 +139,7 @@ export const DeckModal: React.FC<DeckModalProps> = ({
               onClick={onClose}
               className="px-4 py-2 rounded-xl text-xs font-semibold app-text-muted hover:app-text-main transition-colors"
             >
-              Batal
+              {t.common.cancel}
             </button>
             <button
               type="submit"
@@ -149,7 +151,7 @@ export const DeckModal: React.FC<DeckModalProps> = ({
               }`}
             >
               <Icons.Save size={14} />
-              <span>{deck ? 'Simpan Perubahan' : 'Buat Deck'}</span>
+              <span>{deck ? t.common.save : t.modals.createDeck}</span>
             </button>
           </div>
         </form>

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { WorldCard, CardCategory, WorldCanvas } from '../types';
 import { CATEGORY_CONFIGS, PRIMARY_CATEGORIES } from '../data/categoryConfig';
 import { loadWorkspacePreferences, saveWorkspacePreferences } from '../utils/storage';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 interface SidebarFilterProps {
@@ -53,6 +54,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
   onEditCardRequest,
   onFocusCardOnCanvas,
 }) => {
+  const { t, getCategoryLabel } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Resizable Panel Heights in percentage & Sidebar Width in px from preferences
@@ -275,7 +277,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
         <div className="p-3 border-b app-border flex items-center justify-between app-bg-main shrink-0">
           <div className="flex items-center gap-2">
             <Icons.Layers size={16} className="text-[#0d99ff]" />
-            <span className="text-xs font-bold app-text-main tracking-tight">Navigasi Kanvas</span>
+            <span className="text-xs font-bold app-text-main tracking-tight">{t.sidebar.workspaceCanvases}</span>
           </div>
 
           <button
@@ -296,7 +298,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Cari kartu / tag di kanvas..."
+              placeholder={t.sidebar.searchCardPlaceholder}
               className="w-full pl-8 pr-7 py-1.5 text-xs app-bg-secondary border app-border rounded-lg app-text-main placeholder:app-text-muted focus:outline-none focus:border-[#0d99ff]"
             />
             {searchQuery && (
@@ -321,7 +323,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
           >
             <div className="p-2 flex-1 overflow-y-auto space-y-0.5 custom-scrollbar">
               <span className="text-[10px] uppercase font-bold app-text-muted px-2 block my-1">
-                Kategori Kartu
+                {t.sidebar.cardCategories}
               </span>
 
               <button
@@ -335,7 +337,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
               >
                 <span className="flex items-center gap-2">
                   <Icons.Folder size={13} />
-                  <span>Semua Kategori</span>
+                  <span>{t.sidebar.allCategories}</span>
                 </span>
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded app-bg-main border app-border">
                   {cards.length}
@@ -366,7 +368,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                   >
                     <span className="flex items-center gap-2 truncate">
                       <CategoryIcon size={14} style={{ color: cfg.color }} className="shrink-0" />
-                      <span className="truncate">{cfg.label}</span>
+                      <span className="truncate">{getCategoryLabel(catKey as CardCategory)}</span>
                     </span>
                     <span className="text-[10px] font-mono px-1.5 py-0.2 rounded app-bg-main border app-border">
                       {count}
@@ -395,13 +397,13 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
             <div className="p-2 flex-1 overflow-y-auto space-y-0.5 custom-scrollbar">
               <div className="flex items-center justify-between px-2 my-1">
                 <span className="text-[10px] uppercase font-bold app-text-muted">
-                  Kanvas ({canvases.length})
+                  {t.sidebar.workspaceCanvases} ({canvases.length})
                 </span>
                 <button
                   type="button"
                   onClick={onCreateCanvasRequest}
                   className="p-1 rounded hover:app-bg-hover text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                  title="Tambah Kanvas Baru"
+                  title={t.sidebar.newCanvas}
                 >
                   <Icons.Plus size={12} strokeWidth={2.5} />
                 </button>
@@ -433,7 +435,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                         type="button"
                         onClick={() => onCanvasRenameRequest(c.id, c.name)}
                         className="p-0.5 rounded hover:app-bg-main app-text-muted hover:app-text-main transition-colors cursor-pointer"
-                        title="Ubah Nama Kanvas"
+                        title={t.sidebar.renameCanvas}
                       >
                         <Icons.Edit2 size={11} />
                       </button>
@@ -442,7 +444,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                           type="button"
                           onClick={() => onDuplicateCanvas(c.id)}
                           className="p-0.5 rounded hover:app-bg-main text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                          title="Duplikat Kanvas"
+                          title={t.sidebar.duplicateCanvas}
                         >
                           <Icons.Copy size={11} />
                         </button>
@@ -454,7 +456,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                         className={`p-0.5 rounded hover:app-bg-main transition-colors cursor-pointer ${
                           canvases.length <= 1 ? 'opacity-30 cursor-not-allowed text-slate-600' : 'text-rose-500 hover:text-rose-400'
                         }`}
-                        title="Hapus Kanvas"
+                        title={t.sidebar.deleteCanvas}
                       >
                         <Icons.Trash2 size={11} />
                       </button>
@@ -469,7 +471,6 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
           <div 
             onMouseDown={handleMouseDownResize('second')}
             className="h-[5px] min-h-[5px] w-full app-bg-secondary hover:bg-[var(--accent)] cursor-ns-resize transition-all flex items-center justify-center group relative z-10"
-            title="Seret untuk mengubah ukuran panel"
           >
             <div className="w-8 h-[1px] app-border group-hover:bg-[var(--accent)] opacity-50" />
           </div>
@@ -481,12 +482,12 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
           >
             <div className="p-2 flex-1 overflow-y-auto space-y-0.5 custom-scrollbar">
               <span className="text-[10px] uppercase font-bold app-text-muted px-2 block my-1">
-                Kartu Di Kanvas ({filteredCards.length})
+                {t.sidebar.cardList} ({filteredCards.length})
               </span>
 
               {filteredCards.length === 0 ? (
                 <div className="text-center py-6 app-text-muted text-xs select-none">
-                  Belum ada kartu di kanvas ini.
+                  {t.library.emptyTitle}
                 </div>
               ) : (
                 filteredCards.map((card) => {
@@ -507,7 +508,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                       }`}
                     >
                       <CardCategoryIcon size={13} style={{ color: cfg.color }} className="shrink-0" />
-                      <span className="truncate flex-1">{card.title || 'Kartu Tanpa Judul'}</span>
+                      <span className="truncate flex-1">{card.title || t.common.untitled}</span>
                       <span
                         className="w-1.5 h-1.5 rounded-full shrink-0"
                         style={{ backgroundColor: cfg.color }}
@@ -537,7 +538,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
             /* CANVAS ITEM CONTEXT MENU */
             <>
               <div className="px-3 py-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider select-none truncate">
-                🗺️ {contextMenu.targetCanvasName || 'Kanvas'}
+                🗺️ {contextMenu.targetCanvasName || t.sidebar.workspaceCanvases}
               </div>
 
               <div className="py-1 space-y-0.5">
@@ -550,7 +551,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                   className="w-full px-3 py-2 text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
                 >
                   <Icons.Layout size={14} />
-                  <span>Buka / Alihkan Kanvas</span>
+                  <span>{t.sidebar.focusOnCanvas}</span>
                 </button>
 
                 <button
@@ -562,7 +563,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                   className="w-full px-3 py-2 text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors font-semibold text-slate-200 cursor-pointer"
                 >
                   <Icons.Edit2 size={14} />
-                  <span>Ubah Nama Kanvas</span>
+                  <span>{t.sidebar.renameCanvas}</span>
                 </button>
 
                 {onDuplicateCanvas && (
@@ -575,7 +576,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
                   >
                     <Icons.Copy size={14} />
-                    <span>Duplikat Kanvas Board</span>
+                    <span>{t.sidebar.duplicateCanvas}</span>
                   </button>
                 )}
               </div>
@@ -591,7 +592,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors text-rose-400 font-medium cursor-pointer"
                   >
                     <Icons.Trash2 size={14} />
-                    <span>Hapus Kanvas</span>
+                    <span>{t.sidebar.deleteCanvas}</span>
                   </button>
                 </div>
               )}
@@ -600,7 +601,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
             /* CARD ITEM CONTEXT MENU */
             <>
               <div className="px-3 py-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider select-none truncate">
-                📄 {contextMenu.targetCard.title || 'Kartu Tanpa Judul'}
+                📄 {contextMenu.targetCard.title || t.common.untitled}
               </div>
 
               <div className="py-1 space-y-0.5">
@@ -616,7 +617,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                   className="w-full px-3 py-2 text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors font-bold text-[#0d99ff] cursor-pointer"
                 >
                   <Icons.Focus size={14} />
-                  <span>Fokus Ke Kartu Di Canvas</span>
+                  <span>{t.sidebar.focusOnCanvas}</span>
                 </button>
 
                 {onEditCardRequest && (
@@ -629,7 +630,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors font-semibold text-slate-200 cursor-pointer"
                   >
                     <Icons.Edit3 size={14} />
-                    <span>Edit Kartu</span>
+                    <span>{t.sidebar.editCard}</span>
                   </button>
                 )}
               </div>
@@ -645,7 +646,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors text-amber-400 font-medium cursor-pointer"
                   >
                     <Icons.MinusCircle size={14} />
-                    <span>Lepas dari Kanvas Ini</span>
+                    <span>{t.sidebar.removeFromCanvas}</span>
                   </button>
                 )}
 
@@ -659,7 +660,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                     className="w-full px-3 py-2 text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors text-rose-400 font-medium cursor-pointer"
                   >
                     <Icons.Trash2 size={14} />
-                    <span>Hapus Kartu Permanen</span>
+                    <span>{t.sidebar.deletePermanently}</span>
                   </button>
                 )}
               </div>
@@ -676,7 +677,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                 className="w-full px-3 py-2 text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
               >
                 <Icons.Plus size={14} strokeWidth={2.5} />
-                <span>+ Buat Kanvas Baru</span>
+                <span>+ {t.sidebar.newCanvas}</span>
               </button>
             </div>
           )}

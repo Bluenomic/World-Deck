@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
 export type DeleteTargetType = 'node' | 'track' | 'branch' | 'clear_all';
@@ -24,6 +25,8 @@ export const TimelineDeleteModal: React.FC<TimelineDeleteModalProps> = ({
   onClose,
   onConfirm,
 }) => {
+  const { t } = useLanguage();
+
   useEffect(() => {
     if (!isOpen || !target) return;
 
@@ -49,33 +52,33 @@ export const TimelineDeleteModal: React.FC<TimelineDeleteModalProps> = ({
         return {
           icon: <Icons.Trash2 size={20} className="text-rose-400" />,
           badgeClass: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-          title: 'Hapus Kejadian Waktu',
-          desc: 'Apakah Anda yakin ingin menghapus kejadian ini dari garis waktu?',
-          confirmText: 'Hapus Kejadian',
+          title: t.timeline.deleteNodeTitle,
+          desc: t.timeline.deleteNodeDesc,
+          confirmText: t.timeline.deleteEvent,
         };
       case 'branch':
         return {
           icon: <Icons.GitBranch size={20} className="text-cyan-400" />,
           badgeClass: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-          title: 'Hapus Percabangan Waktu',
-          desc: 'Apakah Anda yakin ingin menghapus hubungan percabangan ini?',
-          confirmText: 'Hapus Percabangan',
+          title: t.timeline.deleteBranchTitle,
+          desc: t.timeline.deleteBranchDesc,
+          confirmText: t.timeline.deleteTimeBranch,
         };
       case 'track':
         return {
           icon: <Icons.AlertTriangle size={20} className="text-amber-400" />,
           badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-          title: 'Hapus Garis Waktu Paralel',
-          desc: 'Tindakan ini akan menghapus garis waktu beserta seluruh kejadian di dalamnya.',
-          confirmText: 'Hapus Garis Waktu',
+          title: t.timeline.deleteTrackTitle,
+          desc: t.timeline.deleteTrackDesc,
+          confirmText: t.timeline.deleteTimeline,
         };
       case 'clear_all':
         return {
           icon: <Icons.AlertOctagon size={20} className="text-rose-500" />,
           badgeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
-          title: 'Bersihkan Seluruh Garis Waktu',
-          desc: 'Semua kejadian di seluruh garis waktu akan dihapus secara permanen.',
-          confirmText: 'Bersihkan Semua',
+          title: t.timeline.clearAllTitle,
+          desc: t.timeline.clearAllDesc,
+          confirmText: t.canvas.clearCanvas,
         };
     }
   };
@@ -114,14 +117,14 @@ export const TimelineDeleteModal: React.FC<TimelineDeleteModalProps> = ({
         {/* Item Content Preview */}
         <div className="p-3.5 rounded-xl app-bg-main border app-border space-y-1">
           <div className="text-[10px] font-mono font-bold uppercase tracking-wider app-text-muted">
-            {target.subtitle || 'Target Penghapusan'}
+            {target.subtitle || t.timeline.deletionTarget}
           </div>
           <div className="text-sm font-bold app-text-main truncate">
             {target.title}
           </div>
           {target.itemCount !== undefined && (
             <div className="text-[11px] app-text-muted">
-              Total kejadian terdampak: <span className="font-bold app-text-main">{target.itemCount}</span>
+              {t.timeline.totalEventsAffected} <span className="font-bold app-text-main">{target.itemCount}</span>
             </div>
           )}
         </div>
@@ -133,7 +136,7 @@ export const TimelineDeleteModal: React.FC<TimelineDeleteModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 rounded-xl app-bg-main app-text-main border app-border font-semibold hover:app-bg-hover transition-colors cursor-pointer"
           >
-            Batal
+            {t.common.cancel}
           </button>
           <button
             type="button"
