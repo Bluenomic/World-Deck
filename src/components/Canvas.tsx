@@ -1023,7 +1023,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               className="px-4 py-2 app-accent-bg text-white rounded-lg text-xs font-semibold shadow-md flex items-center justify-center gap-1.5 mx-auto"
             >
               <Icons.Plus size={15} />
-              <span>+ {t.canvas.addCard}</span>
+              <span>{t.canvas.addCard}</span>
             </button>
           </div>
         </div>
@@ -1401,7 +1401,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors text-slate-200 cursor-pointer font-medium"
                   >
                     <Icons.Hand size={14} className="app-text-muted" />
-                    <span>{isSpacePressed ? (language === 'en' ? 'Disable Pan Mode' : 'Matikan Mode Pan') : (language === 'en' ? 'Enable Pan Mode' : 'Aktifkan Mode Pan')}</span>
+                    <span>{isSpacePressed ? t.appPrompts.panModeDisable : t.appPrompts.panModeEnable}</span>
                   </button>
                 </div>
               </>

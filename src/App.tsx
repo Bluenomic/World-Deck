@@ -136,17 +136,12 @@ export const App: React.FC = () => {
 
   // Async Load State on Startup from IndexedDB, Tauri Disk, or LocalStorage
   useEffect(() => {
-    loadLocalFileHandle().then(async (handle) => {
-      if (handle) {
-        try {
-          const options = { mode: 'readwrite' };
-          const permission = await (handle as any).queryPermission(options);
-          if (permission === 'granted') {
-            setLocalDirectoryHandle(handle);
-            setLocalDirectoryName(handle.name);
-            // Load projects from directory
-            const projects = await readAllProjectsFromDirectory(handle);
-            if (projects.length > 0) {
+    const initStorage = async () => {
+      try {
+        if (isTauriAvailable()) {
+          try {
+            const projects = await listWorldsFromDisk();
+            if (projects && projects.length > 0) {
               setWorlds(projects);
               const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
               if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
@@ -155,50 +150,60 @@ export const App: React.FC = () => {
                 setActiveWorldId(projects[0].id);
               }
             } else {
-              // Write default sample world if directory is empty
-              await writeProjectToDirectory(handle, SAMPLE_WORLD);
+              await saveWorldToDisk(SAMPLE_WORLD);
               setWorlds([SAMPLE_WORLD]);
               setActiveWorldId(SAMPLE_WORLD.id);
             }
-          } else {
-            // Need user interaction to restore access permission
+          } catch (tauriErr) {
+            console.warn('Gagal memuat disk Tauri, menggunakan sample world:', tauriErr);
+            setWorlds([SAMPLE_WORLD]);
+            setActiveWorldId(SAMPLE_WORLD.id);
+          }
+          return;
+        }
+
+        const handle = await loadLocalFileHandle();
+        if (handle) {
+          try {
+            const options = { mode: 'readwrite' };
+            const permission = await (handle as any).queryPermission(options);
+            if (permission === 'granted') {
+              setLocalDirectoryHandle(handle);
+              setLocalDirectoryName(handle.name);
+              const projects = await readAllProjectsFromDirectory(handle);
+              if (projects.length > 0) {
+                setWorlds(projects);
+                const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
+                if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
+                  setActiveWorldId(savedActiveId);
+                } else {
+                  setActiveWorldId(projects[0].id);
+                }
+              } else {
+                await writeProjectToDirectory(handle, SAMPLE_WORLD);
+                setWorlds([SAMPLE_WORLD]);
+                setActiveWorldId(SAMPLE_WORLD.id);
+              }
+            } else {
+              setLocalDirectoryHandle(handle);
+              setLocalDirectoryName(handle.name);
+              setNeedDirectoryPermission(true);
+            }
+          } catch (e) {
+            console.warn('Gagal memuat izin directory handle:', e);
             setLocalDirectoryHandle(handle);
             setLocalDirectoryName(handle.name);
             setNeedDirectoryPermission(true);
           }
-        } catch (e) {
-          console.warn('Gagal memuat izin directory handle:', e);
-          setLocalDirectoryHandle(handle);
-          setLocalDirectoryName(handle.name);
-          setNeedDirectoryPermission(true);
         }
+      } catch (err) {
+        console.error('Gagal inisialisasi storage:', err);
+      } finally {
         setIsLoaded(true);
-        return;
       }
+    };
 
-      // Fallback if no local directory handle is saved in IndexedDB
-      if (isTauriAvailable()) {
-        listWorldsFromDisk().then(async (projects) => {
-          if (projects.length > 0) {
-            setWorlds(projects);
-            const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
-            if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
-              setActiveWorldId(savedActiveId);
-            } else {
-              setActiveWorldId(projects[0].id);
-            }
-          } else {
-            await saveWorldToDisk(SAMPLE_WORLD);
-            setWorlds([SAMPLE_WORLD]);
-            setActiveWorldId(SAMPLE_WORLD.id);
-          }
-          setIsLoaded(true);
-        });
-        return;
-      }
-
-      setIsLoaded(true);
-    });
+    initStorage();
   }, []);
 
   // Derived Active World
@@ -221,15 +226,15 @@ export const App: React.FC = () => {
     localStorage.setItem('worlddeck_active_id_v2', activeWorldId);
   }, [activeWorldId, isLoaded]);
 
-  // Auto save active world directly to Tauri disk or linked local directory
+  // Auto save active world directly to linked local directory or Tauri disk
   useEffect(() => {
     if (!isLoaded) return;
+    if (localDirectoryHandle && !needDirectoryPermission) {
+      writeProjectToDirectory(localDirectoryHandle, activeWorld);
+    }
     if (isTauriAvailable()) {
       saveWorldToDisk(activeWorld);
-      return;
     }
-    if (!localDirectoryHandle || needDirectoryPermission) return;
-    writeProjectToDirectory(localDirectoryHandle, activeWorld);
   }, [activeWorld, localDirectoryHandle, isLoaded, needDirectoryPermission]);
 
   // Folder Directory Actions
@@ -602,11 +607,11 @@ export const App: React.FC = () => {
   const handleDeleteDeck = (deckId: string) => {
     setConfirmModalConfig({
       isOpen: true,
-      title: language === 'en' ? 'Delete Deck / Folder' : 'Hapus Deck / Folder',
+      title: t.appPrompts.deleteDeckTitle,
       description: language === 'en'
         ? 'Are you sure you want to delete this Deck? Cards inside will not be deleted and will return to standalone cards.'
         : 'Apakah Anda yakin ingin menghapus Deck ini? Kartu-kartu di dalamnya tidak akan terhapus dan akan dikembalikan menjadi kartu mandiri.',
-      confirmLabel: language === 'en' ? 'Delete Deck' : 'Hapus Deck',
+      confirmLabel: t.appPrompts.deleteDeckConfirm,
       cancelLabel: t.common.cancel,
       variant: 'danger',
       onConfirm: () => {
@@ -678,11 +683,11 @@ export const App: React.FC = () => {
   const handleDeleteDocument = (docId: string) => {
     setConfirmModalConfig({
       isOpen: true,
-      title: language === 'en' ? 'Delete Document' : 'Hapus Dokumen',
+      title: t.appPrompts.deleteDocumentTitle,
       description: language === 'en'
         ? 'Are you sure you want to permanently delete this manuscript document?'
         : 'Apakah Anda yakin ingin menghapus dokumen naskah ini secara permanen?',
-      confirmLabel: language === 'en' ? 'Delete Document' : 'Hapus Dokumen',
+      confirmLabel: t.appPrompts.deleteDocumentConfirm,
       cancelLabel: t.common.cancel,
       variant: 'danger',
       onConfirm: () => {
@@ -787,8 +792,8 @@ export const App: React.FC = () => {
     );
     if (existing) {
       showAlertModal(
-        language === 'en' ? 'Connection Already Exists' : 'Koneksi Sudah Ada',
-        language === 'en' ? 'These two cards are already connected to each other.' : 'Dua kartu ini sudah saling terhubung satu sama lain.',
+        t.appPrompts.connectionExistsTitle,
+        t.appPrompts.connectionExistsDesc,
         'warning'
       );
       return;
@@ -851,19 +856,19 @@ export const App: React.FC = () => {
   const handleDeleteWorld = (worldId: string) => {
     if (worlds.length <= 1) {
       showAlertModal(
-        language === 'en' ? 'Cannot Delete World' : 'Tidak Dapat Menghapus Dunia',
-        language === 'en' ? 'You must have at least one world in the workspace.' : 'Anda harus memiliki setidaknya satu dunia dalam workspace.',
+        t.appPrompts.cannotDeleteWorldTitle,
+        t.appPrompts.cannotDeleteWorldDesc,
         'warning'
       );
       return;
     }
     setConfirmModalConfig({
       isOpen: true,
-      title: language === 'en' ? 'Delete World / Workspace' : 'Hapus Dunia / Workspace',
+      title: t.appPrompts.deleteWorldTitle,
       description: language === 'en'
         ? 'Are you sure you want to permanently delete this world from your world list?'
         : 'Apakah Anda yakin ingin menghapus dunia ini secara permanen dari daftar dunia Anda?',
-      confirmLabel: language === 'en' ? 'Delete Permanently' : 'Hapus Permanen',
+      confirmLabel: t.appPrompts.deletePermanently,
       cancelLabel: t.common.cancel,
       variant: 'danger',
       onConfirm: () => {
@@ -903,12 +908,12 @@ export const App: React.FC = () => {
     const newCanvasId = generateId('canvas');
     const newCanvas = {
       id: newCanvasId,
-      name: name || (language === 'en' ? 'New Canvas' : 'Kanvas Baru'),
+      name: name || t.appPrompts.newCanvasDefault,
       createdAt: Date.now(),
     };
     updateActiveWorld((prev) => ({
       ...prev,
-      canvases: [...(prev.canvases || [{ id: 'default', name: language === 'en' ? 'Main Canvas' : 'Kanvas Utama', createdAt: Date.now() }]), newCanvas],
+      canvases: [...(prev.canvases || [{ id: 'default', name: t.appPrompts.mainCanvasDefault, createdAt: Date.now() }]), newCanvas],
       updatedAt: Date.now(),
     }));
     setActiveCanvasId(newCanvasId);
@@ -918,7 +923,7 @@ export const App: React.FC = () => {
     updateActiveWorld((prev) => {
       const canvases = prev.canvases && prev.canvases.length > 0
         ? prev.canvases
-        : [{ id: 'default', name: language === 'en' ? 'Main Canvas' : 'Kanvas Utama', createdAt: Date.now() }];
+        : [{ id: 'default', name: t.appPrompts.mainCanvasDefault, createdAt: Date.now() }];
       return {
         ...prev,
         canvases: canvases.map((c) => (c.id === canvasId ? { ...c, name: newName } : c)),
@@ -931,8 +936,8 @@ export const App: React.FC = () => {
     setCanvasModalConfig({
       isOpen: true,
       mode: 'create',
-      title: language === 'en' ? 'Create New Canvas' : 'Buat Kanvas Baru',
-      submitLabel: language === 'en' ? 'Create Canvas' : 'Buat Kanvas',
+      title: t.appPrompts.createCanvasTitle,
+      submitLabel: t.appPrompts.createCanvasSubmit,
       initialValue: '',
     });
   };
@@ -942,8 +947,8 @@ export const App: React.FC = () => {
       isOpen: true,
       mode: 'rename',
       canvasId,
-      title: language === 'en' ? 'Rename Canvas' : 'Ubah Nama Kanvas',
-      submitLabel: language === 'en' ? 'Save Name' : 'Simpan Nama',
+      title: t.appPrompts.renameCanvasTitle,
+      submitLabel: t.appPrompts.saveName,
       initialValue: currentName,
     });
   };
@@ -959,22 +964,22 @@ export const App: React.FC = () => {
   const handleDeleteCanvas = (canvasId: string) => {
     const canvases = activeWorld.canvases && activeWorld.canvases.length > 0
       ? activeWorld.canvases
-      : [{ id: 'default', name: language === 'en' ? 'Main Canvas' : 'Kanvas Utama', createdAt: Date.now() }];
+      : [{ id: 'default', name: t.appPrompts.mainCanvasDefault, createdAt: Date.now() }];
     if (canvases.length <= 1) {
       showAlertModal(
-        language === 'en' ? 'Cannot Delete Canvas' : 'Tidak Dapat Menghapus Kanvas',
-        language === 'en' ? 'You must keep at least one canvas.' : 'Anda harus menyisakan setidaknya satu kanvas.',
+        t.appPrompts.cannotDeleteCanvasTitle,
+        t.appPrompts.cannotDeleteCanvasDesc,
         'warning'
       );
       return;
     }
     setConfirmModalConfig({
       isOpen: true,
-      title: language === 'en' ? 'Delete Canvas' : 'Hapus Kanvas',
+      title: t.appPrompts.deleteCanvasTitle,
       description: language === 'en'
         ? 'Are you sure you want to permanently delete this canvas along with card locations inside it?'
         : 'Apakah Anda yakin ingin menghapus kanvas ini beserta lokasi kartu di dalamnya secara permanen?',
-      confirmLabel: language === 'en' ? 'Delete Canvas' : 'Hapus Kanvas',
+      confirmLabel: t.appPrompts.deleteCanvasConfirm,
       cancelLabel: t.common.cancel,
       variant: 'danger',
       onConfirm: () => {
@@ -1008,7 +1013,7 @@ export const App: React.FC = () => {
       const newCanvasId = generateId('canvas');
       const newCanvas: WorldCanvas = {
         id: newCanvasId,
-        name: `${sourceCanvas.name} ${t.documents.copySuffix}`,
+        name: `${sourceCanvas.name} (${t.appPrompts.copySuffix})`,
         createdAt: Date.now(),
       };
       
@@ -1024,7 +1029,7 @@ export const App: React.FC = () => {
       return {
         ...prev,
         updatedAt: Date.now(),
-        canvases: [...(prev.canvases || [{ id: 'default', name: language === 'en' ? 'Main Canvas' : 'Kanvas Utama', createdAt: Date.now() }]), newCanvas],
+        canvases: [...(prev.canvases || [{ id: 'default', name: t.appPrompts.mainCanvasDefault, createdAt: Date.now() }]), newCanvas],
         cards: [...prev.cards, ...clonedCards],
       };
     });
@@ -1058,28 +1063,28 @@ export const App: React.FC = () => {
           const newWorld: WorldProject = {
             ...importedData,
             id: generateId('world'),
-            name: importedData.name || (language === 'en' ? 'Imported World' : 'Dunia Impor'),
+            name: importedData.name || t.appPrompts.importedWorldDefault,
             updatedAt: Date.now(),
           };
           setWorlds((prev) => [...prev, newWorld]);
           setActiveWorldId(newWorld.id);
 
           showAlertModal(
-            language === 'en' ? 'World Import Success' : 'Sukses Impor Dunia',
-            language === 'en' ? `Successfully imported world: ${newWorld.name}` : `Berhasil mengimpor dunia: ${newWorld.name}`,
+            t.appPrompts.worldImportSuccessTitle,
+            `${t.appPrompts.worldImportSuccessDesc} ${newWorld.name}`,
             'success'
           );
         } else {
           showAlertModal(
-            language === 'en' ? 'Import Failed' : 'Gagal Impor',
-            language === 'en' ? 'Invalid JSON file format.' : 'Format berkas JSON tidak valid.',
+            t.appPrompts.importFailedTitle,
+            t.appPrompts.importFailedDesc,
             'danger'
           );
         }
       } catch (err) {
         showAlertModal(
-          language === 'en' ? 'Failed to Read File' : 'Gagal Membaca Berkas',
-          language === 'en' ? 'Failed to read selected JSON file.' : 'Gagal membaca berkas JSON yang dipilih.',
+          t.appPrompts.failedToReadFileTitle,
+          t.appPrompts.failedToReadFileDesc,
           'danger'
         );
       }
@@ -1094,11 +1099,11 @@ export const App: React.FC = () => {
     } else {
       setConfirmModalConfig({
         isOpen: true,
-        title: language === 'en' ? 'Clear All Cards' : 'Bersihkan Seluruh Kartu',
+        title: t.appPrompts.clearCardsTitle,
         description: language === 'en'
           ? 'Are you sure you want to clear all cards in this world and start with an empty canvas?'
           : 'Apakah Anda yakin ingin membersihkan seluruh kartu pada dunia ini dan memulai dari kanvas kosong?',
-        confirmLabel: language === 'en' ? 'Clear Cards' : 'Bersihkan Kartu',
+        confirmLabel: t.appPrompts.clearCardsConfirm,
         cancelLabel: t.common.cancel,
         variant: 'danger',
         onConfirm: () => {
@@ -1119,7 +1124,20 @@ export const App: React.FC = () => {
     if (viewMode !== 'canvas') setViewMode('canvas');
   };
 
-  if (isLoaded && (!localDirectoryHandle || needDirectoryPermission)) {
+  if (!isLoaded) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center app-bg-main app-text-main font-sans">
+        <div className="flex flex-col items-center gap-3 animate-in fade-in duration-200">
+          <div className="w-12 h-12 rounded-2xl app-accent-bg flex items-center justify-center text-white font-bold shadow-lg animate-pulse">
+            <Icons.Sparkles size={24} />
+          </div>
+          <span className="text-xs font-semibold text-slate-400">Memuat Workspace...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isTauriAvailable() && (!localDirectoryHandle || needDirectoryPermission)) {
     return (
       <div className="h-screen w-screen flex items-center justify-center app-bg-main app-text-main font-sans relative overflow-hidden">
         {/* Background Decorative Gradients */}
@@ -1132,11 +1150,11 @@ export const App: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-xl font-extrabold app-text-main tracking-tight">World Deck Workspace</h2>
+            <h2 className="text-xl font-extrabold app-text-main tracking-tight">{t.workspacePermission.title}</h2>
             <p className="text-xs app-text-muted leading-relaxed px-2">
               {!localDirectoryHandle
-                ? "Pilih folder lokal di komputer Anda untuk menyimpan seluruh proyek dunia Anda. Semua perubahan akan disimpan secara otomatis ke folder tersebut."
-                : `Aplikasi membutuhkan izin untuk mengakses kembali folder: "${localDirectoryName}".`}
+                ? t.workspacePermission.selectDesc
+                : `${t.workspacePermission.reGrantDesc} "${localDirectoryName}".`}
             </p>
           </div>
 
@@ -1148,7 +1166,7 @@ export const App: React.FC = () => {
                 className="w-full py-3 rounded-xl app-accent-bg hover:opacity-90 text-white text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Icons.FolderOpen size={16} />
-                <span>Pilih Folder Workspace</span>
+                <span>{t.navbar.selectWorkspace}</span>
               </button>
             ) : (
               <div className="space-y-2">
@@ -1158,7 +1176,7 @@ export const App: React.FC = () => {
                   className="w-full py-3 rounded-xl app-accent-bg hover:opacity-90 text-white text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Icons.Unlock size={16} />
-                  <span>Izinkan Akses Folder "{localDirectoryName}"</span>
+                  <span>{t.workspacePermission.grantAccess} "{localDirectoryName}"</span>
                 </button>
                 <button
                   type="button"
@@ -1166,7 +1184,7 @@ export const App: React.FC = () => {
                   className="w-full py-2.5 rounded-xl app-bg-main border app-border hover:app-bg-hover app-text-muted text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Icons.FolderOpen size={14} />
-                  <span>Pilih Folder Lain</span>
+                  <span>{t.workspacePermission.selectAnother}</span>
                 </button>
               </div>
             )}
@@ -1297,8 +1315,8 @@ export const App: React.FC = () => {
 
           {viewMode === 'timeline' && (
             <TimelineView
-              cards={activeCanvasCards}
-              connections={activeCanvasConnections}
+              cards={activeWorld.cards}
+              connections={activeWorld.connections}
               onCardClick={(card) => setReaderCardId(card.id)}
               activeWorldId={activeWorldId}
               timelineTracks={activeWorld.timelineTracks}

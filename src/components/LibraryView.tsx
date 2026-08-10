@@ -162,6 +162,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const prevRectsRef = useRef<Map<string, DOMRect>>(new Map());
   const lastSwapTimeRef = useRef<number>(0);
 
+  // Pointer drag refs for 100% reliable cross-platform card reordering
+  const pointerDragActiveRef = useRef<boolean>(false);
+  const pointerStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const pointerCardIdRef = useRef<string | null>(null);
+
   // Execute FLIP layout animation whenever liveOrder shifts
   useLayoutEffect(() => {
     if (!liveOrder) {
@@ -232,6 +237,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     setIsNearTop(false);
     draggedCardIdRef.current = null;
     isDroppingRef.current = false;
+    pointerCardIdRef.current = null;
+    pointerDragActiveRef.current = false;
   };
 
   const finishCardDrop = (targetOptions?: {
@@ -321,9 +328,92 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     }, dropDuration);
   };
 
-  // Track global cursor position during HTML5 drag — direct DOM for zero-lag
+  // Get active deck if user navigated inside a deck
+  const activeDeck = decks.find((d) => d.id === activeDeckId) || null;
+
+  // Filter cards based on search, category, and active deck navigation
+  const cardsToDisplay = cards.filter((card) => {
+    if (activeDeckId) {
+      return card.deckId === activeDeckId || (activeDeck?.cardIds || []).includes(card.id);
+    }
+    if (activeTab === 'all') return !card.deckId;
+    return true;
+  });
+
+  // Track global cursor position during Pointer & HTML5 drag — direct DOM for zero-lag
   useEffect(() => {
-    if (!draggedCardId) return;
+    const handleGlobalPointerMove = (e: PointerEvent) => {
+      if (!pointerCardIdRef.current || isDroppingRef.current) return;
+
+      const cardId = pointerCardIdRef.current;
+
+      if (!pointerDragActiveRef.current) {
+        const dist = Math.hypot(e.clientX - pointerStartPosRef.current.x, e.clientY - pointerStartPosRef.current.y);
+        if (dist < 5) return;
+
+        pointerDragActiveRef.current = true;
+        draggedCardIdRef.current = cardId;
+        const targetCard = cardsToDisplay.find((c) => c.id === cardId);
+        if (targetCard) setDraggedCardData(targetCard);
+
+        const cardEl = cardDomRefs.current.get(cardId);
+        if (cardEl) {
+          const rect = cardEl.getBoundingClientRect();
+          dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        } else {
+          dragOffsetRef.current = { x: 120, y: 80 };
+        }
+
+        cardDomRefs.current.forEach((el, id) => {
+          if (el) prevRectsRef.current.set(id, el.getBoundingClientRect());
+        });
+
+        const initOrder = cardsToDisplay.map((c) => c.id);
+        liveOrderRef.current = initOrder;
+        setLiveOrder(initOrder);
+        setDraggedCardId(cardId);
+        setDroppingCardId(null);
+      }
+
+      dragPosRef.current = { x: e.clientX, y: e.clientY };
+
+      if (floatingPreviewRef.current) {
+        const x = e.clientX - dragOffsetRef.current.x;
+        const y = e.clientY - dragOffsetRef.current.y;
+        floatingPreviewRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      }
+
+      const currentOrder = liveOrderRef.current;
+      if (!currentOrder) return;
+
+      const hoveredEl = document.elementFromPoint(e.clientX, e.clientY);
+      const cardItemEl = hoveredEl?.closest('[data-card-id]') as HTMLElement | null;
+      const hoveredCardId = cardItemEl?.getAttribute('data-card-id');
+
+      if (hoveredCardId && hoveredCardId !== cardId) {
+        const now = Date.now();
+        if (now - lastSwapTimeRef.current >= 40) {
+          const fromIdx = currentOrder.indexOf(cardId);
+          const toIdx = currentOrder.indexOf(hoveredCardId);
+
+          if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+            lastSwapTimeRef.current = now;
+            const nextOrder = [...currentOrder];
+            nextOrder.splice(fromIdx, 1);
+            nextOrder.splice(toIdx, 0, cardId);
+            updateLiveOrderWithFLIP(nextOrder);
+          }
+        }
+      }
+    };
+
+    const handleGlobalPointerUp = () => {
+      if (pointerDragActiveRef.current && (draggedCardIdRef.current || draggedCardId)) {
+        finishCardDrop();
+      }
+      pointerCardIdRef.current = null;
+      pointerDragActiveRef.current = false;
+    };
 
     const updatePreviewPos = () => {
       if (isDroppingRef.current) return;
@@ -351,40 +441,35 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     };
 
     const handleGlobalDragEnd = () => {
-      if (!isDroppingRef.current && (draggedCardIdRef.current || draggedCardId)) {
+      if (!isDroppingRef.current && (draggedCardIdRef.current || draggedCardId || pointerDragActiveRef.current)) {
         finishCardDrop();
       }
+      pointerCardIdRef.current = null;
+      pointerDragActiveRef.current = false;
     };
 
+    window.addEventListener('pointermove', handleGlobalPointerMove);
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerUp);
     window.addEventListener('dragenter', handleGlobalDragOver);
     window.addEventListener('dragover', handleGlobalDragOver);
     window.addEventListener('dragend', handleGlobalDragEnd);
     window.addEventListener('mouseup', handleGlobalDragEnd);
-    window.addEventListener('pointerup', handleGlobalDragEnd);
+
     return () => {
+      window.removeEventListener('pointermove', handleGlobalPointerMove);
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('pointercancel', handleGlobalPointerUp);
       window.removeEventListener('dragenter', handleGlobalDragOver);
       window.removeEventListener('dragover', handleGlobalDragOver);
       window.removeEventListener('dragend', handleGlobalDragEnd);
       window.removeEventListener('mouseup', handleGlobalDragEnd);
-      window.removeEventListener('pointerup', handleGlobalDragEnd);
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
     };
-  }, [draggedCardId, onReorderCards]);
-
-  // Get active deck if user navigated inside a deck
-  const activeDeck = decks.find((d) => d.id === activeDeckId) || null;
-
-  // Filter cards based on search, category, and active deck navigation
-  const cardsToDisplay = cards.filter((card) => {
-    if (activeDeckId) {
-      return card.deckId === activeDeckId || (activeDeck?.cardIds || []).includes(card.id);
-    }
-    if (activeTab === 'all') return !card.deckId;
-    return true;
-  });
+  }, [cardsToDisplay, draggedCardId]);
 
   const filteredDecks = decks;
   const showDecksInGrid = !activeDeckId && (activeTab === 'all' || activeTab === 'decks');
@@ -801,6 +886,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           else cardDomRefs.current.delete(card.id);
         }}
         draggable={true}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          const target = e.target as HTMLElement;
+          if (target.closest('button') || target.closest('input') || target.closest('.no-drag')) return;
+          pointerStartPosRef.current = { x: e.clientX, y: e.clientY };
+          pointerCardIdRef.current = card.id;
+          pointerDragActiveRef.current = false;
+        }}
         onMouseDown={() => handleTouchMouseDown(card.id)}
         onMouseUp={handleTouchMouseUp}
         onMouseLeave={handleTouchMouseUp}
@@ -856,13 +949,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         }}
         onDragOver={(e) => {
           e.preventDefault(); // allow drop
-          if (isDroppingRef.current || !draggedCardId || draggedCardId === card.id || !liveOrder) return;
+          const activeDraggedId = draggedCardIdRef.current || draggedCardId;
+          const currentOrder = liveOrderRef.current || liveOrder;
+          if (isDroppingRef.current || !activeDraggedId || activeDraggedId === card.id || !currentOrder) return;
 
           const now = Date.now();
-          if (now - lastSwapTimeRef.current < 160) return;
+          if (now - lastSwapTimeRef.current < 40) return;
 
-          const fromIdx = liveOrder.indexOf(draggedCardId);
-          const toIdx = liveOrder.indexOf(card.id);
+          const fromIdx = currentOrder.indexOf(activeDraggedId);
+          const toIdx = currentOrder.indexOf(card.id);
 
           if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
             const rect = e.currentTarget.getBoundingClientRect();
@@ -874,14 +969,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
             const isForward = fromIdx < toIdx;
             const crossedMidpoint = isForward
-              ? cursorX > midX || cursorY > midY + 15
-              : cursorX < midX || cursorY < midY - 15;
+              ? cursorX > midX || cursorY > midY + 10
+              : cursorX < midX || cursorY < midY - 10;
 
             if (crossedMidpoint) {
               lastSwapTimeRef.current = now;
-              const nextOrder = [...liveOrder];
+              const nextOrder = [...currentOrder];
               nextOrder.splice(fromIdx, 1);
-              nextOrder.splice(toIdx, 0, draggedCardId);
+              nextOrder.splice(toIdx, 0, activeDraggedId);
               updateLiveOrderWithFLIP(nextOrder);
             }
           }
@@ -1051,6 +1146,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           else cardDomRefs.current.delete(card.id);
         }}
         draggable={true}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          const target = e.target as HTMLElement;
+          if (target.closest('button') || target.closest('input') || target.closest('.no-drag')) return;
+          pointerStartPosRef.current = { x: e.clientX, y: e.clientY };
+          pointerCardIdRef.current = card.id;
+          pointerDragActiveRef.current = false;
+        }}
         onMouseDown={() => handleTouchMouseDown(card.id)}
         onMouseUp={handleTouchMouseUp}
         onMouseLeave={handleTouchMouseUp}
@@ -1102,28 +1205,34 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         }}
         onDragOver={(e) => {
           e.preventDefault();
-          if (isDroppingRef.current || !draggedCardId || draggedCardId === card.id || !liveOrder) return;
+          const activeDraggedId = draggedCardIdRef.current || draggedCardId;
+          const currentOrder = liveOrderRef.current || liveOrder;
+          if (isDroppingRef.current || !activeDraggedId || activeDraggedId === card.id || !currentOrder) return;
 
           const now = Date.now();
-          if (now - lastSwapTimeRef.current < 120) return;
+          if (now - lastSwapTimeRef.current < 40) return;
 
-          const fromIdx = liveOrder.indexOf(draggedCardId);
-          const toIdx = liveOrder.indexOf(card.id);
+          const fromIdx = currentOrder.indexOf(activeDraggedId);
+          const toIdx = currentOrder.indexOf(card.id);
 
           if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
             const rect = e.currentTarget.getBoundingClientRect();
             const cursorY = e.clientY || e.pageY;
-            if (!cursorY) return;
+            const cursorX = e.clientX || e.pageX;
+            if (!cursorY && !cursorX) return;
             const midY = rect.top + rect.height / 2;
+            const midX = rect.left + rect.width / 2;
 
             const isForward = fromIdx < toIdx;
-            const crossedMidpoint = isForward ? cursorY > midY + 4 : cursorY < midY - 4;
+            const crossedMidpoint = isForward
+              ? cursorY > midY + 4 || cursorX > midX + 10
+              : cursorY < midY - 4 || cursorX < midX - 10;
 
             if (crossedMidpoint) {
               lastSwapTimeRef.current = now;
-              const nextOrder = [...liveOrder];
+              const nextOrder = [...currentOrder];
               nextOrder.splice(fromIdx, 1);
-              nextOrder.splice(toIdx, 0, draggedCardId);
+              nextOrder.splice(toIdx, 0, activeDraggedId);
               updateLiveOrderWithFLIP(nextOrder);
             }
           }

@@ -2,7 +2,6 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { WorldDocument, WorldCard } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import { generateId } from '../utils/helpers';
-import { isTauriAvailable, saveImageAsset } from '../utils/tauriStorage';
 import { useLanguage } from '../i18n/LanguageContext';
 import * as Icons from 'lucide-react';
 
@@ -130,6 +129,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const replaceImageInputRef = useRef<HTMLInputElement>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+
+  const triggerImageUpload = () => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      savedRangeRef.current = selection.getRangeAt(0).cloneRange();
+    }
+    imageInputRef.current?.click();
+  };
 
   // Inline @ Mention Suggestion Popup State
   const [mentionState, setMentionState] = useState<{
@@ -1177,23 +1185,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     document.body.removeChild(a);
   };
 
-  const handleReplaceImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReplaceImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedImage) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const base64Data = event.target?.result as string;
-      let finalUrl = base64Data;
-      if (isTauriAvailable()) {
-        try {
-          const savedUrl = await saveImageAsset(base64Data, file.name);
-          if (savedUrl) finalUrl = savedUrl;
-        } catch (err) {
-          console.warn('saveImageAsset failed, using base64:', err);
-        }
-      }
-      selectedImage.img.src = finalUrl;
+      if (!base64Data) return;
+      selectedImage.img.src = base64Data;
       selectedImage.img.alt = file.name;
       updateToolbarState();
     };
@@ -1209,24 +1209,48 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   };
 
   // Handle Image Upload into ContentEditable Canvas (Clean Image, No Filename Text)
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const base64Data = event.target?.result as string;
-      let finalUrl = base64Data;
-      if (isTauriAvailable()) {
-        try {
-          const savedUrl = await saveImageAsset(base64Data, file.name);
-          if (savedUrl) finalUrl = savedUrl;
-        } catch (err) {
-          console.warn('saveImageAsset failed, using base64:', err);
+      if (!base64Data) return;
+
+      const imgHtml = `\u00A0<span class="doc-img-wrapper img-mode-inline select-none" contenteditable="false" style="display: inline-block; vertical-align: middle; margin: 0.25rem 0.5rem; float: none; clear: none;"><img src="${base64Data}" alt="${file.name}" class="max-h-[350px] rounded-xl border border-slate-700/60 shadow-md object-contain w-auto inline-block align-middle" /></span>\u00A0`;
+
+      if (editorRef.current) {
+        editorRef.current.focus();
+        const selection = window.getSelection();
+        if (savedRangeRef.current && selection) {
+          selection.removeAllRanges();
+          selection.addRange(savedRangeRef.current);
+
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = imgHtml;
+          const frag = document.createDocumentFragment();
+          let node;
+          let lastInsertedNode: Node | null = null;
+          while ((node = tempDiv.firstChild)) {
+            lastInsertedNode = frag.appendChild(node);
+          }
+          savedRangeRef.current.deleteContents();
+          savedRangeRef.current.insertNode(frag);
+
+          if (lastInsertedNode) {
+            savedRangeRef.current.setStartAfter(lastInsertedNode);
+            savedRangeRef.current.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(savedRangeRef.current);
+          }
+        } else {
+          insertHtmlAtCursor(imgHtml);
         }
+      } else {
+        insertHtmlAtCursor(imgHtml);
       }
-      const imgHtml = `\u00A0<span class="doc-img-wrapper img-mode-inline select-none" contenteditable="false" style="display: inline-block; vertical-align: middle; margin: 0.25rem 0.5rem; float: none; clear: none;"><img src="${finalUrl}" alt="${file.name}" class="max-h-[350px] rounded-xl border border-slate-700/60 shadow-md object-contain w-auto inline-block align-middle" /></span>\u00A0`;
-      insertHtmlAtCursor(imgHtml);
+      updateToolbarState();
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -1906,7 +1930,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => imageInputRef.current?.click()}
+                  onClick={() => triggerImageUpload()}
                   className="p-1.5 rounded-xl hover:bg-[#383838] text-[#0d99ff] font-bold transition-colors cursor-pointer flex items-center gap-1"
                   title={t.documents.addImageTooltip}
                 >
@@ -2891,7 +2915,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
             <button
               type="button"
               onClick={() => {
-                imageInputRef.current?.click();
+                triggerImageUpload();
                 setEditorContextMenu(null);
               }}
               className="w-full px-2.5 py-1.5 rounded-xl flex items-center gap-2 hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"

@@ -7,7 +7,6 @@ import { TimelineDeleteModal } from './TimelineDeleteModal';
 import type { TimelineDeleteTarget } from './TimelineDeleteModal';
 import { ConfirmModal } from './ConfirmModal';
 import type { ConfirmModalConfig } from './ConfirmModal';
-import { isTauriAvailable, saveImageAsset } from '../utils/tauriStorage';
 
 interface TimelineTrack {
   id: string;
@@ -39,7 +38,7 @@ interface TimelineViewProps {
 }
 
 // Minimum gap between adjacent events on the same track
-const MIN_EVENT_GAP = 240;
+const MIN_EVENT_GAP = 310;
 
 // Dynamic Inter-Track Spacing Engine
 const calculateTrackLayout = (sortedTracks: TimelineTrack[], allNodes: SimpleTimelineNode[]) => {
@@ -62,7 +61,8 @@ const calculateTrackLayout = (sortedTracks: TimelineTrack[], allNodes: SimpleTim
       const isUpperStem = idx % 2 === 0;
       if (!isUpperStem) {
         // Lower stem extending DOWNWARD towards trackLower
-        const cardHeight = node.description ? 150 : 120;
+        const hasImage = !!(node.imageUrl || (node.images && node.images.length > 0));
+        const cardHeight = (node.description ? 150 : 120) + (hasImage ? 70 : 0);
         maxDownward = Math.max(maxDownward, 70 + cardHeight);
       }
     });
@@ -73,7 +73,8 @@ const calculateTrackLayout = (sortedTracks: TimelineTrack[], allNodes: SimpleTim
       const isUpperStem = idx % 2 === 0;
       if (isUpperStem) {
         // Upper stem extending UPWARD towards trackUpper
-        const cardHeight = node.description ? 150 : 120;
+        const hasImage = !!(node.imageUrl || (node.images && node.images.length > 0));
+        const cardHeight = (node.description ? 150 : 120) + (hasImage ? 70 : 0);
         maxUpward = Math.max(maxUpward, 70 + cardHeight);
       }
     });
@@ -110,61 +111,33 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 }) => {
   const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
-  const storageKey = `worlddeck_timeline_v4_${activeWorldId}`;
+
+  const defaultTracks: TimelineTrack[] = useMemo(() => [
+    { id: 'track_main', name: t.timeline.mainTimeline, order: 0 },
+  ], [t.timeline.mainTimeline]);
 
   // Timeline Tracks State
   const [tracks, setTracks] = useState<TimelineTrack[]>(() => {
-    if (timelineTracks && timelineTracks.length > 0) return timelineTracks;
-    try {
-      const saved = localStorage.getItem(`${storageKey}_tracks`);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [
-      { id: 'track_main', name: t.timeline.mainTimeline, order: 0 },
-    ];
+    return timelineTracks && timelineTracks.length > 0 ? timelineTracks : defaultTracks;
   });
 
   // Timeline Nodes State
   const [nodes, setNodes] = useState<SimpleTimelineNode[]>(() => {
-    if (timelineNodes) return timelineNodes;
-    try {
-      const saved = localStorage.getItem(`${storageKey}_nodes`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.map((n: any) => ({ ...n, trackId: n.trackId || 'track_main' }));
-      }
-    } catch (e) {}
-    return [];
+    return timelineNodes || [];
   });
 
   // Timeline Branches State
   const [branches, setBranches] = useState<TimelineBranch[]>(() => {
-    if (timelineBranches) return timelineBranches;
-    try {
-      const saved = localStorage.getItem(`${storageKey}_branches`);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [];
+    return timelineBranches || [];
   });
 
   // Sync state when activeWorld or props change
   useEffect(() => {
-    if (timelineTracks && timelineTracks.length > 0) {
-      setTracks(timelineTracks);
-    }
-  }, [timelineTracks]);
-
-  useEffect(() => {
-    if (timelineNodes) {
-      setNodes(timelineNodes);
-    }
-  }, [timelineNodes]);
-
-  useEffect(() => {
-    if (timelineBranches) {
-      setBranches(timelineBranches);
-    }
-  }, [timelineBranches]);
+    setTracks(timelineTracks && timelineTracks.length > 0 ? timelineTracks : defaultTracks);
+    const rawNodes = timelineNodes || [];
+    setNodes(rawNodes.length > 0 ? applyAutoSpacing(rawNodes) : rawNodes);
+    setBranches(timelineBranches || []);
+  }, [activeWorldId, timelineTracks, timelineNodes, timelineBranches, defaultTracks]);
 
   // Interactive Branch Drafting State
   const [draftBranch, setDraftBranch] = useState<{
@@ -298,15 +271,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const sortedTracks = [...tracks].sort((a, b) => a.order - b.order);
   const { relativeYMap, totalSpan, stackCenter } = calculateTrackLayout(sortedTracks, nodes);
 
-  // Persist State to LocalStorage and Parent World state
+  // Persist State to Parent World state (skip during node dragging)
   useEffect(() => {
-    try {
-      localStorage.setItem(`${storageKey}_tracks`, JSON.stringify(tracks));
-      localStorage.setItem(`${storageKey}_nodes`, JSON.stringify(nodes));
-      localStorage.setItem(`${storageKey}_branches`, JSON.stringify(branches));
-    } catch (e) {}
+    if (draggingNodeId) return;
     onSaveTimeline?.(tracks, nodes, branches);
-  }, [tracks, nodes, branches, storageKey]);
+  }, [tracks, nodes, branches, draggingNodeId]);
 
   // Cancel draft branch on Escape key
   useEffect(() => {
@@ -347,30 +316,22 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   useEffect(() => {
     if (!draggingNodeId) return;
 
-    const draggingNode = nodes.find((n) => n.id === draggingNodeId);
-    if (!draggingNode) return;
-
     const handleWindowMouseMove = (e: MouseEvent) => {
       const deltaX = e.clientX - dragStartX;
       const rawNextX = initialNodeX + deltaX;
-
-      const sameTrackNodes = nodes.filter(
-        (n) => n.trackId === draggingNode.trackId && n.id !== draggingNodeId
-      );
-      const sortedSameTrack = [...sameTrackNodes].sort((a, b) => a.x - b.x);
-
-      const leftNeighbor = [...sortedSameTrack].reverse().find((n) => n.x <= initialNodeX);
-      const rightNeighbor = sortedSameTrack.find((n) => n.x >= initialNodeX);
-
-      const minAllowedX = leftNeighbor ? leftNeighbor.x + MIN_EVENT_GAP : 20;
-      const maxAllowedX = rightNeighbor ? rightNeighbor.x - MIN_EVENT_GAP : Infinity;
-
-      const clampedX = Math.max(minAllowedX, Math.min(maxAllowedX, Math.round(rawNextX)));
+      const clampedX = Math.max(20, Math.round(rawNextX));
 
       setNodes((prev) => prev.map((n) => (n.id === draggingNodeId ? { ...n, x: clampedX } : n)));
     };
 
     const handleWindowMouseUp = () => {
+      setNodes((prev) => {
+        const draggedNode = prev.find((n) => n.id === draggingNodeId);
+        if (draggedNode) {
+          return applyAutoSpacing(prev, draggedNode.trackId);
+        }
+        return prev;
+      });
       setDraggingNodeId(null);
     };
 
@@ -381,24 +342,35 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
     };
-  }, [draggingNodeId, dragStartX, initialNodeX, nodes]);
+  }, [draggingNodeId, dragStartX, initialNodeX]);
 
   // Auto-Spacing Helper Function
-  const applyAutoSpacing = (eventList: SimpleTimelineNode[], trackId: string): SimpleTimelineNode[] => {
-    const trackEvents = eventList.filter((n) => n.trackId === trackId);
-    const otherEvents = eventList.filter((n) => n.trackId !== trackId);
+  const applyAutoSpacing = (eventList: SimpleTimelineNode[], targetTrackId?: string): SimpleTimelineNode[] => {
+    const trackIdsToProcess = targetTrackId
+      ? [targetTrackId]
+      : Array.from(new Set(eventList.map((n) => n.trackId)));
 
-    if (trackEvents.length <= 1) return eventList;
+    let result = [...eventList];
 
-    const sorted = [...trackEvents].sort((a, b) => a.x - b.x);
-    for (let i = 1; i < sorted.length; i++) {
-      const prevX = sorted[i - 1].x;
-      if (sorted[i].x < prevX + MIN_EVENT_GAP) {
-        sorted[i] = { ...sorted[i], x: prevX + MIN_EVENT_GAP };
+    for (const trId of trackIdsToProcess) {
+      const trackEvents = result.filter((n) => n.trackId === trId);
+      const otherEvents = result.filter((n) => n.trackId !== trId);
+
+      if (trackEvents.length <= 1) continue;
+
+      const sorted = [...trackEvents].sort((a, b) => a.x - b.x);
+      for (let i = 1; i < sorted.length; i++) {
+        const prevX = sorted[i - 1].x;
+        const requiredX = prevX + MIN_EVENT_GAP;
+        if (sorted[i].x < requiredX) {
+          sorted[i] = { ...sorted[i], x: requiredX };
+        }
       }
+
+      result = [...otherEvents, ...sorted];
     }
 
-    return [...otherEvents, ...sorted];
+    return result;
   };
 
   // Clamp Horizontal Scroll so user cannot scroll endlessly past content boundaries
@@ -2012,7 +1984,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 setPreviewEventImageIndex((prev) => (prev === null || prev <= 0 ? readerImages.length - 1 : prev - 1));
               }}
               className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white bg-black/60 hover:bg-black/90 border border-white/20 rounded-full transition-all cursor-pointer z-30 hover:scale-110 shadow-2xl"
-              title="Gambar Sebelumnya (Panah Kiri)"
+              title={t.timeline.prevImageTooltip}
             >
               <Icons.ChevronLeft size={24} />
             </button>
@@ -2039,7 +2011,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 setPreviewEventImageIndex((prev) => (prev === null || prev >= readerImages.length - 1 ? 0 : prev + 1));
               }}
               className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white bg-black/60 hover:bg-black/90 border border-white/20 rounded-full transition-all cursor-pointer z-30 hover:scale-110 shadow-2xl"
-              title="Gambar Selanjutnya (Panah Kanan)"
+              title={t.timeline.nextImageTooltip}
             >
               <Icons.ChevronRight size={24} />
             </button>
@@ -2064,406 +2036,386 @@ const SimpleNodeModal: React.FC<{
   }) => void;
   onClose: () => void;
 }> = ({ node, cards, onSave, onClose }) => {
-  const { language, t, getCategoryLabel } = useLanguage();
-  const [title, setTitle] = useState(node?.title || '');
-  const [dateLabel, setDateLabel] = useState(node?.dateLabel || '');
-  const [description, setDescription] = useState(node?.description || '');
-  const [cardId, setCardId] = useState<string>(node?.cardId || '');
-  const [cardSearch, setCardSearch] = useState('');
-  const [showCardDropdown, setShowCardDropdown] = useState(false);
-  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const { t, getCategoryLabel } = useLanguage();
+    const [title, setTitle] = useState(node?.title || '');
+    const [dateLabel, setDateLabel] = useState(node?.dateLabel || '');
+    const [description, setDescription] = useState(node?.description || '');
+    const [cardId, setCardId] = useState<string>(node?.cardId || '');
+    const [cardSearch, setCardSearch] = useState('');
+    const [showCardDropdown, setShowCardDropdown] = useState(false);
+    const [showExitConfirm, setShowExitConfirm] = useState(false);
 
-  const [images, setImages] = useState<string[]>(() => {
-    const existing = node?.images ? [...node.images] : [];
-    if (node?.imageUrl && !existing.includes(node.imageUrl)) {
-      existing.unshift(node.imageUrl);
-    }
-    return existing;
-  });
-  const [imageUrl, setImageUrl] = useState<string>(node?.imageUrl || (node?.images?.[0] || ''));
+    const [images, setImages] = useState<string[]>(() => {
+      const existing = node?.images ? [...node.images] : [];
+      if (node?.imageUrl && !existing.includes(node.imageUrl)) {
+        existing.unshift(node.imageUrl);
+      }
+      return existing;
+    });
+    const [imageUrl, setImageUrl] = useState<string>(node?.imageUrl || (node?.images?.[0] || ''));
 
-  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const res = ev.target?.result as string;
-      if (res) {
-        let finalUrl = res;
-        if (isTauriAvailable()) {
-          try {
-            const hint = file.name || title || 'event-image';
-            const savedUrl = await saveImageAsset(res, hint);
-            if (savedUrl) finalUrl = savedUrl;
-          } catch (err) {
-            console.warn('saveImageAsset error, fallback to base64:', err);
-          }
+    const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const res = ev.target?.result as string;
+        if (res) {
+          setImages((prev) => (prev.includes(res) ? prev : [...prev, res]));
+          if (!imageUrl) setImageUrl(res);
         }
-        setImages((prev) => (prev.includes(finalUrl) ? prev : [...prev, finalUrl]));
-        if (!imageUrl) setImageUrl(finalUrl);
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    };
+
+    const isDirty = () => {
+      const initialTitle = node?.title || '';
+      const initialDateLabel = node?.dateLabel || '';
+      const initialDescription = node?.description || '';
+      const initialCardId = node?.cardId || '';
+      const initialImages = JSON.stringify(node?.images || (node?.imageUrl ? [node.imageUrl] : []));
+      const currentImages = JSON.stringify(images);
+      const initialCover = node?.imageUrl || (node?.images?.[0] || '');
+
+      return (
+        title.trim() !== initialTitle.trim() ||
+        dateLabel.trim() !== initialDateLabel.trim() ||
+        description.trim() !== initialDescription.trim() ||
+        cardId !== initialCardId ||
+        currentImages !== initialImages ||
+        imageUrl !== initialCover
+      );
+    };
+
+    const handleCloseRequest = () => {
+      if (!isDirty()) {
+        onClose();
+      } else {
+        setShowExitConfirm(true);
       }
     };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
 
-  const isDirty = () => {
-    const initialTitle = node?.title || '';
-    const initialDateLabel = node?.dateLabel || '';
-    const initialDescription = node?.description || '';
-    const initialCardId = node?.cardId || '';
-    const initialImages = JSON.stringify(node?.images || (node?.imageUrl ? [node.imageUrl] : []));
-    const currentImages = JSON.stringify(images);
-    const initialCover = node?.imageUrl || (node?.images?.[0] || '');
+    const handleSubmit = (e?: React.FormEvent) => {
+      e?.preventDefault();
+      if (!title.trim()) return;
+      onSave({
+        title: title.trim(),
+        dateLabel: dateLabel.trim() || t.timeline.defaultEra,
+        description: description.trim(),
+        cardId: cardId || undefined,
+        images,
+        imageUrl: imageUrl || (images[0] || undefined),
+      });
+    };
 
     return (
-      title.trim() !== initialTitle.trim() ||
-      dateLabel.trim() !== initialDateLabel.trim() ||
-      description.trim() !== initialDescription.trim() ||
-      cardId !== initialCardId ||
-      currentImages !== initialImages ||
-      imageUrl !== initialCover
-    );
-  };
-
-  const handleCloseRequest = () => {
-    if (!isDirty()) {
-      onClose();
-    } else {
-      setShowExitConfirm(true);
-    }
-  };
-
-  const handleSubmit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!title.trim()) return;
-    onSave({
-      title: title.trim(),
-      dateLabel: dateLabel.trim() || t.timeline.defaultEra,
-      description: description.trim(),
-      cardId: cardId || undefined,
-      images,
-      imageUrl: imageUrl || (images[0] || undefined),
-    });
-  };
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150 cursor-pointer"
-      onClick={handleCloseRequest}
-    >
       <div
-        className="w-full max-w-lg app-bg-secondary border app-border rounded-3xl p-6 shadow-2xl app-text-main modal-animate-appear divide-y divide-slate-800/40 cursor-default relative"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150 cursor-pointer"
+        onClick={handleCloseRequest}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl app-accent-bg/10 border border-[var(--accent)]/30 flex items-center justify-center app-accent-text shadow-inner">
-              <Icons.Sparkles size={18} />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold app-text-main tracking-tight">
-                {node ? t.timeline.editEventTitle : t.timeline.addEventTitle}
-              </h3>
-              <p className="text-[11px] app-text-muted">
-                {node ? 'Perbarui informasi titik garis waktu' : 'Tambahkan titik peristiwa baru pada garis waktu'}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleCloseRequest}
-            className="w-8 h-8 rounded-xl app-bg-main border app-border flex items-center justify-center text-slate-400 hover:text-white hover:app-bg-hover transition-colors cursor-pointer"
-          >
-            <Icons.X size={16} />
-          </button>
-        </div>
-
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="pt-4 space-y-4 text-xs">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                <Icons.FileText size={12} className="text-blue-400" />
-                <span>{t.timeline.eventTitleLabel}</span>
-              </label>
-              <input
-                type="text"
-                required
-                autoFocus
-                placeholder={t.timeline.eventTitlePlaceholder}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] font-medium text-xs shadow-inner transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                <Icons.Tag size={12} className="text-amber-400" />
-                <span>{t.timeline.timeMarkerLabel}</span>
-              </label>
-              <input
-                type="text"
-                placeholder={t.timeline.timeMarkerPlaceholder}
-                value={dateLabel}
-                onChange={(e) => setDateLabel(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] text-xs shadow-inner font-mono transition-all"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
-              <Icons.Link size={12} className="text-emerald-400" />
-              <span>{t.timeline.linkCardLabel}</span>
-            </label>
-
-            {(() => {
-              const selectedCard = cards.find((c) => c.id === cardId);
-              const filteredCards = cards.filter((c) => {
-                if (!cardSearch.trim()) return true;
-                const query = cardSearch.toLowerCase();
-                const cardTitle = (c.title || '').toLowerCase();
-                const categoryLabel = (getCategoryLabel(c.category) || '').toLowerCase();
-                return cardTitle.includes(query) || categoryLabel.includes(query);
-              });
-
-              if (selectedCard) {
-                return (
-                  <div className="flex items-center justify-between px-3.5 py-2 rounded-xl app-bg-main border border-[var(--accent)]/50 app-text-main text-xs shadow-inner">
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase app-accent-bg text-white shrink-0">
-                        {getCategoryLabel(selectedCard.category)}
-                      </span>
-                      <span className="font-semibold truncate">{selectedCard.title || t.common.untitled}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCardId('');
-                        setCardSearch('');
-                      }}
-                      className="p-1 rounded-lg app-text-muted hover:text-rose-400 hover:app-bg-hover transition-colors cursor-pointer"
-                      title="Hapus Tautan Kartu"
-                    >
-                      <Icons.X size={14} />
-                    </button>
-                  </div>
-                );
-              }
-
-              return (
-                <div className="relative">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Ketik untuk mencari kartu (karakter, lokasi, faksi...)"
-                      value={cardSearch}
-                      onFocus={() => setShowCardDropdown(true)}
-                      onChange={(e) => {
-                        setCardSearch(e.target.value);
-                        setShowCardDropdown(true);
-                      }}
-                      className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] text-xs pr-8 shadow-inner transition-all"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none app-text-muted">
-                      <Icons.Search size={14} />
-                    </div>
-                  </div>
-
-                  {/* Dropdown Suggestions */}
-                  {showCardDropdown && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setShowCardDropdown(false)}
-                      />
-                      <div className="absolute left-0 right-0 top-full mt-1.5 app-bg-secondary border app-border rounded-2xl shadow-2xl z-50 max-h-48 overflow-y-auto custom-scrollbar divide-y divide-slate-800/40 text-xs">
-                        {filteredCards.length > 0 ? (
-                          filteredCards.map((c) => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onClick={() => {
-                                setCardId(c.id);
-                                setCardSearch('');
-                                setShowCardDropdown(false);
-                              }}
-                              className="w-full px-3.5 py-2 text-left hover:app-bg-hover flex items-center justify-between gap-2 transition-colors cursor-pointer group"
-                            >
-                              <span className="font-medium app-text-main group-hover:app-accent-text truncate">
-                                {c.title || t.common.untitled}
-                              </span>
-                              <span className="px-2 py-0.5 rounded text-[9px] font-mono uppercase app-bg-main app-text-muted border app-border">
-                                {getCategoryLabel(c.category)}
-                              </span>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="px-3.5 py-3 text-center text-xs app-text-muted">
-                            Tidak ada kartu yang cocok
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* Gambar Peristiwa / Image Gallery Section */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-[10px] font-bold app-text-muted uppercase tracking-wider flex items-center gap-1">
-                <Icons.Image size={12} className="text-cyan-400" />
-                <span>Gambar Peristiwa ({images.length})</span>
-              </label>
-              <label className="px-2.5 py-1 rounded-lg app-accent-bg/20 app-accent-text border border-[var(--accent)]/30 text-[11px] font-bold hover:app-bg-hover transition-all cursor-pointer flex items-center gap-1">
-                <Icons.Plus size={12} />
-                <span>Upload Gambar</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageFileUpload}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {images.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1">
-                {images.map((imgSrc, idx) => {
-                  const isCover = imageUrl === imgSrc;
-                  return (
-                    <div
-                      key={idx}
-                      className={`relative rounded-xl overflow-hidden border aspect-video group bg-black/40 ${
-                        isCover ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/40' : 'app-border'
-                      }`}
-                    >
-                      <img src={imgSrc} alt={`Event ${idx + 1}`} className="w-full h-full object-cover" />
-                      {isCover && (
-                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-[var(--accent)] text-white text-[8px] font-bold">
-                          Cover
-                        </span>
-                      )}
-                      <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 p-1">
-                        {!isCover && (
-                          <button
-                            type="button"
-                            onClick={() => setImageUrl(imgSrc)}
-                            className="px-1.5 py-1 rounded bg-[var(--accent)] text-white text-[9px] font-bold hover:opacity-90 cursor-pointer"
-                          >
-                            Cover
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = images.filter((img) => img !== imgSrc);
-                            setImages(next);
-                            if (imageUrl === imgSrc) setImageUrl(next[0] || '');
-                          }}
-                          className="p-1 rounded bg-rose-600 text-white hover:bg-rose-500 cursor-pointer"
-                        >
-                          <Icons.Trash2 size={11} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+        <div
+          className="w-full max-w-lg app-bg-secondary border app-border rounded-3xl p-6 shadow-2xl app-text-main modal-animate-appear divide-y divide-slate-800/40 cursor-default relative"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl app-accent-bg/10 border border-[var(--accent)]/30 flex items-center justify-center app-accent-text shadow-inner">
+                <Icons.Sparkles size={18} />
               </div>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
-              <Icons.AlignLeft size={12} className="text-purple-400" />
-              <span>{t.timeline.briefDescLabel}</span>
-            </label>
-            <textarea
-              rows={3}
-              placeholder={t.timeline.briefDescPlaceholder}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] resize-none text-xs shadow-inner leading-relaxed transition-all"
-            />
-          </div>
-
-          {/* Footer Actions */}
-          <div className="pt-3 flex items-center justify-end gap-2.5">
+              <div>
+                <h3 className="text-sm font-bold app-text-main tracking-tight">
+                  {node ? t.timeline.editEventTitle : t.timeline.addEventTitle}
+                </h3>
+                <p className="text-[11px] app-text-muted">
+                  {node ? t.timeline.editEventSubtitle : t.timeline.addEventSubtitle}
+                </p>
+              </div>
+            </div>
             <button
               type="button"
               onClick={handleCloseRequest}
-              className="px-4 py-2.5 rounded-xl app-bg-main app-text-muted hover:app-text-main border app-border text-xs font-semibold hover:app-bg-hover transition-all cursor-pointer"
+              className="w-8 h-8 rounded-xl app-bg-main border app-border flex items-center justify-center text-slate-400 hover:text-white hover:app-bg-hover transition-colors cursor-pointer"
             >
-              {t.common.cancel}
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2.5 rounded-xl app-accent-bg text-white text-xs font-bold shadow-lg shadow-[var(--accent)]/20 hover:opacity-95 active:scale-95 transition-all cursor-pointer flex items-center gap-2"
-            >
-              <Icons.Check size={14} />
-              <span>{t.timeline.saveEvent}</span>
+              <Icons.X size={16} />
             </button>
           </div>
-        </form>
-      </div>
 
-      {/* Exit Confirmation Dialog */}
-      {showExitConfirm && (
-        <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[160] p-4 animate-in fade-in duration-150 cursor-default"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="w-full max-w-sm app-bg-secondary border app-border rounded-3xl p-5 shadow-2xl app-text-main text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
-              <Icons.AlertTriangle size={24} />
+          {/* Form Body */}
+          <form onSubmit={handleSubmit} className="pt-4 space-y-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                  <Icons.FileText size={12} className="text-blue-400" />
+                  <span>{t.timeline.eventTitleLabel}</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder={t.timeline.eventTitlePlaceholder}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] font-medium text-xs shadow-inner transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                  <Icons.Tag size={12} className="text-amber-400" />
+                  <span>{t.timeline.timeMarkerLabel}</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder={t.timeline.timeMarkerPlaceholder}
+                  value={dateLabel}
+                  onChange={(e) => setDateLabel(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] text-xs shadow-inner font-mono transition-all"
+                />
+              </div>
             </div>
+
             <div>
-              <h4 className="text-sm font-bold app-text-main">
-                {language === 'en' ? 'Unsaved Changes' : 'Ada Perubahan Belum Disimpan'}
-              </h4>
-              <p className="text-xs app-text-muted mt-1 leading-relaxed">
-                {language === 'en'
-                  ? 'You have unsaved changes in this event. Do you want to save or discard them?'
-                  : 'Anda memiliki perubahan pada peristiwa ini yang belum disimpan. Apakah Anda ingin menyimpan atau membuangnya?'}
-              </p>
+              <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <Icons.Link size={12} className="text-emerald-400" />
+                <span>{t.timeline.linkCardLabel}</span>
+              </label>
+
+              {(() => {
+                const selectedCard = cards.find((c) => c.id === cardId);
+                const filteredCards = cards.filter((c) => {
+                  if (!cardSearch.trim()) return true;
+                  const query = cardSearch.toLowerCase();
+                  const cardTitle = (c.title || '').toLowerCase();
+                  const categoryLabel = (getCategoryLabel(c.category) || '').toLowerCase();
+                  return cardTitle.includes(query) || categoryLabel.includes(query);
+                });
+
+                return (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowCardDropdown(!showCardDropdown)}
+                      className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main flex items-center justify-between hover:app-bg-hover transition-colors cursor-pointer text-xs"
+                    >
+                      {selectedCard ? (
+                        <span className="font-semibold text-[var(--accent)] truncate flex items-center gap-2">
+                          <span>{selectedCard.title || t.common.untitled}</span>
+                          <span className="text-[10px] opacity-70 app-text-muted">({getCategoryLabel(selectedCard.category)})</span>
+                        </span>
+                      ) : (
+                        <span className="app-text-muted opacity-70">{t.timeline.noCardOption}</span>
+                      )}
+                      <Icons.ChevronDown size={14} className={`app-text-muted transition-transform ${showCardDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {showCardDropdown && (
+                      <div className="absolute top-full left-0 right-0 mt-1 app-bg-secondary border app-border rounded-xl shadow-2xl z-50 p-2 space-y-2 max-h-56 overflow-y-auto custom-scrollbar animate-in fade-in duration-100">
+                        <div className="relative">
+                          <Icons.Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 app-text-muted" />
+                          <input
+                            type="text"
+                            placeholder={t.common.search}
+                            value={cardSearch}
+                            onChange={(e) => setCardSearch(e.target.value)}
+                            className="w-full pl-7 pr-3 py-1.5 rounded-lg app-bg-main border app-border app-text-main text-[11px] focus:outline-none focus:border-[var(--accent)]"
+                          />
+                        </div>
+
+                        <div className="space-y-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCardId('');
+                              setShowCardDropdown(false);
+                            }}
+                            className={`w-full px-3 py-2 rounded-lg text-left text-[11px] font-medium transition-colors flex items-center justify-between ${
+                              !cardId ? 'app-accent-bg/15 app-accent-text font-bold' : 'app-text-muted hover:app-bg-hover hover:app-text-main'
+                            }`}
+                          >
+                            <span>{t.timeline.noCardOption}</span>
+                            {!cardId && <Icons.Check size={12} />}
+                          </button>
+
+                          {filteredCards.map((c) => {
+                            const isSel = c.id === cardId;
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => {
+                                  setCardId(c.id);
+                                  setShowCardDropdown(false);
+                                }}
+                                className={`w-full px-3 py-2 rounded-lg text-left text-[11px] transition-colors flex items-center justify-between ${
+                                  isSel ? 'app-accent-bg/15 app-accent-text font-bold' : 'app-text-main hover:app-bg-hover'
+                                }`}
+                              >
+                                <span className="truncate pr-2">
+                                  {c.title || t.common.untitled}
+                                  <span className="text-[10px] opacity-60 ml-1.5 font-normal">({getCategoryLabel(c.category)})</span>
+                                </span>
+                                {isSel && <Icons.Check size={12} className="shrink-0" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
-            <div className="flex flex-col gap-2 pt-2">
+
+            {/* Gambar Peristiwa / Image Gallery Section */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold app-text-muted uppercase tracking-wider flex items-center gap-1">
+                  <Icons.Image size={12} className="text-cyan-400" />
+                  <span>{t.timeline.eventImages} ({images.length})</span>
+                </label>
+                <label className="px-2.5 py-1 rounded-lg app-accent-bg/20 app-accent-text border border-[var(--accent)]/30 text-[11px] font-bold hover:app-bg-hover transition-all cursor-pointer flex items-center gap-1">
+                  <Icons.Plus size={12} />
+                  <span>{t.timeline.uploadImage}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageFileUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {images.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1">
+                  {images.map((imgSrc, idx) => {
+                    const isCover = imageUrl === imgSrc;
+                    return (
+                      <div
+                        key={idx}
+                        className={`relative rounded-xl overflow-hidden border aspect-video group bg-black/40 ${
+                          isCover ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/40' : 'app-border'
+                        }`}
+                      >
+                        <img src={imgSrc} alt={`Event ${idx + 1}`} className="w-full h-full object-cover" />
+                        {isCover && (
+                          <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-[var(--accent)] text-white text-[8px] font-bold">
+                            Cover
+                          </span>
+                        )}
+                        <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 p-1">
+                          {!isCover && (
+                            <button
+                              type="button"
+                              onClick={() => setImageUrl(imgSrc)}
+                              className="px-1.5 py-1 rounded bg-[var(--accent)] text-white text-[9px] font-bold hover:opacity-90 cursor-pointer"
+                            >
+                              Cover
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = images.filter((img) => img !== imgSrc);
+                              setImages(next);
+                              if (imageUrl === imgSrc) setImageUrl(next[0] || '');
+                            }}
+                            className="p-1 rounded bg-rose-600 text-white hover:bg-rose-500 cursor-pointer"
+                          >
+                            <Icons.Trash2 size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold app-text-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <Icons.AlignLeft size={12} className="text-purple-400" />
+                <span>{t.timeline.briefDescLabel}</span>
+              </label>
+              <textarea
+                rows={3}
+                placeholder={t.timeline.briefDescPlaceholder}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl app-bg-main border app-border app-text-main focus:outline-none focus:border-[var(--accent)] resize-none text-xs shadow-inner leading-relaxed transition-all"
+              />
+            </div>
+
+            {/* Footer Actions */}
+            <div className="pt-3 flex items-center justify-end gap-2.5">
               <button
                 type="button"
-                onClick={(e) => {
-                  handleSubmit(e);
-                  onClose();
-                }}
-                className="w-full py-2.5 rounded-xl app-accent-bg text-white text-xs font-bold shadow-md hover:opacity-95 transition-all cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Icons.Save size={14} />
-                <span>{language === 'en' ? 'Save & Close' : 'Simpan & Tutup'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Icons.Trash2 size={14} />
-                <span>{language === 'en' ? 'Discard Changes' : 'Buang Perubahan'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowExitConfirm(false)}
-                className="w-full py-2 rounded-xl text-xs app-text-muted hover:app-text-main font-semibold transition-all cursor-pointer"
+                onClick={handleCloseRequest}
+                className="px-4 py-2.5 rounded-xl app-bg-main app-text-muted hover:app-text-main border app-border text-xs font-semibold hover:app-bg-hover transition-all cursor-pointer"
               >
                 {t.common.cancel}
               </button>
+              <button
+                type="submit"
+                className="px-5 py-2.5 rounded-xl app-accent-bg text-white text-xs font-bold shadow-lg shadow-[var(--accent)]/20 hover:opacity-95 active:scale-95 transition-all cursor-pointer flex items-center gap-2"
+              >
+                <Icons.Check size={14} />
+                <span>{t.timeline.saveEvent}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Exit Confirmation Dialog */}
+        {showExitConfirm && (
+          <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[160] p-4 animate-in fade-in duration-150 cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full max-w-sm app-bg-secondary border app-border rounded-3xl p-5 shadow-2xl app-text-main text-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
+                <Icons.AlertTriangle size={24} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold app-text-main">
+                  {t.timeline.unsavedTitle}
+                </h4>
+                <p className="text-xs app-text-muted mt-1 leading-relaxed">
+                  {t.timeline.unsavedEventDesc}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    handleSubmit(e);
+                    onClose();
+                  }}
+                  className="w-full py-2.5 rounded-xl app-accent-bg text-white text-xs font-bold shadow-md hover:opacity-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Icons.Save size={14} />
+                  <span>{t.timeline.saveAndClose}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Icons.Trash2 size={14} />
+                  <span>{t.timeline.discardChanges}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExitConfirm(false)}
+                  className="w-full py-2 rounded-xl text-xs app-text-muted hover:app-text-main font-semibold transition-all cursor-pointer"
+                >
+                  {t.common.cancel}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
+        )}
+      </div>
+    );
+  };

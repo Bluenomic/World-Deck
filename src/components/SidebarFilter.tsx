@@ -677,7 +677,7 @@ export const SidebarFilter: React.FC<SidebarFilterProps> = ({
                 className="w-full px-3 py-2 text-left hover:bg-[#2c2c2c] flex items-center gap-2 transition-colors font-semibold text-emerald-400 cursor-pointer"
               >
                 <Icons.Plus size={14} strokeWidth={2.5} />
-                <span>+ {t.sidebar.newCanvas}</span>
+                <span>{t.sidebar.newCanvas}</span>
               </button>
             </div>
           )}

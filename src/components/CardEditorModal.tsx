@@ -340,7 +340,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                 className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e1e1e] border border-[#383838] hover:border-[#0d99ff] transition-all font-semibold cursor-pointer"
               >
                 <Icons.Image size={14} className="text-[#0d99ff]" />
-                <span>+ {t.cardEditor.addCover}</span>
+                <span>{t.cardEditor.addCover}</span>
               </button>
             ) : (
               <div className="p-3 rounded-xl bg-[#1e1e1e] border border-[#383838] space-y-2 animate-in fade-in duration-100">
@@ -396,7 +396,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
               </div>
               <label className="px-2.5 py-1 rounded-lg bg-[#0d99ff]/20 text-[#0d99ff] border border-[#0d99ff]/30 text-xs font-bold hover:bg-[#0d99ff]/30 transition-all cursor-pointer flex items-center gap-1">
                 <Icons.Plus size={12} />
-                <span>+ {t.cardEditor.addImage}</span>
+                <span>{t.cardEditor.addImage}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -587,9 +587,10 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                   <button
                     type="button"
                     onClick={handleAddTag}
-                    className="px-3 py-1.5 rounded-xl bg-[#2c2c2c] hover:bg-[#383838] text-white text-xs font-bold border border-[#383838] transition-colors cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-[#2c2c2c] hover:bg-[#383838] text-white text-xs font-bold border border-[#383838] transition-colors cursor-pointer flex items-center gap-1"
                   >
-                    + {t.cardEditor.addTag}
+                    <Icons.Plus size={12} />
+                    <span>{t.cardEditor.addTag}</span>
                   </button>
                 </div>
               </div>
@@ -609,7 +610,7 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
                   className="px-3 py-1.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold shadow-md transition-all flex items-center gap-1 cursor-pointer"
                 >
                   <Icons.Plus size={13} />
-                  <span>+ {t.cardEditor.addAttribute}</span>
+                  <span>{t.cardEditor.addAttribute}</span>
                 </button>
               </div>
 
