@@ -134,29 +134,8 @@ export const App: React.FC = () => {
     });
   };
 
-  // Async Load State on Startup from Tauri Disk, IndexedDB, or LocalStorage
+  // Async Load State on Startup from IndexedDB, Tauri Disk, or LocalStorage
   useEffect(() => {
-    if (isTauriAvailable()) {
-      listWorldsFromDisk().then(async (projects) => {
-        if (projects.length > 0) {
-          setWorlds(projects);
-          const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
-          if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
-            setActiveWorldId(savedActiveId);
-          } else {
-            setActiveWorldId(projects[0].id);
-          }
-        } else {
-          await saveWorldToDisk(SAMPLE_WORLD);
-          setWorlds([SAMPLE_WORLD]);
-          setActiveWorldId(SAMPLE_WORLD.id);
-        }
-        setIsLoaded(true);
-      });
-      return;
-    }
-
-    // Load persisted local directory handle from IndexedDB (for Web)
     loadLocalFileHandle().then(async (handle) => {
       if (handle) {
         try {
@@ -189,8 +168,35 @@ export const App: React.FC = () => {
           }
         } catch (e) {
           console.warn('Gagal memuat izin directory handle:', e);
+          setLocalDirectoryHandle(handle);
+          setLocalDirectoryName(handle.name);
+          setNeedDirectoryPermission(true);
         }
+        setIsLoaded(true);
+        return;
       }
+
+      // Fallback if no local directory handle is saved in IndexedDB
+      if (isTauriAvailable()) {
+        listWorldsFromDisk().then(async (projects) => {
+          if (projects.length > 0) {
+            setWorlds(projects);
+            const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
+            if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
+              setActiveWorldId(savedActiveId);
+            } else {
+              setActiveWorldId(projects[0].id);
+            }
+          } else {
+            await saveWorldToDisk(SAMPLE_WORLD);
+            setWorlds([SAMPLE_WORLD]);
+            setActiveWorldId(SAMPLE_WORLD.id);
+          }
+          setIsLoaded(true);
+        });
+        return;
+      }
+
       setIsLoaded(true);
     });
   }, []);
@@ -1113,7 +1119,7 @@ export const App: React.FC = () => {
     if (viewMode !== 'canvas') setViewMode('canvas');
   };
 
-  if (isLoaded && !isTauriAvailable() && (!localDirectoryHandle || needDirectoryPermission)) {
+  if (isLoaded && (!localDirectoryHandle || needDirectoryPermission)) {
     return (
       <div className="h-screen w-screen flex items-center justify-center app-bg-main app-text-main font-sans relative overflow-hidden">
         {/* Background Decorative Gradients */}
@@ -1145,14 +1151,24 @@ export const App: React.FC = () => {
                 <span>Pilih Folder Workspace</span>
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={handleRequestDirectoryPermission}
-                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Icons.Unlock size={16} />
-                <span>Izinkan Akses Folder</span>
-              </button>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={handleRequestDirectoryPermission}
+                  className="w-full py-3 rounded-xl app-accent-bg hover:opacity-90 text-white text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Icons.Unlock size={16} />
+                  <span>Izinkan Akses Folder "{localDirectoryName}"</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSelectWorkspaceDirectory}
+                  className="w-full py-2.5 rounded-xl app-bg-main border app-border hover:app-bg-hover app-text-muted text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Icons.FolderOpen size={14} />
+                  <span>Pilih Folder Lain</span>
+                </button>
+              </div>
             )}
           </div>
         </div>

@@ -2323,7 +2323,7 @@ const SimpleNodeModal: React.FC<{
               </label>
               <label className="px-2.5 py-1 rounded-lg app-accent-bg/20 app-accent-text border border-[var(--accent)]/30 text-[11px] font-bold hover:app-bg-hover transition-all cursor-pointer flex items-center gap-1">
                 <Icons.Plus size={12} />
-                <span>+ Upload Gambar</span>
+                <span>Upload Gambar</span>
                 <input
                   type="file"
                   accept="image/*"
