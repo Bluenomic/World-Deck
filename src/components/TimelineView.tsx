@@ -32,6 +32,10 @@ interface TimelineViewProps {
   connections?: CardConnection[];
   onCardClick: (card: WorldCard) => void;
   activeWorldId?: string;
+  timelineTracks?: TimelineTrack[];
+  timelineNodes?: SimpleTimelineNode[];
+  timelineBranches?: TimelineBranch[];
+  onSaveTimeline?: (tracks: TimelineTrack[], nodes: SimpleTimelineNode[], branches: TimelineBranch[]) => void;
 }
 
 // Minimum gap between adjacent events on the same track
@@ -78,12 +82,11 @@ const calculateTrackLayout = (sortedTracks: TimelineTrack[], allNodes: SimpleTim
     let gap = 240; // Base gap when empty or no opposing cards
 
     if (maxDownward > 0 && maxUpward > 0) {
-      // Both tracks have cards extending towards each other! Expand gap dynamically!
-      gap = maxDownward + maxUpward + 50; // e.g. 210 + 210 + 50 = 470px clearance!
+      gap = Math.max(gap, maxDownward + maxUpward + 40);
     } else if (maxDownward > 0) {
-      gap = Math.max(240, maxDownward + 80);
+      gap = Math.max(gap, maxDownward + 100);
     } else if (maxUpward > 0) {
-      gap = Math.max(240, maxUpward + 80);
+      gap = Math.max(gap, maxUpward + 100);
     }
 
     currentY += gap;
@@ -100,6 +103,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   cards,
   onCardClick,
   activeWorldId = 'default',
+  timelineTracks,
+  timelineNodes,
+  timelineBranches,
+  onSaveTimeline,
 }) => {
   const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -107,6 +114,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
   // Timeline Tracks State
   const [tracks, setTracks] = useState<TimelineTrack[]>(() => {
+    if (timelineTracks && timelineTracks.length > 0) return timelineTracks;
     try {
       const saved = localStorage.getItem(`${storageKey}_tracks`);
       if (saved) return JSON.parse(saved);
@@ -118,6 +126,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
   // Timeline Nodes State
   const [nodes, setNodes] = useState<SimpleTimelineNode[]>(() => {
+    if (timelineNodes) return timelineNodes;
     try {
       const saved = localStorage.getItem(`${storageKey}_nodes`);
       if (saved) {
@@ -130,12 +139,32 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
   // Timeline Branches State
   const [branches, setBranches] = useState<TimelineBranch[]>(() => {
+    if (timelineBranches) return timelineBranches;
     try {
       const saved = localStorage.getItem(`${storageKey}_branches`);
       if (saved) return JSON.parse(saved);
     } catch (e) {}
     return [];
   });
+
+  // Sync state when activeWorld or props change
+  useEffect(() => {
+    if (timelineTracks && timelineTracks.length > 0) {
+      setTracks(timelineTracks);
+    }
+  }, [timelineTracks]);
+
+  useEffect(() => {
+    if (timelineNodes) {
+      setNodes(timelineNodes);
+    }
+  }, [timelineNodes]);
+
+  useEffect(() => {
+    if (timelineBranches) {
+      setBranches(timelineBranches);
+    }
+  }, [timelineBranches]);
 
   // Interactive Branch Drafting State
   const [draftBranch, setDraftBranch] = useState<{
@@ -269,13 +298,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const sortedTracks = [...tracks].sort((a, b) => a.order - b.order);
   const { relativeYMap, totalSpan, stackCenter } = calculateTrackLayout(sortedTracks, nodes);
 
-  // Persist State
+  // Persist State to LocalStorage and Parent World state
   useEffect(() => {
     try {
       localStorage.setItem(`${storageKey}_tracks`, JSON.stringify(tracks));
       localStorage.setItem(`${storageKey}_nodes`, JSON.stringify(nodes));
       localStorage.setItem(`${storageKey}_branches`, JSON.stringify(branches));
     } catch (e) {}
+    onSaveTimeline?.(tracks, nodes, branches);
   }, [tracks, nodes, branches, storageKey]);
 
   // Cancel draft branch on Escape key
@@ -2062,7 +2092,8 @@ const SimpleNodeModal: React.FC<{
         let finalUrl = res;
         if (isTauriAvailable()) {
           try {
-            const savedUrl = await saveImageAsset(res, title || 'event-image');
+            const hint = file.name || title || 'event-image';
+            const savedUrl = await saveImageAsset(res, hint);
             if (savedUrl) finalUrl = savedUrl;
           } catch (err) {
             console.warn('saveImageAsset error, fallback to base64:', err);

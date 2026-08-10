@@ -81,9 +81,20 @@ pub fn save_image_asset_to_disk<R: tauri::Runtime>(
         }
     };
 
+    let raw_hint = filename_hint.unwrap_or("asset");
+    let safe_hint: String = raw_hint
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+    let safe_hint_trimmed = if safe_hint.trim_matches('_').is_empty() {
+        "asset".to_string()
+    } else {
+        safe_hint.chars().take(30).collect()
+    };
+
     let filename = format!(
         "img_{}_{}.{}",
-        filename_hint.unwrap_or("card"),
+        safe_hint_trimmed,
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()

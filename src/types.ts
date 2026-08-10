@@ -95,19 +95,22 @@ export interface WorldDocument {
   updatedAt: number;
 }
 
-export interface WorldProject {
+export interface TimelineTrack {
   id: string;
   name: string;
-  description: string;
-  author?: string;
-  version: string;
-  cards: WorldCard[];
-  connections: CardConnection[];
-  canvases?: WorldCanvas[];
-  decks?: WorldDeck[];
-  documents?: WorldDocument[];
-  createdAt: number;
-  updatedAt: number;
+  order: number;
+}
+
+export interface TimelineNode {
+  id: string;
+  trackId: string;
+  x: number;
+  title: string;
+  dateLabel?: string;
+  description?: string;
+  cardId?: string;
+  images?: string[];
+  imageUrl?: string;
 }
 
 export interface TimelineBranch {
@@ -119,6 +122,24 @@ export interface TimelineBranch {
   targetX: number;
   targetNodeId?: string;
   label?: string;
+}
+
+export interface WorldProject {
+  id: string;
+  name: string;
+  description: string;
+  author?: string;
+  version: string;
+  cards: WorldCard[];
+  connections: CardConnection[];
+  canvases?: WorldCanvas[];
+  decks?: WorldDeck[];
+  documents?: WorldDocument[];
+  timelineTracks?: TimelineTrack[];
+  timelineNodes?: TimelineNode[];
+  timelineBranches?: TimelineBranch[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 export type ViewMode = 'canvas' | 'library' | 'timeline' | 'documents';
@@ -147,33 +168,4 @@ export interface WorkspacePreferences {
   canvasesHeight: number;
   viewMode?: ViewMode;
   canvasViewports?: Record<string, CanvasViewport>;
-}
-
-export interface TimelineTrack {
-  id: string;
-  name: string;
-  y: number;
-  direction: 'right' | 'left';
-  color: string;
-  isMain?: boolean;
-}
-
-export interface TimelineNode {
-  id: string;
-  trackId: string;
-  x: number;
-  title: string;
-  dateLabel: string;
-  description?: string;
-  cardId?: string;
-  nodeType: 'event' | 'branch' | 'joint' | 'loop' | 'point';
-  color?: string;
-}
-
-export interface TimelineLink {
-  id: string;
-  type: 'flow' | 'branch' | 'joint' | 'loop' | 'reverse';
-  sourceNodeId: string;
-  targetNodeId: string;
-  label?: string;
 }

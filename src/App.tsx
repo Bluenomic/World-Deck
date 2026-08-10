@@ -634,6 +634,17 @@ export const App: React.FC = () => {
     });
   };
 
+  // Timeline Data Management Handler
+  const handleSaveTimeline = (tracks: any[], nodes: any[], branches: any[]) => {
+    updateActiveWorld((prev) => ({
+      ...prev,
+      timelineTracks: tracks,
+      timelineNodes: nodes,
+      timelineBranches: branches,
+      updatedAt: Date.now(),
+    }));
+  };
+
   // Document Management Handlers
   const handleSaveDocument = (updatedDoc: WorldDocument) => {
     updateActiveWorld((prev) => {
@@ -1274,6 +1285,10 @@ export const App: React.FC = () => {
               connections={activeCanvasConnections}
               onCardClick={(card) => setReaderCardId(card.id)}
               activeWorldId={activeWorldId}
+              timelineTracks={activeWorld.timelineTracks}
+              timelineNodes={activeWorld.timelineNodes as any}
+              timelineBranches={activeWorld.timelineBranches}
+              onSaveTimeline={handleSaveTimeline}
             />
           )}
 

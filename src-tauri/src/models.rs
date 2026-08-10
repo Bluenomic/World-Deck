@@ -101,6 +101,50 @@ pub struct CardConnection {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TimelineTrack {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub order: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineNode {
+    pub id: String,
+    pub track_id: String,
+    pub x: f64,
+    pub title: String,
+    #[serde(default)]
+    pub date_label: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub card_id: Option<String>,
+    #[serde(default)]
+    pub images: Vec<String>,
+    #[serde(default)]
+    pub image_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineBranch {
+    pub id: String,
+    pub source_track_id: String,
+    pub source_x: f64,
+    #[serde(default)]
+    pub source_node_id: Option<String>,
+    pub target_track_id: String,
+    pub target_x: f64,
+    #[serde(default)]
+    pub target_node_id: Option<String>,
+    #[serde(default)]
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorldProject {
     pub id: String,
     pub name: String,
@@ -118,6 +162,12 @@ pub struct WorldProject {
     pub decks: Option<Vec<WorldDeck>>,
     #[serde(default)]
     pub documents: Option<Vec<WorldDocument>>,
+    #[serde(default)]
+    pub timeline_tracks: Option<Vec<TimelineTrack>>,
+    #[serde(default)]
+    pub timeline_nodes: Option<Vec<TimelineNode>>,
+    #[serde(default)]
+    pub timeline_branches: Option<Vec<TimelineBranch>>,
     pub created_at: f64,
     pub updated_at: f64,
 }
