@@ -151,7 +151,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const liveOrderRef = useRef<string[] | null>(null);
 
   const draggedCardIdRef = useRef<string | null>(null);
-  const transparentImgRef = useRef<HTMLCanvasElement | null>(null);
+  const transparentImgRef = useRef<HTMLImageElement | null>(null);
   const floatingPreviewRef = useRef<HTMLDivElement | null>(null);
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const dragPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -216,19 +216,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
   // Create a transparent 1x1 image for hiding native drag preview
   useEffect(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1;
-    canvas.height = 1;
-    canvas.style.position = 'absolute';
-    canvas.style.top = '-9999px';
-    canvas.style.left = '-9999px';
-    document.body.appendChild(canvas);
-    transparentImgRef.current = canvas;
-    return () => {
-      if (document.body.contains(canvas)) {
-        document.body.removeChild(canvas);
-      }
-    };
+    const img = new Image();
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    transparentImgRef.current = img;
   }, []);
 
   const cleanupDragState = () => {
@@ -349,9 +339,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const handleGlobalDragOver = (e: DragEvent) => {
       if (isDroppingRef.current) return;
       e.preventDefault();
-      if (e.clientX !== 0 || e.clientY !== 0) {
-        dragPosRef.current.x = e.clientX;
-        dragPosRef.current.y = e.clientY;
+      const clientX = e.clientX || e.pageX;
+      const clientY = e.clientY || e.pageY;
+      if (clientX !== 0 || clientY !== 0) {
+        dragPosRef.current.x = clientX;
+        dragPosRef.current.y = clientY;
         if (rafIdRef.current === null) {
           rafIdRef.current = requestAnimationFrame(updatePreviewPos);
         }
@@ -364,11 +356,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       }
     };
 
+    window.addEventListener('dragenter', handleGlobalDragOver);
     window.addEventListener('dragover', handleGlobalDragOver);
     window.addEventListener('dragend', handleGlobalDragEnd);
     window.addEventListener('mouseup', handleGlobalDragEnd);
     window.addEventListener('pointerup', handleGlobalDragEnd);
     return () => {
+      window.removeEventListener('dragenter', handleGlobalDragOver);
       window.removeEventListener('dragover', handleGlobalDragOver);
       window.removeEventListener('dragend', handleGlobalDragEnd);
       window.removeEventListener('mouseup', handleGlobalDragEnd);
@@ -819,8 +813,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           }
           isLongPressRef.current = false;
           if (isDroppingRef.current) return;
-          e.dataTransfer.setData('text/plain', card.id);
-          e.dataTransfer.effectAllowed = 'move';
+          try {
+            e.dataTransfer.setData('text/plain', card.id);
+            e.dataTransfer.effectAllowed = 'move';
+          } catch (err) {}
           draggedCardIdRef.current = card.id;
 
           // Store card data for floating preview
@@ -828,15 +824,22 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
           // Store offset in ref for instant access
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          const clientX = e.clientX || e.pageX || (rect.left + rect.width / 2);
+          const clientY = e.clientY || e.pageY || (rect.top + rect.height / 2);
+
           dragOffsetRef.current = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
+            x: clientX - rect.left,
+            y: clientY - rect.top,
           };
-          dragPosRef.current = { x: e.clientX, y: e.clientY };
+          dragPosRef.current = { x: clientX, y: clientY };
 
           // Hide native drag ghost
           if (transparentImgRef.current && e.dataTransfer.setDragImage) {
-            e.dataTransfer.setDragImage(transparentImgRef.current, 0, 0);
+            try {
+              e.dataTransfer.setDragImage(transparentImgRef.current, 0, 0);
+            } catch (err) {
+              console.warn('setDragImage error:', err);
+            }
           }
 
           // Capture initial rects before setting live order
@@ -863,8 +866,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
           if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
             const rect = e.currentTarget.getBoundingClientRect();
-            const cursorX = e.clientX;
-            const cursorY = e.clientY;
+            const cursorX = e.clientX || e.pageX;
+            const cursorY = e.clientY || e.pageY;
+            if (!cursorX && !cursorY) return;
             const midX = rect.left + rect.width / 2;
             const midY = rect.top + rect.height / 2;
 
@@ -1059,21 +1063,31 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           }
           isLongPressRef.current = false;
           if (isDroppingRef.current) return;
-          e.dataTransfer.setData('text/plain', card.id);
-          e.dataTransfer.effectAllowed = 'move';
+
+          try {
+            e.dataTransfer.setData('text/plain', card.id);
+            e.dataTransfer.effectAllowed = 'move';
+          } catch (err) {}
           draggedCardIdRef.current = card.id;
 
           setDraggedCardData(card);
 
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          const clientX = e.clientX || e.pageX || (rect.left + rect.width / 2);
+          const clientY = e.clientY || e.pageY || (rect.top + rect.height / 2);
+
           dragOffsetRef.current = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
+            x: clientX - rect.left,
+            y: clientY - rect.top,
           };
-          dragPosRef.current = { x: e.clientX, y: e.clientY };
+          dragPosRef.current = { x: clientX, y: clientY };
 
           if (transparentImgRef.current && e.dataTransfer.setDragImage) {
-            e.dataTransfer.setDragImage(transparentImgRef.current, 0, 0);
+            try {
+              e.dataTransfer.setDragImage(transparentImgRef.current, 0, 0);
+            } catch (err) {
+              console.warn('setDragImage error:', err);
+            }
           }
 
           cardDomRefs.current.forEach((el, id) => {
@@ -1098,7 +1112,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
           if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
             const rect = e.currentTarget.getBoundingClientRect();
-            const cursorY = e.clientY;
+            const cursorY = e.clientY || e.pageY;
+            if (!cursorY) return;
             const midY = rect.top + rect.height / 2;
 
             const isForward = fromIdx < toIdx;
