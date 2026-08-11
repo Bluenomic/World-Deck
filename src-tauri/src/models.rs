@@ -63,6 +63,10 @@ pub struct WorldCard {
     #[serde(default)]
     pub image_height: Option<f64>,
     #[serde(default)]
+    pub image_focal_x: Option<f64>,
+    #[serde(default)]
+    pub image_focal_y: Option<f64>,
+    #[serde(default)]
     pub images: Vec<String>,
     #[serde(default)]
     pub tags: Vec<String>,
@@ -125,6 +129,10 @@ pub struct TimelineNode {
     pub images: Vec<String>,
     #[serde(default)]
     pub image_url: Option<String>,
+    #[serde(default)]
+    pub image_focal_x: Option<f64>,
+    #[serde(default)]
+    pub image_focal_y: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
