@@ -24,7 +24,14 @@ import { DeleteCardModal } from './components/DeleteCardModal';
 import { CanvasModal } from './components/CanvasModal';
 import { DeckModal } from './components/DeckModal';
 import { CardReaderSidebar } from './components/CardReaderSidebar';
-import { isTauriAvailable, saveWorldToDisk, listWorldsFromDisk } from './utils/tauriStorage';
+import { WorkspaceLandingScreen } from './components/WorkspaceLandingScreen';
+import {
+  isTauriAvailable,
+  saveProjectToFolder,
+  listProjectsInFolder,
+  deleteProjectFromFolder,
+  openWorkspaceFolderDialog,
+} from './utils/tauriStorage';
 import { ConfirmModal } from './components/ConfirmModal';
 import type { ConfirmModalConfig } from './components/ConfirmModal';
 import { useLanguage } from './i18n/LanguageContext';
@@ -55,13 +62,20 @@ export const App: React.FC = () => {
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
   // Native Local Disk Folder Workspace State
+  const [selectedWorkspacePath, setSelectedWorkspacePath] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('worlddeck_selected_workspace_path') || null;
+    } catch {
+      return null;
+    }
+  });
   const [localDirectoryHandle, setLocalDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [localDirectoryName, setLocalDirectoryName] = useState<string | null>(null);
   const [needDirectoryPermission, setNeedDirectoryPermission] = useState<boolean>(false);
 
-  // Worlds & Active World State
-  const [worlds, setWorlds] = useState<WorldProject[]>([SAMPLE_WORLD]);
-  const [activeWorldId, setActiveWorldId] = useState<string>(SAMPLE_WORLD.id);
+  // Worlds & Active World State (Starts empty until folder is loaded)
+  const [worlds, setWorlds] = useState<WorldProject[]>([]);
+  const [activeWorldId, setActiveWorldId] = useState<string>('');
 
   // UI State initialized from workspace preferences
   const [viewMode, setViewMode] = useState<ViewMode>(() => loadWorkspacePreferences().viewMode || 'canvas');
@@ -136,14 +150,17 @@ export const App: React.FC = () => {
     });
   };
 
-  // Async Load State on Startup from IndexedDB, Tauri Disk, or LocalStorage
+  // Async Load State on Startup from Selected Folder
   useEffect(() => {
     const initStorage = async () => {
       try {
         if (isTauriAvailable()) {
-          try {
-            const projects = await listWorldsFromDisk();
+          const savedFolderPath = localStorage.getItem('worlddeck_selected_workspace_path');
+          if (savedFolderPath) {
+            const projects = await listProjectsInFolder(savedFolderPath);
             if (projects && projects.length > 0) {
+              setSelectedWorkspacePath(savedFolderPath);
+              setLocalDirectoryName(savedFolderPath.split(/[/\\]/).pop() || 'Workspace');
               setWorlds(projects);
               const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
               if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
@@ -152,14 +169,8 @@ export const App: React.FC = () => {
                 setActiveWorldId(projects[0].id);
               }
             } else {
-              await saveWorldToDisk(SAMPLE_WORLD);
-              setWorlds([SAMPLE_WORLD]);
-              setActiveWorldId(SAMPLE_WORLD.id);
+              setSelectedWorkspacePath(null);
             }
-          } catch (tauriErr) {
-            console.warn('Gagal memuat disk Tauri, menggunakan sample world:', tauriErr);
-            setWorlds([SAMPLE_WORLD]);
-            setActiveWorldId(SAMPLE_WORLD.id);
           }
           return;
         }
@@ -181,10 +192,6 @@ export const App: React.FC = () => {
                 } else {
                   setActiveWorldId(projects[0].id);
                 }
-              } else {
-                await writeProjectToDirectory(handle, SAMPLE_WORLD);
-                setWorlds([SAMPLE_WORLD]);
-                setActiveWorldId(SAMPLE_WORLD.id);
               }
             } else {
               setLocalDirectoryHandle(handle);
@@ -228,26 +235,63 @@ export const App: React.FC = () => {
     localStorage.setItem('worlddeck_active_id_v2', activeWorldId);
   }, [activeWorldId, isLoaded]);
 
-  // Auto save active world directly to linked local directory or Tauri disk
+  // Auto save active world directly to linked local directory or Tauri workspace folder
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || !activeWorld) return;
+    if (selectedWorkspacePath && isTauriAvailable()) {
+      saveProjectToFolder(selectedWorkspacePath, activeWorld);
+    }
     if (localDirectoryHandle && !needDirectoryPermission) {
       writeProjectToDirectory(localDirectoryHandle, activeWorld);
     }
-    if (isTauriAvailable()) {
-      saveWorldToDisk(activeWorld);
-    }
-  }, [activeWorld, localDirectoryHandle, isLoaded, needDirectoryPermission]);
+  }, [activeWorld, selectedWorkspacePath, localDirectoryHandle, isLoaded, needDirectoryPermission]);
 
-  // Folder Directory Actions
+  // Folder Directory Actions (Mandatory Workspace Picker)
   const handleSelectWorkspaceDirectory = async () => {
     try {
+      if (isTauriAvailable()) {
+        const folderPath = await openWorkspaceFolderDialog();
+        if (folderPath && typeof folderPath === 'string') {
+          const folderName = folderPath.split(/[/\\]/).pop() || 'Workspace';
+
+          setSelectedWorkspacePath(folderPath);
+          setLocalDirectoryName(folderName);
+          localStorage.setItem('worlddeck_selected_workspace_path', folderPath);
+
+          const projects = await listProjectsInFolder(folderPath);
+          if (projects && projects.length > 0) {
+            setWorlds(projects);
+            setActiveWorldId(projects[0].id);
+          } else {
+            const cleanWorld: WorldProject = {
+              id: generateId('world'),
+              name: folderName,
+              description: '',
+              version: '1.0.0',
+              cards: [],
+              canvases: [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }],
+              connections: [],
+              decks: [],
+              timelineTracks: [],
+              timelineNodes: [],
+              documents: [],
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+            await saveProjectToFolder(folderPath, cleanWorld);
+            setWorlds([cleanWorld]);
+            setActiveWorldId(cleanWorld.id);
+          }
+        }
+        return;
+      }
+
       if (!('showDirectoryPicker' in window)) {
         alert('Browser Anda tidak mendukung File System Access API. Silakan gunakan Chrome, Edge, atau Opera.');
         return;
       }
       const handle = await (window as any).showDirectoryPicker({
-        mode: 'readwrite'
+        mode: 'readwrite',
       });
       if (handle) {
         setLocalDirectoryHandle(handle);
@@ -258,51 +302,32 @@ export const App: React.FC = () => {
         const projects = await readAllProjectsFromDirectory(handle);
         if (projects.length > 0) {
           setWorlds(projects);
-          const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
-          if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
-            setActiveWorldId(savedActiveId);
-          } else {
-            setActiveWorldId(projects[0].id);
-          }
+          setActiveWorldId(projects[0].id);
         } else {
-          await writeProjectToDirectory(handle, SAMPLE_WORLD);
-          setWorlds([SAMPLE_WORLD]);
-          setActiveWorldId(SAMPLE_WORLD.id);
+          const cleanWorld: WorldProject = {
+            id: generateId('world'),
+            name: handle.name,
+            description: '',
+            version: '1.0.0',
+            cards: [],
+            canvases: [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }],
+            connections: [],
+            decks: [],
+            timelineTracks: [],
+            timelineNodes: [],
+            documents: [],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          await writeProjectToDirectory(handle, cleanWorld);
+          setWorlds([cleanWorld]);
+          setActiveWorldId(cleanWorld.id);
         }
-
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        alert('Gagal membuka direktori folder.');
+        alert('Gagal membuka direktori folder workspace.');
       }
-    }
-  };
-
-  const handleRequestDirectoryPermission = async () => {
-    if (!localDirectoryHandle) return;
-    try {
-      const options = { mode: 'readwrite' };
-      const permission = await (localDirectoryHandle as any).requestPermission(options);
-      if (permission === 'granted') {
-        setNeedDirectoryPermission(false);
-        const projects = await readAllProjectsFromDirectory(localDirectoryHandle);
-        if (projects.length > 0) {
-          setWorlds(projects);
-          const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
-          if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
-            setActiveWorldId(savedActiveId);
-          } else {
-            setActiveWorldId(projects[0].id);
-          }
-        } else {
-          await writeProjectToDirectory(localDirectoryHandle, SAMPLE_WORLD);
-          setWorlds([SAMPLE_WORLD]);
-          setActiveWorldId(SAMPLE_WORLD.id);
-        }
-
-      }
-    } catch (err) {
-      alert('Gagal mengaktifkan kembali izin akses folder.');
     }
   };
 
@@ -885,7 +910,10 @@ export const App: React.FC = () => {
         const remaining = worlds.filter((w) => w.id !== worldId);
         setWorlds(remaining);
         
-        // Delete project file from local directory
+        // Delete project file from local directory or Tauri folder
+        if (selectedWorkspacePath && isTauriAvailable()) {
+          deleteProjectFromFolder(selectedWorkspacePath, worldId);
+        }
         if (localDirectoryHandle) {
           deleteProjectFromDirectory(localDirectoryHandle, worldId);
         }
@@ -1147,69 +1175,14 @@ export const App: React.FC = () => {
     );
   }
 
-  if (!isTauriAvailable() && (!localDirectoryHandle || needDirectoryPermission)) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center app-bg-main app-text-main font-sans relative overflow-hidden">
-        {/* Background Decorative Gradients */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
-
-        <div className="w-full max-w-md p-8 rounded-2xl app-bg-secondary border app-border shadow-2xl space-y-6 text-center z-10 animate-in zoom-in-95 duration-300">
-          <div className="mx-auto w-16 h-16 rounded-2xl app-accent-bg flex items-center justify-center text-white font-bold shadow-lg">
-            <Icons.Folder size={32} />
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-xl font-extrabold app-text-main tracking-tight">{t.workspacePermission.title}</h2>
-            <p className="text-xs app-text-muted leading-relaxed px-2">
-              {!localDirectoryHandle
-                ? t.workspacePermission.selectDesc
-                : `${t.workspacePermission.reGrantDesc} "${localDirectoryName}".`}
-            </p>
-          </div>
-
-          <div className="pt-2">
-            {!localDirectoryHandle ? (
-              <button
-                type="button"
-                onClick={handleSelectWorkspaceDirectory}
-                className="w-full py-3 rounded-xl app-accent-bg hover:opacity-90 text-white text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Icons.FolderOpen size={16} />
-                <span>{t.navbar.selectWorkspace}</span>
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={handleRequestDirectoryPermission}
-                  className="w-full py-3 rounded-xl app-accent-bg hover:opacity-90 text-white text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Icons.Unlock size={16} />
-                  <span>{t.workspacePermission.grantAccess} "{localDirectoryName}"</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSelectWorkspaceDirectory}
-                  className="w-full py-2.5 rounded-xl app-bg-main border app-border hover:app-bg-hover app-text-muted text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Icons.FolderOpen size={14} />
-                  <span>{t.workspacePermission.selectAnother}</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const isWorkspaceSelected = !!(selectedWorkspacePath || (localDirectoryHandle && !needDirectoryPermission));
 
   return (
     <div className="h-screen w-screen flex flex-col app-bg-main app-text-main overflow-hidden font-sans">
       
-      {/* Top Navbar */}
+      {/* Top Navbar ALWAYS rendered so Window Controls (Minimize, Maximize, Close) and branding are ALWAYS working */}
       <Navbar
-        projectName={activeWorld.name}
+        projectName={activeWorld?.name || 'World Deck'}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
         currentTheme={currentTheme}
@@ -1224,7 +1197,10 @@ export const App: React.FC = () => {
       />
 
       {/* Main Workspace Area */}
-      <div className="flex-1 flex overflow-hidden relative">
+      {!isWorkspaceSelected ? (
+        <WorkspaceLandingScreen onSelectWorkspace={handleSelectWorkspaceDirectory} />
+      ) : (
+        <div className="flex-1 flex overflow-hidden relative">
         
         {/* Sidebar Filter (Visible in Canvas view) */}
         {viewMode === 'canvas' && (
@@ -1357,6 +1333,7 @@ export const App: React.FC = () => {
           )}
         </main>
       </div>
+      )}
 
       {/* Custom Delete Confirmation Modal */}
       {cardsToDelete && (

@@ -38,6 +38,29 @@ fn import_world_project(file_path: String) -> Result<WorldProject, String> {
 }
 
 #[tauri::command]
+fn save_project_to_folder(folder_path: String, project: WorldProject) -> Result<String, String> {
+    storage::save_project_to_folder_path(&folder_path, &project)
+}
+
+#[tauri::command]
+fn list_projects_in_folder(folder_path: String) -> Result<Vec<WorldProject>, String> {
+    storage::list_projects_in_folder_path(&folder_path)
+}
+
+#[tauri::command]
+fn delete_project_from_folder(folder_path: String, id: String) -> Result<(), String> {
+    storage::delete_project_from_folder_path(&folder_path, &id)
+}
+
+#[tauri::command]
+fn select_workspace_folder_dialog() -> Option<String> {
+    rfd::FileDialog::new()
+        .set_title("Pilih Folder Workspace Proyek")
+        .pick_folder()
+        .map(|p| p.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 fn save_image_asset(
     app_handle: AppHandle,
     image_data: String,
@@ -130,6 +153,10 @@ pub fn run() {
             delete_world_project,
             export_world_project,
             import_world_project,
+            save_project_to_folder,
+            list_projects_in_folder,
+            delete_project_from_folder,
+            select_workspace_folder_dialog,
             save_image_asset,
             search_world_cards,
             compute_bezier_path,

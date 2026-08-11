@@ -135,6 +135,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
           <Icons.ChevronDown size={12} className="text-slate-400 group-hover:text-white transition-colors" />
         </button>
+
+        {localDirectoryName && (
+          <button
+            type="button"
+            data-tauri-drag-region={false}
+            onClick={onChangeDirectory}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1e1e1e] hover:bg-[#383838] border border-[#383838] hover:border-[#0d99ff] text-slate-300 hover:text-white text-[11px] font-mono transition-all cursor-pointer shadow-xs"
+            title="Ganti Folder Workspace"
+          >
+            <Icons.Folder size={13} className="text-[#0d99ff]" />
+            <span className="truncate max-w-[150px] font-bold">{localDirectoryName}</span>
+          </button>
+        )}
       </div>
 
       {/* CENTER: Segmented View Mode Switcher Pills */}

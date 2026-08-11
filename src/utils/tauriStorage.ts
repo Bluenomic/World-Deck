@@ -256,3 +256,71 @@ export const isTauriWindowMaximized = async (): Promise<boolean> => {
   }
 };
 
+/**
+ * Save project directly to user-selected folder path on disk via Tauri
+ */
+export const saveProjectToFolder = async (folderPath: string, project: WorldProject): Promise<string | null> => {
+  if (!isTauriAvailable()) return null;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return await invoke<string>('save_project_to_folder', { folderPath, project });
+  } catch (error) {
+    console.error('Tauri save_project_to_folder failed:', error);
+    return null;
+  }
+};
+
+/**
+ * List all project JSON files inside user-selected folder path via Tauri
+ */
+export const listProjectsInFolder = async (folderPath: string): Promise<WorldProject[]> => {
+  if (!isTauriAvailable()) return [];
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return (await invoke<WorldProject[]>('list_projects_in_folder', { folderPath })) || [];
+  } catch (error) {
+    console.error('Tauri list_projects_in_folder failed:', error);
+    return [];
+  }
+};
+
+/**
+ * Delete a project JSON file inside user-selected folder path by ID via Tauri
+ */
+export const deleteProjectFromFolder = async (folderPath: string, id: string): Promise<boolean> => {
+  if (!isTauriAvailable()) return false;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('delete_project_from_folder', { folderPath, id });
+    return true;
+  } catch (error) {
+    console.error('Tauri delete_project_from_folder failed:', error);
+    return false;
+  }
+};
+
+/**
+ * Opens native OS folder selection dialog via Rust rfd backend
+ */
+export const openWorkspaceFolderDialog = async (): Promise<string | null> => {
+  if (!isTauriAvailable()) return null;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return await invoke<string | null>('select_workspace_folder_dialog');
+  } catch (error) {
+    console.error('Tauri select_workspace_folder_dialog failed:', error);
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Pilih Folder Workspace Proyek',
+      });
+      return typeof selected === 'string' ? selected : null;
+    } catch (e) {
+      console.error('Tauri plugin-dialog failed:', e);
+      return null;
+    }
+  }
+};
+
