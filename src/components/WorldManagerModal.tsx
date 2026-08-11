@@ -225,8 +225,33 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
           )}
 
           {/* Cards List Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {worlds.map((w) => {
+          {worlds.length === 0 && !showCreateForm ? (
+            <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-[#2c2c2c] border border-[#383838] flex items-center justify-center text-[#0d99ff] shadow-inner">
+                <Icons.FolderPlus size={32} />
+              </div>
+              <div className="space-y-1 max-w-sm">
+                <h3 className="text-sm font-extrabold text-white">
+                  {language === 'en' ? 'No Workspaces Found in Folder' : 'Belum Ada Workspace di Folder Ini'}
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {language === 'en'
+                    ? 'Create your first workspace project inside this folder to start building your world.'
+                    : 'Folder ini belum memiliki workspace. Silakan buat workspace baru di bawah ini.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleStartCreate}
+                className="px-5 py-2.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
+              >
+                <Icons.PlusCircle size={16} />
+                <span>{language === 'en' ? 'Create New Workspace' : '+ Buat Workspace Baru'}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {worlds.map((w) => {
               const isActive = w.id === activeWorldId;
               const isEditing = editingWorldId === w.id;
 
@@ -414,6 +439,7 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
               );
             })}
           </div>
+          )}
 
         </div>
       </div>

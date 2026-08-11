@@ -216,7 +216,25 @@ export const App: React.FC = () => {
   }, []);
 
   // Derived Active World
-  const activeWorld = (worlds || []).filter(Boolean).find((w) => w && w.id === activeWorldId) || (worlds || []).filter(Boolean)[0] || SAMPLE_WORLD;
+  const activeWorld = (worlds || []).filter(Boolean).find((w) => w && w.id === activeWorldId) || (worlds || []).filter(Boolean)[0] || (
+    selectedWorkspacePath
+      ? {
+          id: 'temp_empty',
+          name: localDirectoryName || 'Workspace Baru',
+          description: '',
+          version: '1.0.0',
+          cards: [],
+          canvases: [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }],
+          connections: [],
+          decks: [],
+          timelineTracks: [],
+          timelineNodes: [],
+          documents: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        }
+      : SAMPLE_WORLD
+  );
 
   // Derived active canvas cards and connections
   const activeWorldCanvases = activeWorld.canvases && activeWorld.canvases.length > 0
@@ -235,54 +253,83 @@ export const App: React.FC = () => {
     localStorage.setItem('worlddeck_active_id_v2', activeWorldId);
   }, [activeWorldId, isLoaded]);
 
+  const isSwitchingFolderRef = useRef<boolean>(false);
+
   // Auto save active world directly to linked local directory or Tauri workspace folder
   useEffect(() => {
-    if (!isLoaded || !activeWorld) return;
+    if (!isLoaded || !activeWorld || isSwitchingFolderRef.current) return;
+    if (activeWorld.id === SAMPLE_WORLD.id) return;
+    const isWorldInCurrentList = (worlds || []).some((w) => w && w.id === activeWorld.id);
+    if (!isWorldInCurrentList) return;
+
     if (selectedWorkspacePath && isTauriAvailable()) {
       saveProjectToFolder(selectedWorkspacePath, activeWorld);
     }
     if (localDirectoryHandle && !needDirectoryPermission) {
       writeProjectToDirectory(localDirectoryHandle, activeWorld);
     }
-  }, [activeWorld, selectedWorkspacePath, localDirectoryHandle, isLoaded, needDirectoryPermission]);
+  }, [activeWorld, selectedWorkspacePath, worlds, localDirectoryHandle, isLoaded, needDirectoryPermission]);
+
+  // Create New Project explicitly in current workspace folder
+  const handleCreateProjectInFolder = async (name: string, description: string) => {
+    const newProject: WorldProject = {
+      id: generateId('world'),
+      name: name.trim(),
+      description: description.trim(),
+      version: '1.0.0',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      cards: [],
+      canvases: [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }],
+      connections: [],
+      decks: [],
+      timelineTracks: [],
+      timelineNodes: [],
+      documents: [],
+    };
+
+    if (selectedWorkspacePath && isTauriAvailable()) {
+      await saveProjectToFolder(selectedWorkspacePath, newProject);
+      setWorlds([newProject]);
+      setActiveWorldId(newProject.id);
+    } else if (localDirectoryHandle) {
+      await writeProjectToDirectory(localDirectoryHandle, newProject);
+      setWorlds([newProject]);
+      setActiveWorldId(newProject.id);
+    }
+  };
 
   // Folder Directory Actions (Mandatory Workspace Picker)
   const handleSelectWorkspaceDirectory = async () => {
     try {
       if (isTauriAvailable()) {
+        isSwitchingFolderRef.current = true;
         const folderPath = await openWorkspaceFolderDialog();
         if (folderPath && typeof folderPath === 'string') {
           const folderName = folderPath.split(/[/\\]/).pop() || 'Workspace';
 
+          // 1. Purge old worlds from state so they aren't written to the new folder
+          setWorlds([]);
+          setActiveWorldId('');
+
+          // 2. Set new workspace path
           setSelectedWorkspacePath(folderPath);
           setLocalDirectoryName(folderName);
           localStorage.setItem('worlddeck_selected_workspace_path', folderPath);
 
+          // 3. Read existing projects from new folder
           const projects = await listProjectsInFolder(folderPath);
           if (projects && projects.length > 0) {
             setWorlds(projects);
             setActiveWorldId(projects[0].id);
           } else {
-            const cleanWorld: WorldProject = {
-              id: generateId('world'),
-              name: folderName,
-              description: '',
-              version: '1.0.0',
-              cards: [],
-              canvases: [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }],
-              connections: [],
-              decks: [],
-              timelineTracks: [],
-              timelineNodes: [],
-              documents: [],
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            };
-            await saveProjectToFolder(folderPath, cleanWorld);
-            setWorlds([cleanWorld]);
-            setActiveWorldId(cleanWorld.id);
+            // Keep worlds empty and automatically open WorldManagerModal for user creation
+            setWorlds([]);
+            setActiveWorldId('');
+            setShowWorldManager(true);
           }
         }
+        isSwitchingFolderRef.current = false;
         return;
       }
 
@@ -290,10 +337,14 @@ export const App: React.FC = () => {
         alert('Browser Anda tidak mendukung File System Access API. Silakan gunakan Chrome, Edge, atau Opera.');
         return;
       }
+
+      isSwitchingFolderRef.current = true;
       const handle = await (window as any).showDirectoryPicker({
         mode: 'readwrite',
       });
       if (handle) {
+        setWorlds([]);
+        setActiveWorldId('');
         setLocalDirectoryHandle(handle);
         setLocalDirectoryName(handle.name);
         setNeedDirectoryPermission(false);
@@ -304,27 +355,13 @@ export const App: React.FC = () => {
           setWorlds(projects);
           setActiveWorldId(projects[0].id);
         } else {
-          const cleanWorld: WorldProject = {
-            id: generateId('world'),
-            name: handle.name,
-            description: '',
-            version: '1.0.0',
-            cards: [],
-            canvases: [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }],
-            connections: [],
-            decks: [],
-            timelineTracks: [],
-            timelineNodes: [],
-            documents: [],
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          };
-          await writeProjectToDirectory(handle, cleanWorld);
-          setWorlds([cleanWorld]);
-          setActiveWorldId(cleanWorld.id);
+          setWorlds([]);
+          setActiveWorldId('');
         }
       }
+      isSwitchingFolderRef.current = false;
     } catch (err: any) {
+      isSwitchingFolderRef.current = false;
       if (err.name !== 'AbortError') {
         alert('Gagal membuka direktori folder workspace.');
       }
@@ -1198,7 +1235,11 @@ export const App: React.FC = () => {
 
       {/* Main Workspace Area */}
       {!isWorkspaceSelected ? (
-        <WorkspaceLandingScreen onSelectWorkspace={handleSelectWorkspaceDirectory} />
+        <WorkspaceLandingScreen
+          selectedWorkspacePath={selectedWorkspacePath}
+          onSelectWorkspace={handleSelectWorkspaceDirectory}
+          onCreateProjectInFolder={handleCreateProjectInFolder}
+        />
       ) : (
         <div className="flex-1 flex overflow-hidden relative">
         
