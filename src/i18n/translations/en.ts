@@ -138,6 +138,8 @@ export const en: typeof id = {
     viewMode: 'View Mode:',
     cardGrid: 'Card Grid',
     compactTable: 'Compact Table/List',
+    libraryActions: 'Library Actions',
+    cardList: 'List View',
   },
   canvas: {
     title: 'Worldbuilding Canvas',

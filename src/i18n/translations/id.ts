@@ -136,6 +136,8 @@ export const id = {
     viewMode: 'Mode Tampilan:',
     cardGrid: 'Grid Kartu',
     compactTable: 'Tabel / List Ringkas',
+    libraryActions: 'Aksi Library',
+    cardList: 'Daftar / List Kartu',
   },
   canvas: {
     title: 'Worldbuilding Canvas',

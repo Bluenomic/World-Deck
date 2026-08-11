@@ -602,6 +602,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     return (
       <div
         key={`deck-${deck.id}`}
+        data-deck-id={deck.id}
         onContextMenu={(e) => handleOpenContextMenu(e, null, deck)}
         onClick={() => {
           setActiveDeckId(deck.id);
@@ -846,7 +847,18 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       )}
 
       {/* Main Grid / List Area */}
-      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+      <div
+        onContextMenu={(e) => {
+          if (
+            e.target === e.currentTarget ||
+            (e.target as HTMLElement).classList.contains('custom-scrollbar') ||
+            !(e.target as HTMLElement).closest('[data-card-id], [data-deck-id]')
+          ) {
+            handleOpenContextMenu(e, null, null);
+          }
+        }}
+        className="flex-1 overflow-y-auto p-4 custom-scrollbar"
+      >
         {totalItemsCount === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-[#1e1e1e] border border-[#383838] flex items-center justify-center text-slate-500 shadow-inner">
@@ -1035,6 +1047,69 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 >
                   <Icons.Trash2 size={14} />
                   <span>{t.library.deleteDeck}</span>
+                </button>
+              </div>
+            </>
+          )}
+
+          {!contextMenu.targetCard && !contextMenu.targetDeck && (
+            <>
+              <div className="py-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onAddCard(activeDeckId || undefined);
+                    setContextMenu((prev) => ({ ...prev, visible: false }));
+                  }}
+                  className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-semibold text-slate-200 cursor-pointer"
+                >
+                  <Icons.PlusCircle size={14} className="text-[#0d99ff]" />
+                  <span>{t.library.newCard}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCreateDeckRequest();
+                    setContextMenu((prev) => ({ ...prev, visible: false }));
+                  }}
+                  className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-semibold text-slate-200 cursor-pointer"
+                >
+                  <Icons.FolderPlus size={14} className="text-purple-400" />
+                  <span>{t.library.newDeck}</span>
+                </button>
+              </div>
+
+              <div className="py-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleViewLayoutChange(viewLayout === 'grid' ? 'list' : 'grid');
+                    setContextMenu((prev) => ({ ...prev, visible: false }));
+                  }}
+                  className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-semibold text-slate-200 cursor-pointer"
+                >
+                  {viewLayout === 'grid' ? <Icons.List size={14} className="text-slate-400" /> : <Icons.Grid size={14} className="text-slate-400" />}
+                  <span>{viewLayout === 'grid' ? t.library.cardList : t.library.cardGrid}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextSort = sortBy === 'updated' ? 'created' : sortBy === 'created' ? 'title' : 'updated';
+                    handleSortChange(nextSort);
+                    setContextMenu((prev) => ({ ...prev, visible: false }));
+                  }}
+                  className="w-full px-3 py-2 text-left hover:bg-[#383838] flex items-center gap-2 transition-colors font-semibold text-slate-200 cursor-pointer"
+                >
+                  <Icons.ArrowUpDown size={14} className="text-slate-400" />
+                  <span>
+                    {sortBy === 'updated'
+                      ? t.library.lastUpdated
+                      : sortBy === 'created'
+                      ? t.library.dateCreated
+                      : t.library.titleAZ}
+                  </span>
                 </button>
               </div>
             </>
