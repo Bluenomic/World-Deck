@@ -51,7 +51,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
   const isCompact = (height && height < 140) || width < 240;
   const isDetailed = (height && height >= 260) || width >= 340;
 
-  // Drag Resize Handler
+  // Drag Resize Handler for Overall Card Dimensions
   const handleResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -61,6 +61,10 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
     const startW = width;
     const startH = height || nodeRef.current?.offsetHeight || 180;
 
+    // Minimum card height must be at least image height + 90px reserved for content
+    const currentImgH = card.imageUrl && !isCompact ? (card.imageHeight || (isDetailed ? 144 : 96)) : 0;
+    const minCardHeight = Math.max(140, currentImgH + 90);
+
     const handlePointerMove = (moveEvent: MouseEvent | TouchEvent) => {
       const moveX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : (moveEvent as MouseEvent).clientX;
       const moveY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
@@ -68,10 +72,16 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       const deltaX = (moveX - clientX) / (zoom || 1);
       const deltaY = (moveY - clientY) / (zoom || 1);
 
-      const newWidth = Math.round(Math.max(220, Math.min(650, startW + deltaX)));
-      const newHeight = Math.round(Math.max(110, Math.min(800, startH + deltaY)));
+      const newWidth = Math.round(Math.max(220, Math.min(700, startW + deltaX)));
+      const newHeight = Math.round(Math.max(minCardHeight, Math.min(1000, startH + deltaY)));
 
       onUpdateDimensions?.(card.id, newWidth, newHeight);
+
+      // If new card height shrinks near current image height, clamp image height down as well
+      if (card.imageHeight && card.imageHeight > newHeight - 90) {
+        const clampedImgH = Math.max(48, newHeight - 90);
+        onUpdateImageHeight?.(card.id, clampedImgH);
+      }
     };
 
     const handlePointerUp = () => {
@@ -96,11 +106,15 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
     const defaultImgH = isDetailed ? 144 : 96;
     const startImgH = card.imageHeight || defaultImgH;
 
+    // Image height is strictly bounded by card's overall height minus 90px content room
+    const currentCardH = height || nodeRef.current?.offsetHeight || 240;
+    const maxImgHeight = Math.max(48, currentCardH - 90);
+
     const handlePointerMove = (moveEvent: MouseEvent | TouchEvent) => {
       const moveY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
       const deltaY = (moveY - clientY) / (zoom || 1);
 
-      const newImageHeight = Math.round(Math.max(48, Math.min(500, startImgH + deltaY)));
+      const newImageHeight = Math.round(Math.max(48, Math.min(maxImgHeight, startImgH + deltaY)));
       onUpdateImageHeight?.(card.id, newImageHeight);
     };
 
@@ -151,7 +165,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
         card.imageUrl ? (
           <div
             style={{ height: card.imageHeight ? `${card.imageHeight}px` : undefined }}
-            className={`w-full overflow-hidden relative rounded-t-xl shrink-0 group/img ${
+            className={`w-full max-h-[calc(100%-80px)] overflow-hidden relative rounded-t-xl shrink-0 group/img ${
               !card.imageHeight ? (isDetailed ? 'h-36' : 'h-24') : ''
             }`}
           >
