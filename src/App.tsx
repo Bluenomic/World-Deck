@@ -13,6 +13,7 @@ import { Navbar } from './components/Navbar';
 import { SidebarFilter } from './components/SidebarFilter';
 import { Canvas } from './components/Canvas';
 import { LibraryView } from './components/LibraryView';
+import { ImageFocalAdjusterModal } from './components/ImageFocalAdjusterModal';
 import { TimelineView } from './components/TimelineView';
 import { DocumentsView } from './components/DocumentsView';
 import { CardEditorModal } from './components/CardEditorModal';
@@ -88,6 +89,7 @@ export const App: React.FC = () => {
   const [editingCard, setEditingCard] = useState<WorldCard | null>(null);
   const [readerCardId, setReaderCardId] = useState<string | null>(null);
   const [isReaderFullPage, setIsReaderFullPage] = useState<boolean>(false);
+  const [adjustFocalCard, setAdjustFocalCard] = useState<WorldCard | null>(null);
 
   // Close reader sidebar automatically when changing views, worlds, or canvases
   useEffect(() => {
@@ -465,6 +467,14 @@ export const App: React.FC = () => {
       ...prev,
       updatedAt: Date.now(),
       cards: prev.cards.map((c) => (c.id === id ? { ...c, imageHeight } : c)),
+    }));
+  };
+
+  const handleUpdateCardImageFocalPoint = (id: string, imageFocalX: number, imageFocalY: number) => {
+    updateActiveWorld((prev) => ({
+      ...prev,
+      updatedAt: Date.now(),
+      cards: prev.cards.map((c) => (c.id === id ? { ...c, imageFocalX, imageFocalY } : c)),
     }));
   };
 
@@ -1278,6 +1288,7 @@ export const App: React.FC = () => {
               onDeleteConnections={handleDeleteConnections}
               onUpdateCardDimensions={handleUpdateCardDimensions}
               onUpdateCardImageHeight={handleUpdateCardImageHeight}
+              onAdjustImageFocalPointRequest={(card) => setAdjustFocalCard(card)}
               canUndo={canUndo}
               canRedo={canRedo}
               onUndo={handleUndo}
@@ -1310,6 +1321,7 @@ export const App: React.FC = () => {
                 setIsReaderFullPage(true);
               }}
               onDeleteCardsRequest={handleRequestDeleteCards}
+              onAdjustImageFocalPointRequest={(card) => setAdjustFocalCard(card)}
             />
           )}
 
@@ -1459,6 +1471,14 @@ export const App: React.FC = () => {
         config={confirmModalConfig}
         onClose={() => setConfirmModalConfig(null)}
       />
+      {/* Interactive Image Focal Point Adjustment Modal */}
+      {adjustFocalCard && (
+        <ImageFocalAdjusterModal
+          card={adjustFocalCard}
+          onSave={handleUpdateCardImageFocalPoint}
+          onClose={() => setAdjustFocalCard(null)}
+        />
+      )}
     </div>
   );
 };

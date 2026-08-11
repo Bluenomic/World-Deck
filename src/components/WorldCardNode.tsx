@@ -18,6 +18,7 @@ interface WorldCardNodeProps {
   onMeasureHeight?: (cardId: string, height: number) => void;
   onUpdateDimensions?: (cardId: string, width: number, height: number) => void;
   onUpdateImageHeight?: (cardId: string, imageHeight: number) => void;
+  onAdjustImageFocalPointRequest?: (card: WorldCard) => void;
 }
 
 export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
@@ -34,6 +35,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
   onMeasureHeight,
   onUpdateDimensions,
   onUpdateImageHeight,
+  onAdjustImageFocalPointRequest,
 }) => {
   const { t, getCategoryLabel } = useLanguage();
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -157,10 +159,26 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
               src={card.imageUrl}
               alt={card.title}
               className="w-full h-full object-cover opacity-90 group-hover/img:opacity-100 transition-opacity pointer-events-none select-none"
+              style={{ objectPosition: `${card.imageFocalX ?? 50}% ${card.imageFocalY ?? 20}%` }}
               draggable={false}
               onDragStart={(e) => e.preventDefault()}
               loading="lazy"
             />
+
+            {/* Quick Focal Point Adjustment Button */}
+            {onAdjustImageFocalPointRequest && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAdjustImageFocalPointRequest(card);
+                }}
+                className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 backdrop-blur-md text-white hover:text-[#0d99ff] hover:bg-black/90 opacity-0 group-hover/img:opacity-100 transition-all z-20 cursor-pointer shadow-md"
+                title="Atur Fokus Gambar"
+              >
+                <Icons.Focus size={13} />
+              </button>
+            )}
 
             {/* Image Height Drag Resize Handle */}
             {onUpdateImageHeight && (

@@ -38,6 +38,8 @@ export interface WorldCard {
   content: string;
   imageUrl?: string;
   imageHeight?: number;
+  imageFocalX?: number;
+  imageFocalY?: number;
   images?: string[];
   tags: string[];
   attributes: CustomAttribute[];

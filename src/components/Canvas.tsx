@@ -32,6 +32,7 @@ interface CanvasProps {
   onDeleteConnections?: (ids: string[]) => void;
   onUpdateCardDimensions?: (id: string, width: number, height: number) => void;
   onUpdateCardImageHeight?: (id: string, imageHeight: number) => void;
+  onAdjustImageFocalPointRequest?: (card: WorldCard) => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onUndo?: () => void;
@@ -63,6 +64,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onDeleteConnections,
   onUpdateCardDimensions,
   onUpdateCardImageHeight,
+  onAdjustImageFocalPointRequest,
   canUndo,
   canRedo,
   onUndo,
@@ -999,6 +1001,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               onMeasureHeight={(id, h) => cardHeightsRef.current.set(id, h)}
               onUpdateDimensions={onUpdateCardDimensions}
               onUpdateImageHeight={onUpdateCardImageHeight}
+              onAdjustImageFocalPointRequest={onAdjustImageFocalPointRequest}
             />
           );
         })}
@@ -1261,6 +1264,20 @@ export const Canvas: React.FC<CanvasProps> = ({
                     <Icons.Edit3 size={14} />
                     <span>{t.sidebar.editCard}</span>
                   </button>
+
+                  {(clickedCard.imageUrl || (clickedCard.images && clickedCard.images.length > 0)) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onAdjustImageFocalPointRequest?.(clickedCard);
+                        setContextMenu((prev) => ({ ...prev, visible: false }));
+                      }}
+                      className="w-full px-3 py-2 text-left hover:app-bg-hover flex items-center gap-2 transition-colors font-semibold text-[#0d99ff] cursor-pointer"
+                    >
+                      <Icons.Focus size={14} />
+                      <span>{t.library.adjustImageFocus}</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"

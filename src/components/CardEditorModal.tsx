@@ -3,6 +3,7 @@ import type { WorldCard, CardCategory, CustomAttribute, CardConnection } from '.
 import { CATEGORY_CONFIGS, PRIMARY_CATEGORIES } from '../data/categoryConfig';
 import { generateId } from '../utils/helpers';
 import { useLanguage } from '../i18n/LanguageContext';
+import { ImageFocalAdjusterModal } from './ImageFocalAdjusterModal';
 import * as Icons from 'lucide-react';
 
 const SUGGESTED_ATTRIBUTES_BY_CATEGORY: Record<string, { id: string[]; en: string[] }> = {
@@ -79,6 +80,9 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
   const [tags, setTags] = useState<string[]>(card.tags || []);
   const [newTagInput, setNewTagInput] = useState('');
   const [attributes, setAttributes] = useState<CustomAttribute[]>(card.attributes || []);
+  const [imageFocalX, setImageFocalX] = useState<number>(card.imageFocalX ?? 50);
+  const [imageFocalY, setImageFocalY] = useState<number>(card.imageFocalY ?? 20);
+  const [showFocalAdjuster, setShowFocalAdjuster] = useState(false);
   const [activeTab, setActiveTab] = useState<'content' | 'properties' | 'relations'>('content');
 
   const [targetCardId, setTargetCardId] = useState<string>('');
@@ -154,6 +158,8 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
       content: content.trim(),
       imageUrl: imageUrl.trim(),
       imageHeight: imageHeight,
+      imageFocalX,
+      imageFocalY,
       images,
       tags,
       attributes,
@@ -313,8 +319,22 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
         {/* Cover Photo Header */}
         {imageUrl ? (
           <div className="h-40 w-full relative overflow-hidden group border-b border-[#383838] bg-[#1e1e1e]">
-            <img src={imageUrl} alt="Cover" className="w-full h-full object-cover pointer-events-none select-none" draggable={false} />
+            <img
+              src={imageUrl}
+              alt="Cover"
+              className="w-full h-full object-cover pointer-events-none select-none"
+              style={{ objectPosition: `${imageFocalX}% ${imageFocalY}%` }}
+              draggable={false}
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setShowFocalAdjuster(true)}
+                className="px-3 py-1 bg-[#2c2c2c]/90 backdrop-blur-md rounded-lg text-xs text-white border border-[#383838] font-semibold hover:bg-[#383838] flex items-center gap-1.5 cursor-pointer"
+              >
+                <Icons.Focus size={13} className="text-[#0d99ff]" />
+                <span>{t.library.adjustImageFocus}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setShowCoverInput(true)}
@@ -856,6 +876,17 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             </div>
           </div>
         </div>
+      )}
+      {/* Interactive Image Focal Point Adjustment Modal */}
+      {showFocalAdjuster && (
+        <ImageFocalAdjusterModal
+          card={{ ...card, imageUrl, imageFocalX, imageFocalY }}
+          onSave={(_, fx, fy) => {
+            setImageFocalX(fx);
+            setImageFocalY(fy);
+          }}
+          onClose={() => setShowFocalAdjuster(false)}
+        />
       )}
     </div>
   );

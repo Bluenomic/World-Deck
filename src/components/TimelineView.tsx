@@ -1282,6 +1282,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                           src={node.imageUrl || node.images?.[0]}
                           alt={node.title}
                           className="w-full h-full object-cover select-none pointer-events-none"
+                          style={{ objectPosition: `${(node as any).imageFocalX ?? 50}% ${(node as any).imageFocalY ?? 20}%` }}
                         />
                         {node.images && node.images.length > 1 && (
                           <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-xs text-[9px] font-mono font-bold text-white flex items-center gap-1 shadow-sm">

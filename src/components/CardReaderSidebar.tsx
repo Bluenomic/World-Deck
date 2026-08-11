@@ -154,6 +154,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
               src={activeCard.imageUrl}
               alt={activeCard.title}
               className="w-full h-full object-cover group-hover/img:brightness-110 transition-all"
+              style={{ objectPosition: `${activeCard.imageFocalX ?? 50}% ${activeCard.imageFocalY ?? 20}%` }}
               loading="lazy"
             />
             <div className="absolute inset-0 bg-black/35 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-bold gap-1">
@@ -306,7 +307,12 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
                   }}
                   className="relative rounded-xl overflow-hidden border app-border hover:border-[#0d99ff] group bg-black/40 aspect-video cursor-pointer transition-all hover:scale-[1.02] shadow-sm"
                 >
-                  <img src={imgSrc} alt={`Galeri ${idx + 1}`} className="w-full h-full object-cover" />
+                  <img
+                    src={imgSrc}
+                    alt={`Galeri ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    style={{ objectPosition: `${activeCard.imageFocalX ?? 50}% ${activeCard.imageFocalY ?? 20}%` }}
+                  />
                   {isThumbnail && (
                     <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-[#0d99ff] text-white text-[9px] font-bold shadow-xs">
                       Thumbnail
