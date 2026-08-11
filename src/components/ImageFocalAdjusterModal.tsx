@@ -33,6 +33,7 @@ export const ImageFocalAdjusterModal: React.FC<ImageFocalAdjusterModalProps> = (
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
     isDraggingRef.current = true;
     setIsDragging(true);
 
@@ -76,7 +77,8 @@ export const ImageFocalAdjusterModal: React.FC<ImageFocalAdjusterModalProps> = (
     window.addEventListener('pointerup', handlePointerUp);
   };
 
-  const handleSave = () => {
+  const handleSave = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     onSave(card.id, focalX, focalY);
     onClose();
   };
@@ -84,8 +86,17 @@ export const ImageFocalAdjusterModal: React.FC<ImageFocalAdjusterModalProps> = (
   if (!imageUrl) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
-      <div className="bg-[#1e1e1e] border border-[#383838] rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col space-y-4 p-6">
+    <div
+      className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 select-none cursor-pointer"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+    >
+      <div
+        className="bg-[#1e1e1e] border border-[#383838] rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col space-y-4 p-6 cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-[#383838] pb-3">
@@ -100,7 +111,10 @@ export const ImageFocalAdjusterModal: React.FC<ImageFocalAdjusterModalProps> = (
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
             className="p-1.5 rounded-xl hover:bg-[#383838] text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
             <Icons.X size={18} />
@@ -150,7 +164,10 @@ export const ImageFocalAdjusterModal: React.FC<ImageFocalAdjusterModalProps> = (
         <div className="flex items-center justify-end pt-2 border-t border-[#383838] gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
             className="px-4 py-2 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
           >
             {t.common.cancel}

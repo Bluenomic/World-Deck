@@ -316,9 +316,13 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
           </div>
         </div>
 
-        {/* Cover Photo Header */}
-        {imageUrl ? (
-          <div className="h-40 w-full relative overflow-hidden group border-b border-[#383838] bg-[#1e1e1e]">
+        {/* Form Container wrapping scrollable body and sticky action footer */}
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          {/* Main Unified Scrollable Modal Body */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+            {/* Cover Photo Header (Enlarged to h-64 md:h-72 for rich vertical view) */}
+            {imageUrl ? (
+              <div className="h-64 md:h-72 w-full relative overflow-hidden group border-b border-[#383838] bg-[#1e1e1e] shrink-0">
             <img
               src={imageUrl}
               alt="Cover"
@@ -498,8 +502,8 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
           />
         </div>
 
-        {/* Tab Navigation Segment */}
-        <div className="px-6 border-b border-[#383838] flex items-center gap-2 text-xs font-semibold shrink-0">
+            {/* Sticky Tab Navigation Segment */}
+            <div className="sticky top-0 z-20 bg-[#1e1e1e]/95 backdrop-blur-md px-6 border-b border-[#383838] flex items-center gap-2 text-xs font-semibold shrink-0 py-1">
           <button
             type="button"
             onClick={() => setActiveTab('content')}
@@ -538,8 +542,8 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
           </button>
         </div>
 
-        {/* Form Body Form / Tab Contents */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            {/* Form Tab Contents Body */}
+            <div className="p-6 space-y-6 flex-1">
           {activeTab === 'content' && (
             <div className="space-y-5 animate-in fade-in duration-150">
               <div className="space-y-1.5">
@@ -803,8 +807,11 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
             </div>
           )}
 
-          {/* Footer Buttons */}
-          <div className="pt-4 border-t border-[#383838] flex items-center justify-end gap-2">
+            </div>
+          </div>
+
+          {/* Sticky Bottom Action Bar */}
+          <div className="px-6 py-3 border-t border-[#383838] bg-[#1e1e1e] flex items-center justify-end gap-2 shrink-0 z-20">
             <button
               type="button"
               onClick={handleCloseRequest}
