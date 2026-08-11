@@ -20,6 +20,7 @@ export const ImageFocalAdjusterModal: React.FC<ImageFocalAdjusterModalProps> = (
   // Focal point percentages (0 - 100)
   const [focalX, setFocalX] = useState<number>(card.imageFocalX ?? 50);
   const [focalY, setFocalY] = useState<number>(card.imageFocalY ?? 20);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef<boolean>(false);
@@ -33,6 +34,7 @@ export const ImageFocalAdjusterModal: React.FC<ImageFocalAdjusterModalProps> = (
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     isDraggingRef.current = true;
+    setIsDragging(true);
 
     dragStartPosRef.current = {
       x: e.clientX,
@@ -42,40 +44,36 @@ export const ImageFocalAdjusterModal: React.FC<ImageFocalAdjusterModalProps> = (
     };
 
     const container = containerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-
-    // Directly set focal point based on click position relative to container
-    const newX = Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
-    const newY = Math.max(0, Math.min(100, Math.round(((e.clientY - rect.top) / rect.height) * 100)));
-
-    setFocalX(newX);
-    setFocalY(newY);
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       if (!isDraggingRef.current || !container) return;
-      const currentRect = container.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
 
-      const moveX = Math.max(0, Math.min(100, Math.round(((moveEvent.clientX - currentRect.left) / currentRect.width) * 100)));
-      const moveY = Math.max(0, Math.min(100, Math.round(((moveEvent.clientY - currentRect.top) / currentRect.height) * 100)));
+      const deltaX = moveEvent.clientX - dragStartPosRef.current.x;
+      const deltaY = moveEvent.clientY - dragStartPosRef.current.y;
 
-      setFocalX(moveX);
-      setFocalY(moveY);
+      // Smooth 1:1 Mouse Panning Physics:
+      // Multiplier factor (0.22) prevents hyper-sensitivity and matches 1:1 physical mouse distance
+      const sensitivity = 0.22;
+      const deltaFocalX = (deltaX / rect.width) * 100 * sensitivity;
+      const deltaFocalY = (deltaY / rect.height) * 100 * sensitivity;
+
+      const newFocalX = Math.max(0, Math.min(100, Math.round(dragStartPosRef.current.startFocalX - deltaFocalX)));
+      const newFocalY = Math.max(0, Math.min(100, Math.round(dragStartPosRef.current.startFocalY - deltaFocalY)));
+
+      setFocalX(newFocalX);
+      setFocalY(newFocalY);
     };
 
     const handlePointerUp = () => {
       isDraggingRef.current = false;
+      setIsDragging(false);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
-  };
-
-  const handleResetToFace = () => {
-    setFocalX(50);
-    setFocalY(20);
   };
 
   const handleSave = () => {
@@ -87,7 +85,7 @@ export const ImageFocalAdjusterModal: React.FC<ImageFocalAdjusterModalProps> = (
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
-      <div className="bg-[#1e1e1e] border border-[#383838] rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl flex flex-col space-y-4 p-5">
+      <div className="bg-[#1e1e1e] border border-[#383838] rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col space-y-4 p-6">
         
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-[#383838] pb-3">
@@ -96,14 +94,7 @@ export const ImageFocalAdjusterModal: React.FC<ImageFocalAdjusterModalProps> = (
               <Icons.Focus size={18} />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-white">
-                {language === 'en' ? 'Adjust Image Focus' : 'Atur Fokus Gambar'}
-              </h3>
-              <p className="text-[11px] text-slate-400">
-                {language === 'en'
-                  ? 'Drag or click anywhere on the image to position key subject focus (such as face)'
-                  : 'Tarik atau klik pada area gambar untuk menentukan posisi fokus (seperti wajah)'}
-              </p>
+              <h3 className="font-extrabold text-sm text-white">Adjust Cover</h3>
             </div>
           </div>
 
@@ -119,81 +110,60 @@ export const ImageFocalAdjusterModal: React.FC<ImageFocalAdjusterModalProps> = (
         {/* Live Card Banner Drag Area */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-300 font-semibold px-1">
-            <span>{language === 'en' ? 'Card Banner Preview:' : 'Pratinjau Banner Kartu:'}</span>
+            <span>{language === 'en' ? 'Card Cover Preview:' : 'Pratinjau Foto Sampul:'}</span>
             <span className="font-mono text-[11px] text-slate-400">
-              {language === 'en' ? 'Focus:' : 'Posisi Fokus:'} {focalX}% X, {focalY}% Y
+              {focalX}% X, {focalY}% Y
             </span>
           </div>
 
-          {/* Interactive Drag Banner Container */}
+          {/* Enlarge height vertically (h-72 = 288px) for spacious vertical view & smooth 1:1 mouse panning */}
           <div
             ref={containerRef}
             onPointerDown={handlePointerDown}
-            className="h-44 w-full relative overflow-hidden rounded-2xl border-2 border-dashed border-[#0d99ff]/70 hover:border-[#0d99ff] cursor-crosshair bg-black group transition-all shadow-inner"
+            className={`h-72 w-full relative overflow-hidden rounded-2xl border-2 transition-all shadow-inner bg-black ${
+              isDragging
+                ? 'border-[#0d99ff] cursor-grabbing'
+                : 'border-[#383838] hover:border-[#0d99ff]/70 cursor-grab'
+            }`}
           >
             <img
               src={imageUrl}
               alt={card.title}
-              className="w-full h-full object-cover pointer-events-none select-none"
+              className="w-full h-full object-cover pointer-events-none select-none transition-all duration-75"
               style={{ objectPosition: `${focalX}% ${focalY}%` }}
               draggable={false}
             />
 
-            {/* Target Reticle Overlay Indicator */}
-            <div
-              className="absolute w-8 h-8 -ml-4 -mt-4 pointer-events-none flex items-center justify-center transition-all duration-75"
-              style={{ left: `${focalX}%`, top: `${focalY}%` }}
-            >
-              <div className="w-8 h-8 rounded-full border-2 border-white bg-[#0d99ff]/40 shadow-[0_0_12px_rgba(13,153,255,0.8)] animate-pulse flex items-center justify-center">
-                <div className="w-2 h-2 rounded-full bg-white" />
-              </div>
-            </div>
-
-            {/* Hint Overlay */}
-            <div className="absolute top-2 left-2 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-[10px] text-white font-bold flex items-center gap-1.5 border border-white/10 pointer-events-none">
-              <Icons.Move size={12} className="text-[#0d99ff]" />
+            {/* Subtle Hint Overlay */}
+            <div className="absolute top-3 left-3 px-3 py-1.5 rounded-xl bg-black/65 backdrop-blur-md text-xs text-white font-bold flex items-center gap-1.5 border border-white/10 pointer-events-none shadow-md">
+              <Icons.Move size={14} className="text-[#0d99ff]" />
               <span>
                 {language === 'en'
-                  ? 'Drag or click anywhere to move focus'
-                  : 'Geser atau klik di mana saja untuk memindahkan fokus'}
+                  ? 'Drag image to adjust cover view'
+                  : 'Geser gambar untuk mengatur tampilan sampul'}
               </span>
             </div>
           </div>
         </div>
 
         {/* Action Controls Footer */}
-        <div className="flex items-center justify-between pt-2 border-t border-[#383838]">
+        <div className="flex items-center justify-end pt-2 border-t border-[#383838] gap-2">
           <button
             type="button"
-            onClick={handleResetToFace}
-            className="px-3 py-1.5 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
           >
-            <Icons.RotateCcw size={13} />
-            <span>
-              {language === 'en'
-                ? 'Reset (Face Focus 50% / 20%)'
-                : 'Reset (Fokus Wajah 50% / 20%)'}
-            </span>
+            {t.common.cancel}
           </button>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3.5 py-1.5 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
-            >
-              {t.common.cancel}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              className="px-4 py-1.5 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5"
-            >
-              <Icons.Check size={14} />
-              <span>{language === 'en' ? 'Save Position' : 'Simpan Posisi'}</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="px-5 py-2 rounded-xl bg-[#0d99ff] hover:bg-[#0b85de] text-white text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5"
+          >
+            <Icons.Check size={14} />
+            <span>{language === 'en' ? 'Save Position' : 'Simpan Posisi'}</span>
+          </button>
         </div>
 
       </div>
