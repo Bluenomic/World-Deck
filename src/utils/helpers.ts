@@ -122,3 +122,33 @@ export const downloadProjectJson = (projectData: any) => {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
+
+/**
+ * Helper to get all canvas IDs a card is assigned to (supporting legacy single canvasId and multi-canvas canvasIds)
+ */
+export const getCardCanvasIds = (card: WorldCard): string[] => {
+  if (card.canvasIds && Array.isArray(card.canvasIds) && card.canvasIds.length > 0) {
+    return card.canvasIds;
+  }
+  if (card.canvasId) {
+    return [card.canvasId];
+  }
+  return [];
+};
+
+/**
+ * Checks if a card is placed on a specific canvas
+ */
+export const isCardOnCanvas = (card: WorldCard, canvasId: string): boolean => {
+  return getCardCanvasIds(card).includes(canvasId);
+};
+
+/**
+ * Returns a card's position on a specific canvas, fallback to card.x / card.y
+ */
+export const getCardPositionOnCanvas = (card: WorldCard, canvasId: string): { x: number; y: number } => {
+  if (card.canvasPositions && card.canvasPositions[canvasId]) {
+    return card.canvasPositions[canvasId];
+  }
+  return { x: card.x ?? 0, y: card.y ?? 0 };
+};

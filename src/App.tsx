@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme, WorldDocument, WorldCanvas } from './types';
 import { SAMPLE_WORLD } from './data/sampleWorld';
-import { generateId, downloadProjectJson } from './utils/helpers';
+import { generateId, downloadProjectJson, getCardCanvasIds, isCardOnCanvas, getCardPositionOnCanvas } from './utils/helpers';
 import { saveLocalFileHandle, loadLocalFileHandle, loadWorkspacePreferences, saveWorkspacePreferences } from './utils/storage';
 import * as Icons from 'lucide-react';
 import {
@@ -241,7 +241,16 @@ export const App: React.FC = () => {
     ? activeWorld.canvases
     : [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }];
 
-  const activeCanvasCards = activeWorld.cards.filter((c) => c.canvasId === activeCanvasId);
+  const activeCanvasCards = activeWorld.cards
+    .filter((c) => isCardOnCanvas(c, activeCanvasId))
+    .map((c) => {
+      const pos = getCardPositionOnCanvas(c, activeCanvasId);
+      return {
+        ...c,
+        x: pos.x,
+        y: pos.y,
+      };
+    });
   const activeCanvasCardIds = activeCanvasCards.map((c) => c.id);
   const activeCanvasConnections = activeWorld.connections.filter(
     (conn) => activeCanvasCardIds.includes(conn.sourceId) && activeCanvasCardIds.includes(conn.targetId)
@@ -499,7 +508,19 @@ export const App: React.FC = () => {
     updateActiveWorld((prev) => ({
       ...prev,
       updatedAt: Date.now(),
-      cards: prev.cards.map((c) => (c.id === id ? { ...c, x, y } : c)),
+      cards: prev.cards.map((c) => {
+        if (c.id !== id) return c;
+        const currentPositions = c.canvasPositions || {};
+        return {
+          ...c,
+          x,
+          y,
+          canvasPositions: {
+            ...currentPositions,
+            [activeCanvasId]: { x, y },
+          },
+        };
+      }),
     }));
   };
 
@@ -511,7 +532,17 @@ export const App: React.FC = () => {
       updatedAt: Date.now(),
       cards: prev.cards.map((c) => {
         const up = updateMap.get(c.id);
-        return up ? { ...c, x: up.x, y: up.y } : c;
+        if (!up) return c;
+        const currentPositions = c.canvasPositions || {};
+        return {
+          ...c,
+          x: up.x,
+          y: up.y,
+          canvasPositions: {
+            ...currentPositions,
+            [activeCanvasId]: { x: up.x, y: up.y },
+          },
+        };
       }),
     }));
   };
@@ -555,6 +586,8 @@ export const App: React.FC = () => {
       x,
       y,
       canvasId: activeCanvasId,
+      canvasIds: [activeCanvasId],
+      canvasPositions: { [activeCanvasId]: { x, y } },
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -584,6 +617,7 @@ export const App: React.FC = () => {
       x: 300,
       y: 300,
       canvasId: undefined, // Belongs to Galeri only until manually added to Canvas
+      canvasIds: [],
       deckId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -598,19 +632,37 @@ export const App: React.FC = () => {
     setEditingCard(newCard);
   };
 
-  // Remove Cards from Canvas (Keep in Galeri)
+  // Remove Cards from Canvas (Keep in Galeri / Other Canvases)
   const handleRemoveCardsFromCanvas = (cardIds: string[]) => {
     updateActiveWorld((prev) => ({
       ...prev,
       updatedAt: Date.now(),
-      cards: prev.cards.map((c) => (cardIds.includes(c.id) ? { ...c, canvasId: undefined } : c)),
-      connections: prev.connections.filter(
-        (conn) => !cardIds.includes(conn.sourceId) && !cardIds.includes(conn.targetId)
-      ),
+      cards: prev.cards.map((c) => {
+        if (!cardIds.includes(c.id)) return c;
+        const currentCanvasIds = getCardCanvasIds(c);
+        const remainingCanvasIds = currentCanvasIds.filter((id) => id !== activeCanvasId);
+        const nextPositions = { ...(c.canvasPositions || {}) };
+        delete nextPositions[activeCanvasId];
+        return {
+          ...c,
+          canvasId: remainingCanvasIds[0] || undefined,
+          canvasIds: remainingCanvasIds,
+          canvasPositions: nextPositions,
+        };
+      }),
+      connections: prev.connections.filter((conn) => {
+        if (!cardIds.includes(conn.sourceId) && !cardIds.includes(conn.targetId)) return true;
+        const sourceCard = prev.cards.find((card) => card.id === conn.sourceId);
+        const targetCard = prev.cards.find((card) => card.id === conn.targetId);
+        if (!sourceCard || !targetCard) return false;
+        const srcCanvases = getCardCanvasIds(sourceCard).filter((id) => id !== activeCanvasId);
+        const tgtCanvases = getCardCanvasIds(targetCard).filter((id) => id !== activeCanvasId);
+        return srcCanvases.some((id) => tgtCanvases.includes(id));
+      }),
     }));
   };
 
-  // Add Multiple Cards to Canvas from Gallery at Position
+  // Add Multiple Cards to Canvas from Gallery at Position (Preserving presence on existing canvases)
   const handleAddCardsToCanvasAtPosition = (cardIds: string[], position: { x: number; y: number }) => {
     const COLS = 3;
     const SPACING_X = 260;
@@ -623,11 +675,21 @@ export const App: React.FC = () => {
           const col = index % COLS;
           const row = Math.floor(index / COLS);
           index++;
+          const targetX = position.x + col * SPACING_X;
+          const targetY = position.y + row * SPACING_Y;
+          const currentCanvasIds = getCardCanvasIds(c);
+          const newCanvasIds = Array.from(new Set([...currentCanvasIds, activeCanvasId]));
+          const newPositions = {
+            ...(c.canvasPositions || {}),
+            [activeCanvasId]: { x: targetX, y: targetY },
+          };
           return {
             ...c,
             canvasId: activeCanvasId,
-            x: position.x + col * SPACING_X,
-            y: position.y + row * SPACING_Y,
+            canvasIds: newCanvasIds,
+            canvasPositions: newPositions,
+            x: targetX,
+            y: targetY,
           };
         }
         return c;
@@ -639,8 +701,6 @@ export const App: React.FC = () => {
         cards: updatedCards,
       };
     });
-
-
   };
 
   // Deck Management Actions
@@ -1052,26 +1112,31 @@ export const App: React.FC = () => {
       isOpen: true,
       title: t.appPrompts.deleteCanvasTitle,
       description: language === 'en'
-        ? 'Are you sure you want to permanently delete this canvas along with card locations inside it?'
-        : 'Apakah Anda yakin ingin menghapus kanvas ini beserta lokasi kartu di dalamnya secara permanen?',
+        ? 'Are you sure you want to delete this canvas? Cards will remain safely stored in your Library.'
+        : 'Apakah Anda yakin ingin menghapus kanvas ini? Kartu akan tetap tersimpan dengan aman di Galeri / Library.',
       confirmLabel: t.appPrompts.deleteCanvasConfirm,
       cancelLabel: t.common.cancel,
       variant: 'danger',
       onConfirm: () => {
         updateActiveWorld((prev) => {
           const remainingCanvases = (prev.canvases || []).filter((c) => c.id !== canvasId);
+          const updatedCards = prev.cards.map((c) => {
+            const currentCanvasIds = getCardCanvasIds(c);
+            if (!currentCanvasIds.includes(canvasId)) return c;
+            const remainingIds = currentCanvasIds.filter((id) => id !== canvasId);
+            const nextPositions = { ...(c.canvasPositions || {}) };
+            delete nextPositions[canvasId];
+            return {
+              ...c,
+              canvasId: remainingIds[0] || undefined,
+              canvasIds: remainingIds,
+              canvasPositions: nextPositions,
+            };
+          });
           return {
             ...prev,
             canvases: remainingCanvases,
-            cards: prev.cards.filter((c) => (c.canvasId || 'default') !== canvasId),
-            connections: prev.connections.filter((conn) => {
-              const sourceCard = prev.cards.find((c) => c.id === conn.sourceId);
-              const targetCard = prev.cards.find((c) => c.id === conn.targetId);
-              return (
-                sourceCard && (sourceCard.canvasId || 'default') !== canvasId &&
-                targetCard && (targetCard.canvasId || 'default') !== canvasId
-              );
-            }),
+            cards: updatedCards,
             updatedAt: Date.now(),
           };
         });
@@ -1091,21 +1156,28 @@ export const App: React.FC = () => {
         name: `${sourceCanvas.name} (${t.appPrompts.copySuffix})`,
         createdAt: Date.now(),
       };
-      
-      const sourceCards = prev.cards.filter((c) => c.canvasId === canvasId);
-      const clonedCards: WorldCard[] = sourceCards.map((c) => ({
-        ...c,
-        id: generateId('card'),
-        canvasId: newCanvasId,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }));
+
+      const updatedCards = prev.cards.map((c) => {
+        if (!isCardOnCanvas(c, canvasId)) return c;
+        const currentCanvasIds = getCardCanvasIds(c);
+        const newCanvasIds = Array.from(new Set([...currentCanvasIds, newCanvasId]));
+        const pos = getCardPositionOnCanvas(c, canvasId);
+        const newPositions = {
+          ...(c.canvasPositions || {}),
+          [newCanvasId]: pos,
+        };
+        return {
+          ...c,
+          canvasIds: newCanvasIds,
+          canvasPositions: newPositions,
+        };
+      });
 
       return {
         ...prev,
         updatedAt: Date.now(),
         canvases: [...(prev.canvases || [{ id: 'default', name: t.appPrompts.mainCanvasDefault, createdAt: Date.now() }]), newCanvas],
-        cards: [...prev.cards, ...clonedCards],
+        cards: updatedCards,
       };
     });
   };

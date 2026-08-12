@@ -83,9 +83,20 @@ pub struct WorldCard {
     #[serde(default)]
     pub canvas_id: Option<String>,
     #[serde(default)]
+    pub canvas_ids: Vec<String>,
+    #[serde(default)]
+    pub canvas_positions: Option<std::collections::HashMap<String, CardPosition>>,
+    #[serde(default)]
     pub deck_id: Option<String>,
     pub created_at: f64,
     pub updated_at: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardPosition {
+    pub x: f64,
+    pub y: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

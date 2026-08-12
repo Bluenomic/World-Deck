@@ -49,6 +49,8 @@ export interface WorldCard {
   height?: number;
   pinned?: boolean;
   canvasId?: string;
+  canvasIds?: string[];
+  canvasPositions?: Record<string, { x: number; y: number }>;
   deckId?: string;
   createdAt: number;
   updatedAt: number;
