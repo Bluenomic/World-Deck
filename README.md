@@ -1,115 +1,139 @@
 # World Deck
 
-World Deck is an interactive canvas-based worldbuilding application. Designed for writers, game designers, and world builders who want to visually map and connect elements of their fictional worlds -- from characters, factions, locations, and items to key events.
+A native, canvas-based worldbuilding application designed for writers, game designers, and worldbuilders. Map, structure, and visualize complex fictional worlds with interconnected cards, timelines, interactive canvases, and document managers.
 
-## Features
+---
 
-### Interactive Canvas
-- Drag-and-drop cards on a free-form canvas with smooth pan and zoom
-- Cursor-centric focal zoom (zooms toward the mouse pointer position)
-- Hold Spacebar + drag to navigate the canvas
-- Box selection to select multiple cards at once
-- Double-click on empty canvas area to create a new card at that position
+## Overview
 
-### World Cards
-- 7 categories: Character, Faction, Location, Lore, Timeline, Item, and Realm
-- Each card supports a title, subtitle, summary, full content, cover image, tags, and custom attributes
-- Cross-reference other cards using `@CardName` within content
+World Deck provides a visual workspace for crafting narrative universes. Built with React 19, Vite, TypeScript, Tailwind CSS, and Tauri v2 (Rust), it combines high-performance web graphics with transparent local desktop file system storage.
 
-### Relations and Connections
-- Connect cards by dragging connection handles from card edges
-- Customizable relation labels (ally, enemy, leader, member, etc.)
-- Bezier curve lines with arrowheads and midpoint labels
-- Per-theme high-contrast line colors
+All project data is saved directly to your chosen local directory as human-readable JSON files (`project_<id>.json`). No cloud lock-in, no proprietary databases.
 
-### Multi-Workspace
-- Create, duplicate, and manage multiple separate worlds within one app
-- Export and import worlds as JSON files
-- Auto-save to IndexedDB with LocalStorage fallback
+---
 
-### View Modes
-- **Canvas**: Primary visual map with cards and connection lines
-- **Library**: Grid/list view of all cards
-- **Timeline**: Chronological event view
-- **Relations**: Full list of all connections between cards
+## Key Features
 
-### Auto-Layout
-- 4 layout modes for selected cards: Grid, Horizontal, Vertical, and Radial
-- Only operates on cards selected via box selection (minimum 2 cards)
+### Interactive Worldbuilding Canvas
+- Free-form canvas navigation with smooth panning, zooming, and cursor-focal zoom.
+- Bezier curve connection handles for linking cards with customizable relationship types.
+- Auto-layout engines (Grid, Horizontal, Vertical, Radial) for organizing selected nodes.
+- Full undo/redo history stack (up to 50 steps).
 
-### Undo / Redo
-- History stack up to 50 steps
-- Keyboard shortcuts: `Ctrl+Z` (Undo), `Ctrl+Y` / `Ctrl+Shift+Z` (Redo)
+### Smart Card System
+- Seven core categories: Character, Faction, Location, Lore, Timeline, Item, and Realm.
+- Rich metadata: Title, Subtitle, Summary, Detailed Lore, Tags, Custom Attributes, and Gallery.
+- Cover Image Focal Point Adjuster: Interactive 1:1 touch-drag panning for framing cover artwork.
+- Resizable card containers with dynamic height and boundary enforcement.
+- Cross-card referencing using `@CardTitle` mentions.
 
-### Card Deletion
-- Delete one or multiple cards at once with `Delete` / `Backspace`
-- Custom confirmation modal listing all cards to be removed
-- All related connections are automatically cleaned up
+### Comprehensive View Modes
+- Canvas View: Primary visual map with card nodes and relationship links.
+- Library View: Searchable grid and list view with empty-area quick action context menus.
+- Timeline View: Chronological event tracking across multi-track narrative timelines.
+- Documents View: Long-form manuscript and guide editor with interactive card mentions.
 
-### Themes
-- 5 visual themes: Notion Dark, Notion Light, Cyberpunk, Dracula, and Nordic Slate
-- Connection line contrast and UI elements adapt per theme
+### Native Workspace Architecture
+- Direct integration with local file systems via Tauri v2 and Rust `rfd` dialogs.
+- Workspace Folder Isolation: Complete data separation per user-selected directory.
+- Real-time auto-saving to `project_<id>.json` files with strict race condition prevention.
+- Explicit Workspace Project Manager for creating and switching projects within local folders.
 
-## Tech Stack
+---
 
-- **React 19** + **TypeScript**
-- **Vite** (build tool)
-- **Tailwind CSS** (styling)
-- **Lucide React** (icon library)
-- **IndexedDB** + **LocalStorage** (client-side persistence)
-- **Canvas Confetti** (visual effects)
+## Technology Stack
 
-## Getting Started
+- Frontend Core: React 19, TypeScript, Vite
+- Styling: Tailwind CSS, Vanilla CSS design tokens
+- Icons: Lucide React
+- Desktop Engine: Tauri v2 (Rust)
+- File System & Dialogs: Rust `rfd` crate (Native OS File Explorer)
+- Storage Format: Standalone JSON (`project_<id>.json`)
 
-```bash
-# Install dependencies
-npm install
-
-# Start dev server
-npm run dev
-
-# Production build
-npm run build
-
-# Preview production build
-npm run preview
-```
+---
 
 ## Project Structure
 
 ```
-src/
-  App.tsx                  # Root component and state management
-  types.ts                 # Type definitions (WorldCard, CardConnection, etc.)
-  index.css                # Global styles and theme variables
-  main.tsx                 # Entry point
-  components/
-    Canvas.tsx             # Interactive canvas (pan, zoom, box selection, auto-layout)
-    WorldCardNode.tsx      # Individual card node on canvas
-    CardEditorModal.tsx    # Card editor modal
-    ConnectionModal.tsx    # Connection/relation editor modal
-    DeleteCardModal.tsx    # Card deletion confirmation modal
-    Navbar.tsx             # Main navigation and project controls
-    SidebarFilter.tsx      # Category filter sidebar and search
-    LibraryView.tsx        # Library grid view
-    TimelineView.tsx       # Timeline view
-    RelationListView.tsx   # Relation list view
-    WorldManagerModal.tsx  # Multi-workspace manager modal
-    HelpGuideModal.tsx     # Usage guide modal
-  data/
-    sampleWorld.ts         # Default new world template
-  utils/
-    helpers.ts             # Utility functions (ID generator, bezier path, etc.)
-    storage.ts             # IndexedDB + LocalStorage persistence engine
-    localFileStorage.ts    # File System Access API utilities
+World-Deck/
+|-- src/
+|   |-- components/
+|   |   |-- Canvas.tsx                 # Interactive node canvas
+|   |   |-- WorldCardNode.tsx          # Card node renderer with resizers
+|   |   |-- CardEditorModal.tsx        # Card editor modal
+|   |   |-- ImageFocalAdjusterModal.tsx# Cover image focal point adjuster
+|   |   |-- LibraryView.tsx            # Library grid/list view with context menus
+|   |   |-- TimelineView.tsx           # Multi-track narrative timeline
+|   |   |-- DocumentsView.tsx          # Document editor with card mentions
+|   |   |-- WorkspaceLandingScreen.tsx # Workspace folder landing screen
+|   |   |-- WorldManagerModal.tsx      # Multi-project workspace manager
+|   |   +-- Navbar.tsx                 # Top navigation and window controls
+|   |-- i18n/                          # Translations (Indonesian & English)
+|   |-- utils/                         # Storage wrappers and Tauri IPC bridge
+|   |-- App.tsx                        # Main application container
+|   +-- types.ts                       # Type definitions
+|-- src-tauri/
+|   |-- src/
+|   |   |-- lib.rs                     # Tauri command handler registrations
+|   |   |-- storage.rs                 # Native Rust file system storage engine
+|   |   +-- models.rs                  # Rust data structures for project JSON
+|   |-- Cargo.toml                     # Rust dependencies (Tauri, Serde, rfd)
+|   +-- tauri.conf.json                # Application configuration
++-- package.json
 ```
 
-## Native App Build (Optional)
+---
 
-This project is compatible with [Tauri v2](https://v2.tauri.app/) for packaging as a desktop (.exe) or Android (.apk) application.
+## Development Setup
 
+### Prerequisites
+- Node.js (v18 or higher)
+- Rust and Cargo (for Tauri desktop builds)
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Bluenomic/World-Archive.git
+   cd World-Archive
+   ```
+
+2. Install JavaScript dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Run in web development mode:
+   ```bash
+   npm run dev
+   ```
+
+4. Run as native desktop application:
+   ```bash
+   npx tauri dev
+   ```
+
+---
+
+## Build and Distribution
+
+### Production Web Build
 ```bash
-npx @tauri-apps/cli init
-npx tauri build           # Desktop
-npx tauri android build   # Android
+npm run build
 ```
+
+### Production Desktop Executable
+```bash
+npx tauri build
+```
+
+Output installers and binaries are generated at:
+- Setup Installer (.exe): `src-tauri/target/release/bundle/nsis/World Deck_0.1.0_x64-setup.exe`
+- MSI Installer (.msi): `src-tauri/target/release/bundle/msi/World Deck_0.1.0_x64_en-US.msi`
+- Standalone Executable (.exe): `src-tauri/target/release/app.exe`
+
+---
+
+## License
+
+This project is open source and available under the MIT License.
