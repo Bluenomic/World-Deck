@@ -550,5 +550,13 @@ export const en: typeof id = {
     unnamedMap: 'Unnamed Map',
     saveMap: 'Save Map',
     cancel: 'Cancel',
+    addPinHere: 'Add Pin Here',
+    linkCardHere: 'Link Card Here',
+    centerMapHere: 'Center Map Here',
+    editPin: 'Edit Pin',
+    quickColor: 'Pin Color',
+    copiedCoords: 'Coordinates copied to clipboard!',
+    copyCoords: 'Copy Coordinates',
+    selectCardToLinkModal: 'Select Card to Link',
   },
 };

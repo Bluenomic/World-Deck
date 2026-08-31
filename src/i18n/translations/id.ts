@@ -548,5 +548,13 @@ export const id = {
     unnamedMap: 'Peta Tanpa Nama',
     saveMap: 'Simpan Peta',
     cancel: 'Batal',
+    addPinHere: 'Tambah Pin di Sini',
+    linkCardHere: 'Tautkan Kartu di Sini',
+    centerMapHere: 'Pusatkan Peta ke Sini',
+    editPin: 'Edit Pin',
+    quickColor: 'Warna Pin',
+    copiedCoords: 'Koordinat disalin ke clipboard!',
+    copyCoords: 'Salin Koordinat',
+    selectCardToLinkModal: 'Pilih Kartu untuk Ditautkan',
   },
 };

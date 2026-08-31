@@ -71,6 +71,36 @@ export const MapView: React.FC<MapViewProps> = ({
   const [mapName, setMapName] = useState('');
   const [mapDesc, setMapDesc] = useState('');
   const [mapImageUrl, setMapImageUrl] = useState('');
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    mapPercentX: number | null;
+    mapPercentY: number | null;
+    pinId: string | null;
+    isNearRight: boolean;
+    isNearBottom: boolean;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    mapPercentX: null,
+    mapPercentY: null,
+    pinId: null,
+    isNearRight: false,
+    isNearBottom: false,
+  });
+
+  // Modal to select card for linking at context menu position
+  const [showLinkCardModal, setShowLinkCardModal] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
+  // Toast notification for copy coordinates
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -169,6 +199,32 @@ export const MapView: React.FC<MapViewProps> = ({
       el.removeEventListener('wheel', onNativeWheel);
     };
   }, [zoomAtPoint]);
+
+  // Close context menu on global click or wheel/scroll
+  useEffect(() => {
+    if (!contextMenu.visible) return;
+
+    const handleClose = () => {
+      setContextMenu((prev) => ({ ...prev, visible: false }));
+    };
+
+    window.addEventListener('click', handleClose);
+    window.addEventListener('wheel', handleClose, { passive: true });
+    window.addEventListener('resize', handleClose);
+
+    return () => {
+      window.removeEventListener('click', handleClose);
+      window.removeEventListener('wheel', handleClose);
+      window.removeEventListener('resize', handleClose);
+    };
+  }, [contextMenu.visible]);
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = setTimeout(() => setToastMessage(null), 2500);
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
 
   // Global mouseup listener to release pan/drag anywhere
   useEffect(() => {
@@ -387,6 +443,141 @@ export const MapView: React.FC<MapViewProps> = ({
     setDraggingPinId(null);
   };
 
+  // Context Menu Handler
+  const handleContextMenu = (e: React.MouseEvent) => {
+    // If clicking on an input/textarea or button, do not intercept
+    const target = e.target as HTMLElement;
+    if (target.closest('input, textarea, button, select')) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Check if right-clicking on a pin
+    const pinElem = target.closest('.map-pin-element');
+    const pinId = pinElem?.getAttribute('data-pin-id') || null;
+
+    let mapPercentX: number | null = null;
+    let mapPercentY: number | null = null;
+
+    if (imageRef.current) {
+      const rect = imageRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      // Clamp between 0 and 100
+      const rawX = (clickX / rect.width) * 100;
+      const rawY = (clickY / rect.height) * 100;
+      if (rawX >= -5 && rawX <= 105 && rawY >= -5 && rawY <= 105) {
+        mapPercentX = Math.round(Math.min(100, Math.max(0, rawX)) * 10) / 10;
+        mapPercentY = Math.round(Math.min(100, Math.max(0, rawY)) * 10) / 10;
+      }
+    }
+
+    if (pinId) {
+      setSelectedPinId(pinId);
+    }
+
+    const isNearRight = e.clientX > window.innerWidth - 240;
+    const isNearBottom = e.clientY > window.innerHeight - 240;
+
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      mapPercentX,
+      mapPercentY,
+      pinId,
+      isNearRight,
+      isNearBottom,
+    });
+  };
+
+  // Create Pin at exact context menu position
+  const handleAddPinAtPos = (posX: number, posY: number, cardId?: string) => {
+    if (!currentMap) return;
+    const linkedCard = cardId ? cards.find((c) => c.id === cardId) : undefined;
+
+    const newPin: MapPin = {
+      id: `pin_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      title: linkedCard ? linkedCard.title : t.map.pinTitlePlaceholder,
+      description: linkedCard?.summary || '',
+      cardId: cardId,
+      x: posX,
+      y: posY,
+      color: '#0d99ff',
+    };
+
+    const updatedPins = [...currentMap.pins, newPin];
+    onSaveMap({
+      ...currentMap,
+      pins: updatedPins,
+      updatedAt: Date.now(),
+    });
+
+    setSelectedPinId(newPin.id);
+    if (!cardId) {
+      setEditingPin(newPin);
+    }
+  };
+
+  // Center viewport on context menu coordinate
+  const handleCenterOnPos = (screenX: number, screenY: number) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    // Shift pan so (screenX, screenY) moves to (centerX, centerY)
+    const deltaX = centerX - screenX;
+    const deltaY = centerY - screenY;
+
+    const newPanX = panRef.current.x + deltaX;
+    const newPanY = panRef.current.y + deltaY;
+
+    panRef.current = { x: newPanX, y: newPanY };
+    setPan({ x: newPanX, y: newPanY });
+  };
+
+  // Focus and center on a pin
+  const handleFocusOnPin = (pin: MapPin) => {
+    if (!imageRef.current) return;
+
+    // We want pin position to align with center
+    // Pin coordinate on unscaled map image
+    const naturalWidth = imageRef.current.offsetWidth;
+    const naturalHeight = imageRef.current.offsetHeight;
+    const pinImageX = (pin.x / 100) * naturalWidth;
+    const pinImageY = (pin.y / 100) * naturalHeight;
+
+    // When centered, image center is at (0, 0) relative to pan
+    const targetZoom = Math.max(zoomRef.current, 1.4);
+    const newPanX = (naturalWidth / 2 - pinImageX) * targetZoom;
+    const newPanY = (naturalHeight / 2 - pinImageY) * targetZoom;
+
+    zoomRef.current = targetZoom;
+    panRef.current = { x: newPanX, y: newPanY };
+    setZoom(targetZoom);
+    setPan({ x: newPanX, y: newPanY });
+    setSelectedPinId(pin.id);
+  };
+
+  // Quick change pin color
+  const handleQuickChangePinColor = (pinId: string, color: string) => {
+    if (!currentMap) return;
+    const newPins = currentMap.pins.map((p) => (p.id === pinId ? { ...p, color } : p));
+    onSaveMap({
+      ...currentMap,
+      pins: newPins,
+      updatedAt: Date.now(),
+    });
+  };
+
+  // Copy coordinates
+  const handleCopyCoords = (px: number, py: number) => {
+    const text = `X: ${px}%, Y: ${py}%`;
+    navigator.clipboard.writeText(text);
+    setToastMessage(`${t.map.copiedCoords} (${text})`);
+  };
+
   // Filtered pins based on search query
   const filteredPins = useMemo(() => {
     if (!currentMap) return [];
@@ -577,6 +768,7 @@ export const MapView: React.FC<MapViewProps> = ({
             onMouseDown={handleContainerMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
+            onContextMenu={handleContextMenu}
             className={`flex-1 relative overflow-hidden bg-[#121212] flex items-center justify-center ${
               isAddPinMode ? 'cursor-crosshair' : isPanning ? 'cursor-grabbing' : 'cursor-grab'
             }`}
@@ -621,6 +813,7 @@ export const MapView: React.FC<MapViewProps> = ({
                   return (
                     <div
                       key={pin.id}
+                      data-pin-id={pin.id}
                       style={{
                         left: `${pin.x}%`,
                         top: `${pin.y}%`,
@@ -890,7 +1083,282 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      {/* CREATE / EDIT MAP MODAL */}
+      {/* CONTEXT MENU */}
+      {contextMenu.visible && (
+        <div
+          style={{
+            top: `${contextMenu.y}px`,
+            left: `${contextMenu.x}px`,
+          }}
+          className={`fixed z-50 min-w-[210px] bg-[#1e1e1e]/95 backdrop-blur-md border border-[#383838] rounded-xl shadow-2xl py-1 text-xs text-slate-200 select-none animate-in fade-in zoom-in-95 duration-100 ${
+            contextMenu.isNearRight ? '-translate-x-full' : ''
+          } ${contextMenu.isNearBottom ? '-translate-y-full' : ''}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Skenario 1: Klik Kanan pada Pin */}
+          {contextMenu.pinId ? (() => {
+            const pin = currentMap?.pins.find((p) => p.id === contextMenu.pinId);
+            if (!pin) return null;
+            const linkedCard = cards.find((c) => c.id === pin.cardId);
+
+            return (
+              <div className="space-y-0.5">
+                <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#383838] flex items-center gap-1.5">
+                  <div
+                    style={{ backgroundColor: pin.color || '#0d99ff' }}
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                  />
+                  <span className="truncate">{pin.title}</span>
+                </div>
+
+                {/* Buka Kartu Terkait */}
+                {linkedCard && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenCard(linkedCard.id);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-white font-semibold cursor-pointer"
+                  >
+                    <Icons.ExternalLink size={14} className="text-[#0d99ff]" />
+                    <span className="truncate">{t.map.viewCard}: {linkedCard.title}</span>
+                  </button>
+                )}
+
+                {/* Edit Pin */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingPin(pin);
+                    setContextMenu((prev) => ({ ...prev, visible: false }));
+                  }}
+                  className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-200 cursor-pointer"
+                >
+                  <Icons.Edit3 size={14} className="text-amber-400" />
+                  <span>{t.map.editPin}</span>
+                </button>
+
+                {/* Quick Color Palette */}
+                <div className="px-3 py-1.5 flex items-center gap-1.5">
+                  {PIN_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => {
+                        handleQuickChangePinColor(pin.id, c.value);
+                        setContextMenu((prev) => ({ ...prev, visible: false }));
+                      }}
+                      style={{ backgroundColor: c.value }}
+                      className={`w-4 h-4 rounded-full transition-transform hover:scale-125 cursor-pointer border ${
+                        (pin.color || '#0d99ff') === c.value
+                          ? 'border-white scale-110'
+                          : 'border-transparent opacity-80'
+                      }`}
+                      title={c.label}
+                    />
+                  ))}
+                </div>
+
+                {/* Fokus ke Pin Ini */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleFocusOnPin(pin);
+                    setContextMenu((prev) => ({ ...prev, visible: false }));
+                  }}
+                  className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-200 cursor-pointer"
+                >
+                  <Icons.Crosshair size={14} className="text-[#0d99ff]" />
+                  <span>Fokus ke Pin Ini</span>
+                </button>
+
+                <div className="my-1 border-t border-[#383838]" />
+
+                {/* Hapus Pin */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDeletePin(pin.id);
+                    setContextMenu((prev) => ({ ...prev, visible: false }));
+                  }}
+                  className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-rose-400 cursor-pointer"
+                >
+                  <Icons.Trash2 size={14} />
+                  <span>{t.map.deletePin}</span>
+                </button>
+              </div>
+            );
+          })() : (
+            /* Skenario 2: Klik Kanan pada Area Peta Kosong */
+            <div className="space-y-0.5">
+              {contextMenu.mapPercentX !== null && contextMenu.mapPercentY !== null && (
+                <>
+                  {/* Tambah Pin di Sini */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleAddPinAtPos(contextMenu.mapPercentX!, contextMenu.mapPercentY!);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-emerald-400 font-semibold cursor-pointer"
+                  >
+                    <Icons.PlusCircle size={14} />
+                    <span>{t.map.addPinHere}</span>
+                  </button>
+
+                  {/* Tautkan Kartu di Sini */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowLinkCardModal({
+                        x: contextMenu.mapPercentX!,
+                        y: contextMenu.mapPercentY!,
+                      });
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-[#0d99ff] font-semibold cursor-pointer"
+                  >
+                    <Icons.Link size={14} />
+                    <span>{t.map.linkCardHere}</span>
+                  </button>
+
+                  <div className="my-1 border-t border-[#383838]" />
+                </>
+              )}
+
+              {/* Pusatkan Peta ke Sini */}
+              <button
+                type="button"
+                onClick={() => {
+                  handleCenterOnPos(contextMenu.x, contextMenu.y);
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-200 cursor-pointer"
+              >
+                <Icons.Target size={14} className="text-[#0d99ff]" />
+                <span>{t.map.centerMapHere}</span>
+              </button>
+
+              {/* Reset Zoom (100%) */}
+              <button
+                type="button"
+                onClick={() => {
+                  zoomRef.current = 1;
+                  panRef.current = { x: 0, y: 0 };
+                  setZoom(1);
+                  setPan({ x: 0, y: 0 });
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-200 cursor-pointer"
+              >
+                <Icons.RotateCcw size={14} className="text-amber-400" />
+                <span>{t.map.resetZoom} (100%)</span>
+              </button>
+
+              {/* Salin Koordinat Peta */}
+              {contextMenu.mapPercentX !== null && contextMenu.mapPercentY !== null && (
+                <>
+                  <div className="my-1 border-t border-[#383838]" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCopyCoords(contextMenu.mapPercentX!, contextMenu.mapPercentY!);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-400 hover:text-white cursor-pointer text-[11px]"
+                  >
+                    <Icons.Copy size={13} />
+                    <span>
+                      {t.map.copyCoords} ({contextMenu.mapPercentX}%, {contextMenu.mapPercentY}%)
+                    </span>
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SELECT CARD TO LINK MODAL */}
+      {showLinkCardModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none">
+          <div className="bg-[#222222] border border-[#383838] rounded-2xl max-w-md w-full p-5 text-white shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#383838] pb-3">
+              <h3 className="font-bold text-base flex items-center gap-2 text-white">
+                <Icons.Link size={18} className="text-[#0d99ff]" />
+                <span>{t.map.selectCardToLinkModal}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowLinkCardModal(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                <Icons.X size={18} />
+              </button>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
+              {cards.map((card) => (
+                <button
+                  key={card.id}
+                  type="button"
+                  onClick={() => {
+                    handleAddPinAtPos(showLinkCardModal.x, showLinkCardModal.y, card.id);
+                    setShowLinkCardModal(null);
+                  }}
+                  className="w-full text-left p-2.5 rounded-xl bg-[#181818] hover:bg-[#2a2a2a] border border-[#383838] hover:border-[#0d99ff] flex items-center gap-3 transition-colors cursor-pointer group"
+                >
+                  {card.imageUrl ? (
+                    <img
+                      src={card.imageUrl}
+                      alt={card.title}
+                      className="w-10 h-10 rounded-lg object-cover border border-[#383838] shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-[#252525] border border-[#383838] flex items-center justify-center shrink-0 text-slate-400">
+                      <Icons.FileText size={18} />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-xs text-white group-hover:text-[#0d99ff] truncate">
+                        {card.title}
+                      </span>
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-[#0d99ff]/20 text-[#0d99ff] shrink-0">
+                        {getCategoryLabel(card.category)}
+                      </span>
+                    </div>
+                    {card.summary && (
+                      <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                        {card.summary}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-[#383838]">
+              <button
+                type="button"
+                onClick={() => setShowLinkCardModal(null)}
+                className="px-4 py-2 rounded-xl bg-[#181818] hover:bg-[#383838] text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                {t.map.cancel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST NOTIFICATION */}
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#1e1e1e]/95 text-white border border-emerald-500/50 shadow-2xl px-4 py-2.5 rounded-xl text-xs font-medium flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <Icons.CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
       {showMapModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none">
           <form
