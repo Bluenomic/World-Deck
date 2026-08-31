@@ -80,8 +80,32 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Mutable refs for zoom & pan to prevent stale closure lag during rapid wheel events
+  const zoomRef = useRef<number>(zoom);
+  const panRef = useRef<{ x: number; y: number }>(pan);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  useEffect(() => {
+    panRef.current = pan;
+  }, [pan]);
+
+  // Animation frame refs for smooth Google Maps style zoom & inertia scroll
+  const animFrameRef = useRef<number | null>(null);
+  const wheelRafRef = useRef<number | null>(null);
+
   // Restore saved viewport when activeCanvasId changes
   useEffect(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (wheelRafRef.current) {
+      cancelAnimationFrame(wheelRafRef.current);
+      wheelRafRef.current = null;
+    }
     const saved = loadCanvasViewport(targetCanvasId);
     setZoom(saved.zoom);
     setPan(saved.pan);
@@ -270,18 +294,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedCardIds, selectedCardId, selectedConnectionIds, onDeleteCardsRequest, onDeleteConnection, onDeleteConnections]);
 
-  // Mutable refs for zoom & pan to prevent stale closure lag during rapid wheel events
-  const zoomRef = useRef<number>(zoom);
-  const panRef = useRef<{ x: number; y: number }>(pan);
-
-  useEffect(() => {
-    zoomRef.current = zoom;
-  }, [zoom]);
-
-  useEffect(() => {
-    panRef.current = pan;
-  }, [pan]);
-
   // Auto-save viewport preferences when zoom or pan changes (debounced)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -304,8 +316,51 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
   }, [targetCanvasId]);
 
+  // Smooth animate to target zoom and target pan (ease-out cubic / exponential smoothing like Google Maps)
+  const animateTo = useCallback((targetZoom: number, targetPan: { x: number; y: number }, durationMs: number = 220) => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (wheelRafRef.current) {
+      cancelAnimationFrame(wheelRafRef.current);
+      wheelRafRef.current = null;
+    }
+
+    const startZoom = zoomRef.current;
+    const startPanX = panRef.current.x;
+    const startPanY = panRef.current.y;
+    const startTime = performance.now();
+
+    // Ease-out cubic function: fast onset, buttery-soft deceleration landing
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const step = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(1, Math.max(0, elapsed / durationMs));
+      const ease = easeOutCubic(progress);
+
+      const currentZ = startZoom + (targetZoom - startZoom) * ease;
+      const currentPx = startPanX + (targetPan.x - startPanX) * ease;
+      const currentPy = startPanY + (targetPan.y - startPanY) * ease;
+
+      zoomRef.current = currentZ;
+      panRef.current = { x: currentPx, y: currentPy };
+      setZoom(currentZ);
+      setPan({ x: currentPx, y: currentPy });
+
+      if (progress < 1) {
+        animFrameRef.current = requestAnimationFrame(step);
+      } else {
+        animFrameRef.current = null;
+      }
+    };
+
+    animFrameRef.current = requestAnimationFrame(step);
+  }, []);
+
   // Precise Cursor-Centric Focal Zoom
-  const zoomAtPoint = useCallback((targetZoom: number, clientX: number, clientY: number) => {
+  const zoomAtPoint = useCallback((targetZoom: number, clientX: number, clientY: number, smooth: boolean = false) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const mouseX = clientX - rect.left;
@@ -315,7 +370,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const currentPan = panRef.current;
 
     const nextZoom = Math.max(0.15, Math.min(3.0, targetZoom));
-    if (nextZoom === currentZoom) return;
+    if (Math.abs(nextZoom - currentZoom) < 0.0001) return;
 
     // Calculate world coordinate under mouse cursor
     const worldX = (mouseX - currentPan.x) / currentZoom;
@@ -325,12 +380,19 @@ export const Canvas: React.FC<CanvasProps> = ({
     const newPanX = mouseX - worldX * nextZoom;
     const newPanY = mouseY - worldY * nextZoom;
 
-    zoomRef.current = nextZoom;
-    panRef.current = { x: newPanX, y: newPanY };
-
-    setZoom(nextZoom);
-    setPan({ x: newPanX, y: newPanY });
-  }, []);
+    if (smooth) {
+      animateTo(nextZoom, { x: newPanX, y: newPanY }, 240);
+    } else {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      zoomRef.current = nextZoom;
+      panRef.current = { x: newPanX, y: newPanY };
+      setZoom(nextZoom);
+      setPan({ x: newPanX, y: newPanY });
+    }
+  }, [animateTo]);
 
   // Zoom handlers (focus on center if triggered by button)
   const handleZoom = (delta: number) => {
@@ -338,7 +400,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const rect = containerRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    zoomAtPoint(zoomRef.current + delta, centerX, centerY);
+    zoomAtPoint(zoomRef.current + delta, centerX, centerY, true);
   };
 
   // Center Viewport onto target cards (selected cards first, or all cards if none selected)
@@ -351,8 +413,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       : (selectedCardId ? cards.filter((c) => c.id === selectedCardId) : cards);
 
     if (targetCards.length === 0) {
-      panRef.current = { x: 40, y: 40 };
-      setPan({ x: 40, y: 40 });
+      animateTo(zoomRef.current, { x: 40, y: 40 }, 260);
       return;
     }
 
@@ -368,8 +429,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const newPanX = Math.round(rect.width / 2 - contentCenterX * currentZoom);
     const newPanY = Math.round(rect.height / 2 - contentCenterY * currentZoom);
 
-    panRef.current = { x: newPanX, y: newPanY };
-    setPan({ x: newPanX, y: newPanY });
+    animateTo(currentZoom, { x: newPanX, y: newPanY }, 260);
   };
 
   // Fit View onto all cards on canvas
@@ -392,10 +452,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const newPanX = Math.round(rect.width / 2 - contentCenterX * targetZoom);
     const newPanY = Math.round(rect.height / 2 - contentCenterY * targetZoom);
 
-    zoomRef.current = targetZoom;
-    panRef.current = { x: newPanX, y: newPanY };
-    setZoom(targetZoom);
-    setPan({ x: newPanX, y: newPanY });
+    animateTo(targetZoom, { x: newPanX, y: newPanY }, 280);
   };
 
   // Reset Zoom scale to 100%
@@ -404,7 +461,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const rect = containerRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    zoomAtPoint(1.0, centerX, centerY);
+    zoomAtPoint(1.0, centerX, centerY, true);
   };
 
   // Convert screen coordinates to canvas world coordinates
@@ -420,34 +477,133 @@ export const Canvas: React.FC<CanvasProps> = ({
     [pan, zoom]
   );
 
-  // Wheel zoom (Ctrl + MouseWheel) centered at mouse cursor position
+  // Wheel zoom (Ctrl + Wheel) & Smooth 2D Scroll navigation (Horizontal & Vertical with inertia damping)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    const onNativeWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const factor = e.deltaY < 0 ? 1.15 : 0.85;
-        zoomAtPoint(zoomRef.current * factor, e.clientX, e.clientY);
-      } else if (e.shiftKey) {
-        e.preventDefault();
-        // Shift + Mouse Wheel = Horizontal scroll / pan
-        const scrollDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-        const nextPanX = panRef.current.x - scrollDelta * 0.8;
-        panRef.current = { ...panRef.current, x: nextPanX };
-        setPan((prev) => ({ ...prev, x: nextPanX }));
+    let targetZoomLevel = zoomRef.current;
+    let targetPanX = panRef.current.x;
+    let targetPanY = panRef.current.y;
+    let lastClientX = 0;
+    let lastClientY = 0;
+    let isZoomingMode = false;
+
+    const updateSmoothWheel = () => {
+      if (isZoomingMode) {
+        const current = zoomRef.current;
+        const diff = targetZoomLevel - current;
+
+        if (Math.abs(diff) > 0.001) {
+          const nextStepZoom = current + diff * 0.22;
+          zoomAtPoint(nextStepZoom, lastClientX, lastClientY, false);
+          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
+        } else {
+          zoomAtPoint(targetZoomLevel, lastClientX, lastClientY, false);
+          wheelRafRef.current = null;
+        }
       } else {
-        const nextPanX = panRef.current.x - e.deltaX * 0.8;
-        const nextPanY = panRef.current.y - e.deltaY * 0.8;
-        panRef.current = { x: nextPanX, y: nextPanY };
-        setPan({ x: nextPanX, y: nextPanY });
+        // Smooth scroll damping (vertical & horizontal pan)
+        const currentPanX = panRef.current.x;
+        const currentPanY = panRef.current.y;
+        const diffX = targetPanX - currentPanX;
+        const diffY = targetPanY - currentPanY;
+
+        if (Math.abs(diffX) > 0.4 || Math.abs(diffY) > 0.4) {
+          const nextPx = currentPanX + diffX * 0.22;
+          const nextPy = currentPanY + diffY * 0.22;
+          panRef.current = { x: nextPx, y: nextPy };
+          setPan({ x: nextPx, y: nextPy });
+          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
+        } else {
+          panRef.current = { x: targetPanX, y: targetPanY };
+          setPan({ x: targetPanX, y: targetPanY });
+          wheelRafRef.current = null;
+        }
+      }
+    };
+
+    const onNativeWheel = (e: WheelEvent) => {
+      e.preventDefault();
+
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        // Smooth Zoom mode
+        if (!isZoomingMode && wheelRafRef.current) {
+          cancelAnimationFrame(wheelRafRef.current);
+          wheelRafRef.current = null;
+        }
+        isZoomingMode = true;
+        lastClientX = e.clientX;
+        lastClientY = e.clientY;
+
+        if (wheelRafRef.current === null) {
+          targetZoomLevel = zoomRef.current;
+        }
+
+        const delta = Math.max(-100, Math.min(100, e.deltaY));
+        const factor = Math.exp(-delta * 0.0016);
+        targetZoomLevel = Math.max(0.15, Math.min(3.0, targetZoomLevel * factor));
+
+        if (!wheelRafRef.current) {
+          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
+        }
+      } else if (e.shiftKey) {
+        // Shift + Wheel = Smooth horizontal pan
+        if (isZoomingMode && wheelRafRef.current) {
+          cancelAnimationFrame(wheelRafRef.current);
+          wheelRafRef.current = null;
+        }
+        isZoomingMode = false;
+
+        if (wheelRafRef.current === null) {
+          targetPanX = panRef.current.x;
+          targetPanY = panRef.current.y;
+        }
+
+        const scrollDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        const clampedDelta = Math.max(-200, Math.min(200, scrollDelta));
+        targetPanX -= clampedDelta * 0.9;
+
+        if (!wheelRafRef.current) {
+          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
+        }
+      } else {
+        // Standard Wheel = Smooth 2D pan (vertical deltaY & horizontal deltaX)
+        if (isZoomingMode && wheelRafRef.current) {
+          cancelAnimationFrame(wheelRafRef.current);
+          wheelRafRef.current = null;
+        }
+        isZoomingMode = false;
+
+        if (wheelRafRef.current === null) {
+          targetPanX = panRef.current.x;
+          targetPanY = panRef.current.y;
+        }
+
+        const clampedDeltaX = Math.max(-200, Math.min(200, e.deltaX));
+        const clampedDeltaY = Math.max(-200, Math.min(200, e.deltaY));
+
+        targetPanX -= clampedDeltaX * 0.9;
+        targetPanY -= clampedDeltaY * 0.9;
+
+        if (!wheelRafRef.current) {
+          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
+        }
       }
     };
 
     el.addEventListener('wheel', onNativeWheel, { passive: false });
     return () => {
       el.removeEventListener('wheel', onNativeWheel);
+      if (wheelRafRef.current) {
+        cancelAnimationFrame(wheelRafRef.current);
+        wheelRafRef.current = null;
+      }
     };
   }, [zoomAtPoint]);
 
@@ -457,6 +613,14 @@ export const Canvas: React.FC<CanvasProps> = ({
       const worldPos = screenToWorld(e.clientX, e.clientY);
 
       if (isSpacePressed || e.button === 1) {
+        if (animFrameRef.current) {
+          cancelAnimationFrame(animFrameRef.current);
+          animFrameRef.current = null;
+        }
+        if (wheelRafRef.current) {
+          cancelAnimationFrame(wheelRafRef.current);
+          wheelRafRef.current = null;
+        }
         setIsPanning(true);
         setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
       } else {
@@ -475,6 +639,14 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Touch Start Background
   const handleTouchStartBackground = (e: React.TouchEvent) => {
     if (e.touches.length === 1 && (e.target === containerRef.current || (e.target as HTMLElement).id === 'canvas-svg-bg')) {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      if (wheelRafRef.current) {
+        cancelAnimationFrame(wheelRafRef.current);
+        wheelRafRef.current = null;
+      }
       setIsPanning(true);
       setPanStart({ x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y });
       onSelectCard(null);
@@ -488,6 +660,14 @@ export const Canvas: React.FC<CanvasProps> = ({
     e.stopPropagation();
     
     if (isSpacePressed) {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      if (wheelRafRef.current) {
+        cancelAnimationFrame(wheelRafRef.current);
+        wheelRafRef.current = null;
+      }
       const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
       setIsPanning(true);
@@ -553,9 +733,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
 
     if (isPanning) {
+      const nextPanX = clientX - panStart.x;
+      const nextPanY = clientY - panStart.y;
+      panRef.current = { x: nextPanX, y: nextPanY };
       setPan({
-        x: clientX - panStart.x,
-        y: clientY - panStart.y,
+        x: nextPanX,
+        y: nextPanY,
       });
       return;
     }
