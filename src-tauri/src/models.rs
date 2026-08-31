@@ -164,6 +164,37 @@ pub struct TimelineBranch {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MapPin {
+    pub id: String,
+    #[serde(default)]
+    pub card_id: Option<String>,
+    pub title: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    pub x: f64,
+    pub y: f64,
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub icon: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorldMap {
+    pub id: String,
+    pub name: String,
+    pub image_url: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub pins: Vec<MapPin>,
+    pub created_at: f64,
+    pub updated_at: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorldProject {
     pub id: String,
     pub name: String,
@@ -187,6 +218,8 @@ pub struct WorldProject {
     pub timeline_nodes: Option<Vec<TimelineNode>>,
     #[serde(default)]
     pub timeline_branches: Option<Vec<TimelineBranch>>,
+    #[serde(default)]
+    pub world_maps: Option<Vec<WorldMap>>,
     pub created_at: f64,
     pub updated_at: f64,
 }

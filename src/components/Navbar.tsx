@@ -25,11 +25,12 @@ interface NavbarProps {
   onChangeDirectory: () => void;
 }
 
-const VIEW_TABS: { id: ViewMode; labelKey: 'canvas' | 'library' | 'timeline' | 'documents'; icon: any }[] = [
+const VIEW_TABS: { id: ViewMode; labelKey: 'canvas' | 'library' | 'timeline' | 'documents' | 'map'; icon: any }[] = [
   { id: 'canvas', labelKey: 'canvas', icon: Icons.LayoutGrid },
   { id: 'library', labelKey: 'library', icon: Icons.Library },
   { id: 'timeline', labelKey: 'timeline', icon: Icons.Clock },
   { id: 'documents', labelKey: 'documents', icon: Icons.BookOpen },
+  { id: 'map', labelKey: 'map', icon: Icons.Map },
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({

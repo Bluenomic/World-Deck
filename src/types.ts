@@ -128,6 +128,27 @@ export interface TimelineBranch {
   label?: string;
 }
 
+export interface MapPin {
+  id: string;
+  cardId?: string;
+  title: string;
+  description?: string;
+  x: number;
+  y: number;
+  color?: string;
+  icon?: string;
+}
+
+export interface WorldMap {
+  id: string;
+  name: string;
+  imageUrl: string;
+  description?: string;
+  pins: MapPin[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface WorldProject {
   id: string;
   name: string;
@@ -142,11 +163,12 @@ export interface WorldProject {
   timelineTracks?: TimelineTrack[];
   timelineNodes?: TimelineNode[];
   timelineBranches?: TimelineBranch[];
+  worldMaps?: WorldMap[];
   createdAt: number;
   updatedAt: number;
 }
 
-export type ViewMode = 'canvas' | 'library' | 'timeline' | 'documents';
+export type ViewMode = 'canvas' | 'library' | 'timeline' | 'documents' | 'map';
 
 export type AppTheme = 'dark' | 'light';
 

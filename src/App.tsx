@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme, WorldDocument, WorldCanvas } from './types';
+import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme, WorldDocument, WorldCanvas, WorldMap } from './types';
 import { SAMPLE_WORLD } from './data/sampleWorld';
 import { generateId, downloadProjectJson, getCardCanvasIds, isCardOnCanvas, getCardPositionOnCanvas } from './utils/helpers';
 import { saveLocalFileHandle, loadLocalFileHandle, loadWorkspacePreferences, saveWorkspacePreferences } from './utils/storage';
@@ -16,6 +16,7 @@ import { LibraryView } from './components/LibraryView';
 import { ImageFocalAdjusterModal } from './components/ImageFocalAdjusterModal';
 import { TimelineView } from './components/TimelineView';
 import { DocumentsView } from './components/DocumentsView';
+import { MapView } from './components/MapView';
 import { CardEditorModal } from './components/CardEditorModal';
 import { ConnectionModal } from './components/ConnectionModal';
 import { HelpGuideModal } from './components/HelpGuideModal';
@@ -832,6 +833,29 @@ export const App: React.FC = () => {
     });
   };
 
+  const handleSaveMap = (updatedMap: WorldMap) => {
+    updateActiveWorld((prev) => {
+      const existingMaps = prev.worldMaps || [];
+      const exists = existingMaps.some((m) => m.id === updatedMap.id);
+      const newMaps = exists
+        ? existingMaps.map((m) => (m.id === updatedMap.id ? updatedMap : m))
+        : [...existingMaps, updatedMap];
+      return {
+        ...prev,
+        worldMaps: newMaps,
+        updatedAt: Date.now(),
+      };
+    });
+  };
+
+  const handleDeleteMap = (mapId: string) => {
+    updateActiveWorld((prev) => ({
+      ...prev,
+      worldMaps: (prev.worldMaps || []).filter((m) => m.id !== mapId),
+      updatedAt: Date.now(),
+    }));
+  };
+
   // Reorder cards in gallery
   const handleReorderCards = (orderedCardIds: string[]) => {
     updateActiveWorld((prev) => {
@@ -1442,6 +1466,16 @@ export const App: React.FC = () => {
                   cards: [...prev.cards, newCard],
                 }));
               }}
+            />
+          )}
+
+          {viewMode === 'map' && (
+            <MapView
+              worldMaps={activeWorld.worldMaps || []}
+              cards={activeWorld.cards}
+              onSaveMap={handleSaveMap}
+              onDeleteMap={handleDeleteMap}
+              onOpenCard={(cardId) => setReaderCardId(cardId)}
             />
           )}
         </main>
