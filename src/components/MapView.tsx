@@ -116,8 +116,20 @@ export const MapView: React.FC<MapViewProps> = ({
     panRef.current = pan;
   }, [pan]);
 
+  // Ref for active smooth zoom animation loop
+  const animFrameRef = useRef<number | null>(null);
+  const wheelRafRef = useRef<number | null>(null);
+
   // Reset zoom & pan when map changes
   useEffect(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (wheelRafRef.current) {
+      cancelAnimationFrame(wheelRafRef.current);
+      wheelRafRef.current = null;
+    }
     zoomRef.current = 1;
     panRef.current = { x: 0, y: 0 };
     setZoom(1);
@@ -128,8 +140,51 @@ export const MapView: React.FC<MapViewProps> = ({
     setHasDragged(false);
   }, [selectedMapId]);
 
+  // Smooth animate to target zoom and target pan (ease-out cubic / exponential smoothing like Google Maps)
+  const animateTo = useCallback((targetZoom: number, targetPan: { x: number; y: number }, durationMs: number = 220) => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (wheelRafRef.current) {
+      cancelAnimationFrame(wheelRafRef.current);
+      wheelRafRef.current = null;
+    }
+
+    const startZoom = zoomRef.current;
+    const startPanX = panRef.current.x;
+    const startPanY = panRef.current.y;
+    const startTime = performance.now();
+
+    // Ease-out cubic function: fast onset, buttery-soft deceleration landing
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const step = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(1, Math.max(0, elapsed / durationMs));
+      const ease = easeOutCubic(progress);
+
+      const currentZ = startZoom + (targetZoom - startZoom) * ease;
+      const currentPx = startPanX + (targetPan.x - startPanX) * ease;
+      const currentPy = startPanY + (targetPan.y - startPanY) * ease;
+
+      zoomRef.current = currentZ;
+      panRef.current = { x: currentPx, y: currentPy };
+      setZoom(currentZ);
+      setPan({ x: currentPx, y: currentPy });
+
+      if (progress < 1) {
+        animFrameRef.current = requestAnimationFrame(step);
+      } else {
+        animFrameRef.current = null;
+      }
+    };
+
+    animFrameRef.current = requestAnimationFrame(step);
+  }, []);
+
   // Precise Cursor-Centric Focal Zoom
-  const zoomAtPoint = useCallback((targetZoom: number, clientX: number, clientY: number) => {
+  const zoomAtPoint = useCallback((targetZoom: number, clientX: number, clientY: number, smooth: boolean = false) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
@@ -151,50 +206,99 @@ export const MapView: React.FC<MapViewProps> = ({
     const newPanX = (clientX - centerX) - worldX * nextZoom;
     const newPanY = (clientY - centerY) - worldY * nextZoom;
 
-    zoomRef.current = nextZoom;
-    panRef.current = { x: newPanX, y: newPanY };
+    if (smooth) {
+      animateTo(nextZoom, { x: newPanX, y: newPanY }, 240);
+    } else {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      zoomRef.current = nextZoom;
+      panRef.current = { x: newPanX, y: newPanY };
+      setZoom(nextZoom);
+      setPan({ x: newPanX, y: newPanY });
+    }
+  }, [animateTo]);
 
-    setZoom(nextZoom);
-    setPan({ x: newPanX, y: newPanY });
-  }, []);
-
-  // Zoom handlers (focus on center if triggered by button)
+  // Smooth zoom handlers for buttons (focus on viewport center)
   const handleZoom = (delta: number) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    zoomAtPoint(zoomRef.current + delta, centerX, centerY);
+    zoomAtPoint(zoomRef.current + delta, centerX, centerY, true);
   };
 
-  // Wheel zoom centered at mouse cursor position (supports Ctrl+Wheel like Canvas, and direct wheel zoom/pan)
+  // Wheel zoom centered at mouse cursor position with momentum smoothing like Google Maps
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
+    let targetZoomLevel = zoomRef.current;
+    let lastClientX = 0;
+    let lastClientY = 0;
+
+    const updateSmoothWheelZoom = () => {
+      const current = zoomRef.current;
+      const diff = targetZoomLevel - current;
+
+      if (Math.abs(diff) > 0.001) {
+        // Interpolate toward target zoom (smooth damping factor 0.22 per frame)
+        const nextStepZoom = current + diff * 0.22;
+        zoomAtPoint(nextStepZoom, lastClientX, lastClientY, false);
+        wheelRafRef.current = requestAnimationFrame(updateSmoothWheelZoom);
+      } else {
+        zoomAtPoint(targetZoomLevel, lastClientX, lastClientY, false);
+        wheelRafRef.current = null;
+      }
+    };
+
     const onNativeWheel = (e: WheelEvent) => {
       e.preventDefault();
 
-      if (e.ctrlKey || e.metaKey) {
-        // Ctrl + Wheel / Pinch gesture: smooth proportional zoom
-        const zoomFactor = Math.exp(-e.deltaY * 0.0025);
-        zoomAtPoint(zoomRef.current * zoomFactor, e.clientX, e.clientY);
-      } else if (e.shiftKey) {
+      if (e.shiftKey) {
         // Shift + Wheel = Horizontal pan
+        if (animFrameRef.current) {
+          cancelAnimationFrame(animFrameRef.current);
+          animFrameRef.current = null;
+        }
+        if (wheelRafRef.current) {
+          cancelAnimationFrame(wheelRafRef.current);
+          wheelRafRef.current = null;
+        }
         const scrollDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
         const nextPanX = panRef.current.x - scrollDelta * 0.8;
         panRef.current = { ...panRef.current, x: nextPanX };
         setPan((prev) => ({ ...prev, x: nextPanX }));
       } else {
-        // Standard mouse wheel: smooth proportional focal zoom centered at cursor position
-        const zoomFactor = Math.exp(-e.deltaY * 0.0025);
-        zoomAtPoint(zoomRef.current * zoomFactor, e.clientX, e.clientY);
+        // Track mouse position for anchor
+        lastClientX = e.clientX;
+        lastClientY = e.clientY;
+
+        // If user started wheeling from a fresh state, sync target to current
+        if (wheelRafRef.current === null) {
+          targetZoomLevel = zoomRef.current;
+        }
+
+        // Proportional exponential zoom per wheel notch (smooth Google Maps feeling)
+        const delta = Math.max(-100, Math.min(100, e.deltaY));
+        const factor = Math.exp(-delta * 0.0016);
+
+        targetZoomLevel = Math.max(0.2, Math.min(5.0, targetZoomLevel * factor));
+
+        if (!wheelRafRef.current) {
+          wheelRafRef.current = requestAnimationFrame(updateSmoothWheelZoom);
+        }
       }
     };
 
     el.addEventListener('wheel', onNativeWheel, { passive: false });
     return () => {
       el.removeEventListener('wheel', onNativeWheel);
+      if (wheelRafRef.current) {
+        cancelAnimationFrame(wheelRafRef.current);
+        wheelRafRef.current = null;
+      }
     };
   }, [zoomAtPoint]);
 
@@ -351,6 +455,14 @@ export const MapView: React.FC<MapViewProps> = ({
     if (isAddPinMode) return;
 
     if (e.button === 0 || e.button === 1) {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      if (wheelRafRef.current) {
+        cancelAnimationFrame(wheelRafRef.current);
+        wheelRafRef.current = null;
+      }
       setIsPanning(true);
       setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
       setHasDragged(false);
@@ -550,11 +662,10 @@ export const MapView: React.FC<MapViewProps> = ({
     const newPanX = panRef.current.x + deltaX;
     const newPanY = panRef.current.y + deltaY;
 
-    panRef.current = { x: newPanX, y: newPanY };
-    setPan({ x: newPanX, y: newPanY });
+    animateTo(zoomRef.current, { x: newPanX, y: newPanY }, 250);
   };
 
-  // Focus and center on a pin
+  // Focus and center on a pin smoothly
   const handleFocusOnPin = (pin: MapPin) => {
     if (!imageRef.current) return;
 
@@ -570,11 +681,8 @@ export const MapView: React.FC<MapViewProps> = ({
     const newPanX = (naturalWidth / 2 - pinImageX) * targetZoom;
     const newPanY = (naturalHeight / 2 - pinImageY) * targetZoom;
 
-    zoomRef.current = targetZoom;
-    panRef.current = { x: newPanX, y: newPanY };
-    setZoom(targetZoom);
-    setPan({ x: newPanX, y: newPanY });
     setSelectedPinId(pin.id);
+    animateTo(targetZoom, { x: newPanX, y: newPanY }, 300);
   };
 
   // Quick change pin color
@@ -746,10 +854,7 @@ export const MapView: React.FC<MapViewProps> = ({
             <button
               type="button"
               onClick={() => {
-                zoomRef.current = 1;
-                panRef.current = { x: 0, y: 0 };
-                setZoom(1);
-                setPan({ x: 0, y: 0 });
+                animateTo(1, { x: 0, y: 0 }, 250);
               }}
               className="p-1 rounded text-slate-300 hover:text-white hover:bg-[#383838] transition-colors"
               title={t.map.resetZoom}
