@@ -175,9 +175,9 @@ export const MapView: React.FC<MapViewProps> = ({
       e.preventDefault();
 
       if (e.ctrlKey || e.metaKey) {
-        // Ctrl + Wheel / Pinch gesture
-        const factor = e.deltaY < 0 ? 1.15 : 0.85;
-        zoomAtPoint(zoomRef.current * factor, e.clientX, e.clientY);
+        // Ctrl + Wheel / Pinch gesture: smooth proportional zoom
+        const zoomFactor = Math.exp(-e.deltaY * 0.0025);
+        zoomAtPoint(zoomRef.current * zoomFactor, e.clientX, e.clientY);
       } else if (e.shiftKey) {
         // Shift + Wheel = Horizontal pan
         const scrollDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
@@ -185,9 +185,9 @@ export const MapView: React.FC<MapViewProps> = ({
         panRef.current = { ...panRef.current, x: nextPanX };
         setPan((prev) => ({ ...prev, x: nextPanX }));
       } else {
-        // Standard mouse wheel: perform focal zoom centered at cursor position
-        const factor = e.deltaY < 0 ? 1.15 : 0.85;
-        zoomAtPoint(zoomRef.current * factor, e.clientX, e.clientY);
+        // Standard mouse wheel: smooth proportional focal zoom centered at cursor position
+        const zoomFactor = Math.exp(-e.deltaY * 0.0025);
+        zoomAtPoint(zoomRef.current * zoomFactor, e.clientX, e.clientY);
       }
     };
 
@@ -579,6 +579,16 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   }, [currentMap, searchQuery, cards]);
 
+  // Dynamic pin scaling: pins counter-scale with zoom so they remain readable without becoming excessively tiny or overwhelmingly huge
+  const pinScale = useMemo(() => {
+    // Keep pins at an optimal screen size (~1.0x - 1.35x):
+    // When zooming in, visual scale gently expands to ~1.3x so pins & text labels are bold, crisp, and easily readable.
+    // Screen size = pinScale * zoom.
+    // targetVisualScale = clamp(1.0, 1.45, 0.95 + 0.15 * zoom)
+    const targetVisualScale = Math.max(1.0, Math.min(1.45, 0.95 + 0.15 * zoom));
+    return targetVisualScale / zoom;
+  }, [zoom]);
+
   const selectedPin = useMemo(
     () => currentMap?.pins.find((p) => p.id === selectedPinId) || null,
     [currentMap, selectedPinId]
@@ -792,6 +802,7 @@ export const MapView: React.FC<MapViewProps> = ({
                   const isSelected = selectedPinId === pin.id;
                   const linkedCard = cards.find((c) => c.id === pin.cardId);
                   const pinColor = pin.color || '#0d99ff';
+                  const baseScale = pinScale * (isSelected ? 1.25 : 1);
 
                   return (
                     <div
@@ -800,14 +811,16 @@ export const MapView: React.FC<MapViewProps> = ({
                       style={{
                         left: `${pin.x}%`,
                         top: `${pin.y}%`,
+                        transform: `translate(-50%, -100%) scale(${baseScale})`,
+                        transformOrigin: 'bottom center',
                       }}
                       onMouseDown={(e) => handlePinMouseDown(e, pin.id)}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedPinId(pin.id);
                       }}
-                      className={`map-pin-element absolute -translate-x-1/2 -translate-y-full cursor-pointer z-10 transition-transform group ${
-                        isSelected ? 'scale-125 z-30' : 'hover:scale-110'
+                      className={`map-pin-element absolute cursor-pointer z-10 will-change-transform group ${
+                        isSelected ? 'z-30' : 'hover:brightness-110'
                       }`}
                     >
                       {/* Pin Icon / Marker Badge */}
