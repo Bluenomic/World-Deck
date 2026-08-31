@@ -553,8 +553,6 @@ export const id = {
     centerMapHere: 'Pusatkan Peta ke Sini',
     editPin: 'Edit Pin',
     quickColor: 'Warna Pin',
-    copiedCoords: 'Koordinat disalin ke clipboard!',
-    copyCoords: 'Salin Koordinat',
     selectCardToLinkModal: 'Pilih Kartu untuk Ditautkan',
   },
 };

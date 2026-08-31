@@ -98,9 +98,6 @@ export const MapView: React.FC<MapViewProps> = ({
     y: number;
   } | null>(null);
 
-  // Toast notification for copy coordinates
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -218,13 +215,6 @@ export const MapView: React.FC<MapViewProps> = ({
       window.removeEventListener('resize', handleClose);
     };
   }, [contextMenu.visible]);
-
-  // Auto-dismiss toast
-  useEffect(() => {
-    if (!toastMessage) return;
-    const timer = setTimeout(() => setToastMessage(null), 2500);
-    return () => clearTimeout(timer);
-  }, [toastMessage]);
 
   // Global mouseup listener to release pan/drag anywhere
   useEffect(() => {
@@ -569,13 +559,6 @@ export const MapView: React.FC<MapViewProps> = ({
       pins: newPins,
       updatedAt: Date.now(),
     });
-  };
-
-  // Copy coordinates
-  const handleCopyCoords = (px: number, py: number) => {
-    const text = `X: ${px}%, Y: ${py}%`;
-    navigator.clipboard.writeText(text);
-    setToastMessage(`${t.map.copiedCoords} (${text})`);
   };
 
   // Filtered pins based on search query
@@ -1255,26 +1238,6 @@ export const MapView: React.FC<MapViewProps> = ({
                 <Icons.RotateCcw size={14} className="text-amber-400" />
                 <span>{t.map.resetZoom} (100%)</span>
               </button>
-
-              {/* Salin Koordinat Peta */}
-              {contextMenu.mapPercentX !== null && contextMenu.mapPercentY !== null && (
-                <>
-                  <div className="my-1 border-t border-[#383838]" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleCopyCoords(contextMenu.mapPercentX!, contextMenu.mapPercentY!);
-                      setContextMenu((prev) => ({ ...prev, visible: false }));
-                    }}
-                    className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-400 hover:text-white cursor-pointer text-[11px]"
-                  >
-                    <Icons.Copy size={13} />
-                    <span>
-                      {t.map.copyCoords} ({contextMenu.mapPercentX}%, {contextMenu.mapPercentY}%)
-                    </span>
-                  </button>
-                </>
-              )}
             </div>
           )}
         </div>
@@ -1352,13 +1315,6 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      {/* TOAST NOTIFICATION */}
-      {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#1e1e1e]/95 text-white border border-emerald-500/50 shadow-2xl px-4 py-2.5 rounded-xl text-xs font-medium flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <Icons.CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
       {showMapModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none">
           <form
