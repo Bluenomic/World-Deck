@@ -800,7 +800,6 @@ export const MapView: React.FC<MapViewProps> = ({
                 {/* RENDER PINS ON MAP */}
                 {filteredPins.map((pin) => {
                   const isSelected = selectedPinId === pin.id;
-                  const linkedCard = cards.find((c) => c.id === pin.cardId);
                   const pinColor = pin.color || '#0d99ff';
                   const baseScale = pinScale * (isSelected ? 1.25 : 1);
 
@@ -823,23 +822,29 @@ export const MapView: React.FC<MapViewProps> = ({
                         isSelected ? 'z-30' : 'hover:brightness-110'
                       }`}
                     >
-                      {/* Pin Icon / Marker Badge */}
+                      {/* Pin Marker (Seamless Teardrop Pin) */}
                       <div className="relative flex flex-col items-center">
-                        <div
-                          style={{ backgroundColor: pinColor }}
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-xl border-2 border-white/80 group-hover:border-white transition-colors"
-                        >
-                          {linkedCard ? (
-                            <Icons.MapPin size={16} />
-                          ) : (
-                            <Icons.Pin size={14} />
-                          )}
+                        <div className="relative filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.45)] group-hover:scale-105 transition-transform">
+                          <svg
+                            width="28"
+                            height="36"
+                            viewBox="0 0 32 40"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="block"
+                          >
+                            {/* Seamless Pin Body */}
+                            <path
+                              d="M16 39C16 39 30 25.4 30 16C30 8.268 23.732 2 16 2C8.268 2 2 8.268 2 16C2 25.4 16 39 16 39Z"
+                              fill={pinColor}
+                              stroke="white"
+                              strokeWidth="2.5"
+                              strokeLinejoin="round"
+                            />
+                            {/* Clean Center Dot Accent */}
+                            <circle cx="16" cy="16" r="5" fill="white" />
+                          </svg>
                         </div>
-                        {/* Pin Pointer Arrow */}
-                        <div
-                          style={{ borderTopColor: pinColor }}
-                          className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] -mt-0.5"
-                        />
 
                         {/* Title Label below pin */}
                         <div className="mt-1 bg-slate-950/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-xs border border-white/20 whitespace-nowrap max-w-[120px] truncate shadow-md">
