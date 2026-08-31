@@ -540,7 +540,7 @@ export const id = {
     savePin: 'Simpan Pin',
     deletePin: 'Hapus Pin',
     deletePinConfirm: 'Apakah kamu yakin ingin menghapus pin ini?',
-    dragPinHint: 'Geser pin pada peta untuk menyesuaikan posisi',
+    dragPinHint: 'Klik ganda (double-click) dan geser untuk memindahkan pin',
     pinsCount: 'Pin',
     zoomIn: 'Perbesar',
     zoomOut: 'Perkecil',

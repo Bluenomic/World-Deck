@@ -106,6 +106,7 @@ export const MapView: React.FC<MapViewProps> = ({
   // Mutable refs for zoom & pan to prevent stale closure lag during rapid wheel events
   const zoomRef = useRef<number>(zoom);
   const panRef = useRef<{ x: number; y: number }>(pan);
+  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -221,6 +222,7 @@ export const MapView: React.FC<MapViewProps> = ({
     const handleGlobalMouseUp = () => {
       setIsPanning(false);
       setDraggingPinId(null);
+      dragOffsetRef.current = { x: 0, y: 0 };
     };
     window.addEventListener('mouseup', handleGlobalMouseUp);
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
@@ -384,10 +386,30 @@ export const MapView: React.FC<MapViewProps> = ({
 
   // Drag pin handlers
   const handlePinMouseDown = (e: React.MouseEvent, pinId: string) => {
+    // Only handle primary (left) button
+    if (e.button !== 0) return;
     e.stopPropagation();
     if (isAddPinMode) return;
-    setDraggingPinId(pinId);
+
+    // Single click selects pin and opens drawer
     setSelectedPinId(pinId);
+
+    // Only initiate dragging on double-click (e.detail >= 2)
+    if (e.detail >= 2) {
+      if (imageRef.current) {
+        const rect = imageRef.current.getBoundingClientRect();
+        const cursorPercentX = ((e.clientX - rect.left) / rect.width) * 100;
+        const cursorPercentY = ((e.clientY - rect.top) / rect.height) * 100;
+        const targetPin = currentMap?.pins.find((p) => p.id === pinId);
+        if (targetPin) {
+          dragOffsetRef.current = {
+            x: cursorPercentX - targetPin.x,
+            y: cursorPercentY - targetPin.y,
+          };
+        }
+      }
+      setDraggingPinId(pinId);
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -406,8 +428,12 @@ export const MapView: React.FC<MapViewProps> = ({
       const clickX = e.clientX - rect.left;
       const clickY = e.clientY - rect.top;
 
-      const percentX = Math.min(100, Math.max(0, (clickX / rect.width) * 100));
-      const percentY = Math.min(100, Math.max(0, (clickY / rect.height) * 100));
+      // Compensate for cursor offset relative to pin coordinate so the pin does not jump abruptly
+      const rawPercentX = ((clickX / rect.width) * 100) - dragOffsetRef.current.x;
+      const rawPercentY = ((clickY / rect.height) * 100) - dragOffsetRef.current.y;
+
+      const percentX = Math.min(100, Math.max(0, rawPercentX));
+      const percentY = Math.min(100, Math.max(0, rawPercentY));
 
       const updatedPins = currentMap.pins.map((p) => {
         if (p.id === draggingPinId) {
@@ -431,6 +457,7 @@ export const MapView: React.FC<MapViewProps> = ({
   const handleMouseUp = () => {
     setIsPanning(false);
     setDraggingPinId(null);
+    dragOffsetRef.current = { x: 0, y: 0 };
   };
 
   // Context Menu Handler
@@ -803,6 +830,8 @@ export const MapView: React.FC<MapViewProps> = ({
                   const pinColor = pin.color || '#0d99ff';
                   const baseScale = pinScale * (isSelected ? 1.25 : 1);
 
+                  const isDragging = draggingPinId === pin.id;
+
                   return (
                     <div
                       key={pin.id}
@@ -818,9 +847,10 @@ export const MapView: React.FC<MapViewProps> = ({
                         e.stopPropagation();
                         setSelectedPinId(pin.id);
                       }}
-                      className={`map-pin-element absolute cursor-pointer z-10 will-change-transform group ${
-                        isSelected ? 'z-30' : 'hover:brightness-110'
-                      }`}
+                      title={t.map.dragPinHint}
+                      className={`map-pin-element absolute z-10 will-change-transform group select-none ${
+                        isDragging ? 'cursor-grabbing z-40' : 'cursor-pointer'
+                      } ${isSelected ? 'z-30' : 'hover:brightness-110'}`}
                     >
                       {/* Pin Marker (Seamless Teardrop Pin) */}
                       <div className="relative flex flex-col items-center">
