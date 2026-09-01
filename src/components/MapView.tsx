@@ -9,9 +9,9 @@ interface MapViewProps {
   onSaveMap: (map: WorldMap) => void;
   onDeleteMap: (mapId: string) => void;
   onOpenCard: (cardId: string) => void;
-  onAddCard?: (card: WorldCard) => void;
   onUpdateCard?: (card: WorldCard) => void;
   onEditCard?: (card: WorldCard) => void;
+  onCreatePinCard?: (mapId: string, x: number, y: number) => void;
 }
 
 const PIN_COLORS = [
@@ -29,9 +29,9 @@ export const MapView: React.FC<MapViewProps> = ({
   onSaveMap,
   onDeleteMap,
   onOpenCard,
-  onAddCard,
   onUpdateCard,
   onEditCard,
+  onCreatePinCard,
 }) => {
   const { language, t, getCategoryLabel } = useLanguage();
   
@@ -469,7 +469,7 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   };
 
-  // Handle click on Map Image to add pin (automatically creates a Location Card)
+  // Handle click on Map Image to add pin (triggers card creation modal)
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (hasDragged) {
       setHasDragged(false);
@@ -490,53 +490,14 @@ export const MapView: React.FC<MapViewProps> = ({
 
     const percentX = Math.min(100, Math.max(0, (clickX / rect.width) * 100));
     const percentY = Math.min(100, Math.max(0, (clickY / rect.height) * 100));
+    const posX = Math.round(percentX * 10) / 10;
+    const posY = Math.round(percentY * 10) / 10;
 
-    const now = Date.now();
-    const newCardId = `card_${now}_${Math.random().toString(36).substr(2, 6)}`;
-    const defaultTitle = language === 'en' ? 'New Location' : 'Lokasi Baru';
-
-    // 1. Create a corresponding WorldCard with Category 'location'
-    const newCard: WorldCard = {
-      id: newCardId,
-      title: defaultTitle,
-      subtitle: '',
-      category: 'location',
-      summary: '',
-      content: '',
-      tags: [],
-      attributes: [],
-      x: 300,
-      y: 300,
-      canvasId: undefined,
-      canvasIds: [],
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    // 2. Create the MapPin linked to the new Location Card
-    const newPin: MapPin = {
-      id: `pin_${now}_${Math.random().toString(36).substr(2, 5)}`,
-      title: defaultTitle,
-      description: '',
-      cardId: newCardId,
-      x: Math.round(percentX * 10) / 10,
-      y: Math.round(percentY * 10) / 10,
-      color: '#0d99ff',
-    };
-
-    if (onAddCard) {
-      onAddCard(newCard);
-    }
-
-    const updatedPins = [...currentMap.pins, newPin];
-    onSaveMap({
-      ...currentMap,
-      pins: updatedPins,
-      updatedAt: now,
-    });
-
-    setSelectedPinId(newPin.id);
     setIsAddPinMode(false);
+
+    if (onCreatePinCard) {
+      onCreatePinCard(currentMap.id, posX, posY);
+    }
   };
 
   // Container Mouse Down for Google Maps style pan-and-drag
@@ -728,64 +689,35 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   };
 
-  // Create Pin at exact context menu position (auto-creates Location card if none provided)
+  // Create Pin at exact context menu position
   const handleAddPinAtPos = (posX: number, posY: number, cardId?: string) => {
     if (!currentMap) return;
-    const now = Date.now();
-
-    let finalCardId = cardId;
-    let pinTitle = language === 'en' ? 'New Location' : 'Lokasi Baru';
-    let pinDescription = '';
 
     if (cardId) {
       const linkedCard = cards.find((c) => c.id === cardId);
-      if (linkedCard) {
-        pinTitle = linkedCard.title;
-        pinDescription = linkedCard.summary || '';
-      }
-    } else {
-      // Automatically create a new Card with Category 'location'
-      finalCardId = `card_${now}_${Math.random().toString(36).substr(2, 6)}`;
-      const newCard: WorldCard = {
-        id: finalCardId,
-        title: pinTitle,
-        subtitle: '',
-        category: 'location',
-        summary: '',
-        content: '',
-        tags: [],
-        attributes: [],
-        x: 300,
-        y: 300,
-        canvasId: undefined,
-        canvasIds: [],
-        createdAt: now,
-        updatedAt: now,
+      const newPin: MapPin = {
+        id: `pin_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        title: linkedCard ? linkedCard.title : (language === 'en' ? 'New Location' : 'Lokasi Baru'),
+        description: linkedCard?.summary || '',
+        cardId: cardId,
+        x: posX,
+        y: posY,
+        color: '#0d99ff',
       };
 
-      if (onAddCard) {
-        onAddCard(newCard);
+      const updatedPins = [...currentMap.pins, newPin];
+      onSaveMap({
+        ...currentMap,
+        pins: updatedPins,
+        updatedAt: Date.now(),
+      });
+
+      setSelectedPinId(newPin.id);
+    } else {
+      if (onCreatePinCard) {
+        onCreatePinCard(currentMap.id, posX, posY);
       }
     }
-
-    const newPin: MapPin = {
-      id: `pin_${now}_${Math.random().toString(36).substr(2, 5)}`,
-      title: pinTitle,
-      description: pinDescription,
-      cardId: finalCardId,
-      x: posX,
-      y: posY,
-      color: '#0d99ff',
-    };
-
-    const updatedPins = [...currentMap.pins, newPin];
-    onSaveMap({
-      ...currentMap,
-      pins: updatedPins,
-      updatedAt: now,
-    });
-
-    setSelectedPinId(newPin.id);
   };
 
   // Center viewport on context menu coordinate

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme, WorldDocument, WorldCanvas, WorldMap } from './types';
+import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme, WorldDocument, WorldCanvas, WorldMap, MapPin } from './types';
 import { SAMPLE_WORLD } from './data/sampleWorld';
 import { generateId, downloadProjectJson, getCardCanvasIds, isCardOnCanvas, getCardPositionOnCanvas } from './utils/helpers';
 import { saveLocalFileHandle, loadLocalFileHandle, loadWorkspacePreferences, saveWorkspacePreferences } from './utils/storage';
@@ -116,6 +116,12 @@ export const App: React.FC = () => {
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
   const [showWorldManager, setShowWorldManager] = useState<boolean>(false);
   const [cardsToDelete, setCardsToDelete] = useState<WorldCard[] | null>(null);
+  const [pendingMapPin, setPendingMapPin] = useState<{
+    mapId: string;
+    x: number;
+    y: number;
+    color?: string;
+  } | null>(null);
   const [canvasModalConfig, setCanvasModalConfig] = useState<{
     isOpen: boolean;
     mode: 'create' | 'rename';
@@ -879,13 +885,74 @@ export const App: React.FC = () => {
     });
   };
 
-  // Save Card from Editor
-  const handleSaveCard = (updatedCard: WorldCard) => {
+  // Add New Location Card directly from Map Pin placement
+  const handleCreateLocationPinCard = (mapId: string, x: number, y: number) => {
+    const newCard: WorldCard = {
+      id: generateId('card'),
+      title: '',
+      subtitle: '',
+      category: 'location',
+      summary: '',
+      content: '',
+      tags: [],
+      attributes: [],
+      x: 300,
+      y: 300,
+      canvasId: undefined,
+      canvasIds: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    setPendingMapPin({ mapId, x, y, color: '#0d99ff' });
     updateActiveWorld((prev) => ({
       ...prev,
       updatedAt: Date.now(),
-      cards: prev.cards.map((c) => (c.id === updatedCard.id ? updatedCard : c)),
+      cards: [...prev.cards, newCard],
     }));
+    setEditingCard(newCard);
+  };
+
+  // Save Card from Editor
+  const handleSaveCard = (updatedCard: WorldCard) => {
+    updateActiveWorld((prev) => {
+      let updatedMaps = prev.worldMaps || [];
+      if (pendingMapPin) {
+        const newPin: MapPin = {
+          id: generateId('pin'),
+          title: updatedCard.title.trim() || (language === 'en' ? 'New Location' : 'Lokasi Baru'),
+          description: updatedCard.summary || '',
+          cardId: updatedCard.id,
+          x: pendingMapPin.x,
+          y: pendingMapPin.y,
+          color: pendingMapPin.color || '#0d99ff',
+        };
+        updatedMaps = updatedMaps.map((m) =>
+          m.id === pendingMapPin.mapId
+            ? { ...m, pins: [...m.pins, newPin], updatedAt: Date.now() }
+            : m
+        );
+      } else {
+        // Synchronize pin titles/descriptions with card updates
+        updatedMaps = updatedMaps.map((m) => ({
+          ...m,
+          pins: m.pins.map((p) =>
+            p.cardId === updatedCard.id
+              ? { ...p, title: updatedCard.title || p.title, description: updatedCard.summary ?? p.description }
+              : p
+          ),
+        }));
+      }
+
+      return {
+        ...prev,
+        updatedAt: Date.now(),
+        cards: prev.cards.map((c) => (c.id === updatedCard.id ? updatedCard : c)),
+        worldMaps: updatedMaps,
+      };
+    });
+
+    setPendingMapPin(null);
     setEditingCard(null);
   };
 
@@ -938,6 +1005,7 @@ export const App: React.FC = () => {
     if (selectedCardId === cardId) {
       setSelectedCardId(null);
     }
+    setPendingMapPin(null);
     setEditingCard(null);
   };
 
@@ -1476,13 +1544,6 @@ export const App: React.FC = () => {
               onSaveMap={handleSaveMap}
               onDeleteMap={handleDeleteMap}
               onOpenCard={(cardId) => setReaderCardId(cardId)}
-              onAddCard={(newCard) => {
-                updateActiveWorld((prev) => ({
-                  ...prev,
-                  updatedAt: Date.now(),
-                  cards: [...prev.cards, newCard],
-                }));
-              }}
               onUpdateCard={(updatedCard) => {
                 updateActiveWorld((prev) => ({
                   ...prev,
@@ -1491,6 +1552,7 @@ export const App: React.FC = () => {
                 }));
               }}
               onEditCard={(card) => setEditingCard(card)}
+              onCreatePinCard={handleCreateLocationPinCard}
             />
           )}
         </main>
@@ -1555,7 +1617,13 @@ export const App: React.FC = () => {
           connections={activeCanvasConnections}
           onSave={handleSaveCard}
           onDelete={handleDeleteCard}
-          onClose={() => setEditingCard(null)}
+          onClose={() => {
+            if (pendingMapPin && editingCard) {
+              handleDiscardCard(editingCard.id);
+            } else {
+              setEditingCard(null);
+            }
+          }}
           onNavigateToCard={handleNavigateToCard}
           onAddConnection={handleAddConnection}
           onDiscard={handleDiscardCard}
