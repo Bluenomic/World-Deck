@@ -591,32 +591,37 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   };
 
-  // Drag pin handlers
+  // Drag pin handlers (Direct click-and-drag to move, double-click to open card)
   const handlePinMouseDown = (e: React.MouseEvent, pinId: string) => {
     // Only handle primary (left) button
     if (e.button !== 0) return;
     e.stopPropagation();
     if (isAddPinMode) return;
 
-    // Single click selects pin and opens drawer
     setSelectedPinId(pinId);
 
-    // Only initiate dragging on double-click (e.detail >= 2)
-    if (e.detail >= 2) {
-      if (imageRef.current) {
-        const rect = imageRef.current.getBoundingClientRect();
-        const cursorPercentX = ((e.clientX - rect.left) / rect.width) * 100;
-        const cursorPercentY = ((e.clientY - rect.top) / rect.height) * 100;
-        const targetPin = currentMap?.pins.find((p) => p.id === pinId);
-        if (targetPin) {
-          dragOffsetRef.current = {
-            x: cursorPercentX - targetPin.x,
-            y: cursorPercentY - targetPin.y,
-          };
-        }
-      }
-      setDraggingPinId(pinId);
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
     }
+    if (wheelRafRef.current) {
+      cancelAnimationFrame(wheelRafRef.current);
+      wheelRafRef.current = null;
+    }
+
+    if (imageRef.current) {
+      const rect = imageRef.current.getBoundingClientRect();
+      const cursorPercentX = ((e.clientX - rect.left) / rect.width) * 100;
+      const cursorPercentY = ((e.clientY - rect.top) / rect.height) * 100;
+      const targetPin = currentMap?.pins.find((p) => p.id === pinId);
+      if (targetPin) {
+        dragOffsetRef.current = {
+          x: cursorPercentX - targetPin.x,
+          y: cursorPercentY - targetPin.y,
+        };
+      }
+    }
+    setDraggingPinId(pinId);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -1041,6 +1046,9 @@ export const MapView: React.FC<MapViewProps> = ({
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedPinId(pin.id);
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
                         if (pin.cardId) {
                           onOpenCard(pin.cardId);
                         }

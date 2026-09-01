@@ -542,7 +542,7 @@ export const en: typeof id = {
     savePin: 'Save Pin',
     deletePin: 'Delete Pin',
     deletePinConfirm: 'Are you sure you want to delete this pin?',
-    dragPinHint: 'Double-click and drag to move pin',
+    dragPinHint: 'Click and drag to move pin, double-click to open card',
     pinsCount: 'Pins',
     zoomIn: 'Zoom In',
     zoomOut: 'Zoom Out',
