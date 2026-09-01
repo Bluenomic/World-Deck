@@ -9,9 +9,12 @@ interface AddCardFromGalleryModalProps {
   onClose: () => void;
   allCards: WorldCard[];
   allDecks: WorldDeck[];
-  activeCanvasId: string;
+  activeCanvasId?: string;
   targetPosition: { x: number; y: number };
   onAddCardsToCanvas: (cardIds: string[], position: { x: number; y: number }) => void;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
 }
 
 export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = ({
@@ -21,6 +24,9 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
   allDecks,
   targetPosition,
   onAddCardsToCanvas,
+  title,
+  description,
+  submitLabel,
 }) => {
   const { language, t, getCategoryLabel } = useLanguage();
   const [activeTab, setActiveTab] = useState<'cards' | 'decks'>('cards');
@@ -83,11 +89,15 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
               <Icons.FolderPlus size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold app-text-main">{t.library.addCardToCanvas}</h3>
+              <h3 className="text-sm font-bold app-text-main">
+                {title || t.library.addCardToCanvas}
+              </h3>
               <p className="text-[11px] app-text-muted">
-                {language === 'en'
-                  ? 'Select cards or decks from gallery to add to this canvas'
-                  : 'Pilih kartu atau Deck dari galeri untuk ditambahkan ke Kanvas ini'}
+                {description || (
+                  language === 'en'
+                    ? 'Select cards or decks from gallery to add to this canvas'
+                    : 'Pilih kartu atau Deck dari galeri untuk ditambahkan ke Kanvas ini'
+                )}
               </p>
             </div>
           </div>
@@ -293,9 +303,11 @@ export const AddCardFromGalleryModal: React.FC<AddCardFromGalleryModalProps> = (
           >
             <Icons.Plus size={14} strokeWidth={2.5} />
             <span>
-              {language === 'en'
-                ? `Add (${selectedCardIds.length}) Cards to Canvas`
-                : `Tambahkan (${selectedCardIds.length}) Kartu ke Kanvas`}
+              {submitLabel
+                ? submitLabel.replace('$COUNT', String(selectedCardIds.length))
+                : language === 'en'
+                  ? `Add (${selectedCardIds.length}) Cards to Canvas`
+                  : `Tambahkan (${selectedCardIds.length}) Kartu ke Kanvas`}
             </span>
           </button>
         </div>

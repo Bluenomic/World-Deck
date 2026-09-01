@@ -551,10 +551,11 @@ export const en: typeof id = {
     saveMap: 'Save Map',
     cancel: 'Cancel',
     addPinHere: 'Add Pin Here',
-    linkCardHere: 'Link Card Here',
+    addFromGalleryHere: 'Add Cards from Gallery',
     centerMapHere: 'Center Map Here',
     editPin: 'Edit Pin',
     quickColor: 'Pin Color',
-    selectCardToLinkModal: 'Select Card to Link',
+    addCardToMapModal: 'Add Cards from Gallery to Map',
+    addCardToMapDesc: 'Select cards or decks from gallery to add as Pins on this map',
   },
 };

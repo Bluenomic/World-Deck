@@ -1561,6 +1561,7 @@ export const App: React.FC = () => {
             <MapView
               worldMaps={activeWorld.worldMaps || []}
               cards={activeWorld.cards}
+              decks={activeWorld.decks || []}
               onSaveMap={handleSaveMap}
               onDeleteMap={handleDeleteMap}
               onOpenCard={(cardId) => setReaderCardId(cardId)}

@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import type { WorldMap, MapPin, WorldCard } from '../types';
+import type { WorldMap, MapPin, WorldCard, WorldDeck } from '../types';
 import * as Icons from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { ConfirmModal } from './ConfirmModal';
 import type { ConfirmModalConfig } from './ConfirmModal';
+import { AddCardFromGalleryModal } from './AddCardFromGalleryModal';
 
 interface MapViewProps {
   worldMaps: WorldMap[];
   cards: WorldCard[];
+  decks?: WorldDeck[];
   onSaveMap: (map: WorldMap) => void;
   onDeleteMap: (mapId: string) => void;
   onOpenCard: (cardId: string) => void;
@@ -27,13 +29,14 @@ const PIN_COLORS = [
 export const MapView: React.FC<MapViewProps> = ({
   worldMaps,
   cards,
+  decks = [],
   onSaveMap,
   onDeleteMap,
   onOpenCard,
   onEditCard,
   onCreatePinCard,
 }) => {
-  const { language, t, getCategoryLabel } = useLanguage();
+  const { language, t } = useLanguage();
   
   const [confirmModalConfig, setConfirmModalConfig] = useState<ConfirmModalConfig | null>(null);
 
@@ -99,8 +102,8 @@ export const MapView: React.FC<MapViewProps> = ({
     isNearBottom: false,
   });
 
-  // Modal to select card for linking at context menu position
-  const [showLinkCardModal, setShowLinkCardModal] = useState<{
+  // Target position for AddCardFromGalleryModal
+  const [galleryTargetPos, setGalleryTargetPos] = useState<{
     x: number;
     y: number;
   } | null>(null);
@@ -689,37 +692,6 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   };
 
-  // Create Pin at exact context menu position
-  const handleAddPinAtPos = (posX: number, posY: number, cardId?: string) => {
-    if (!currentMap) return;
-
-    if (cardId) {
-      const linkedCard = cards.find((c) => c.id === cardId);
-      const newPin: MapPin = {
-        id: `pin_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        title: linkedCard ? linkedCard.title : (language === 'en' ? 'New Location' : 'Lokasi Baru'),
-        description: linkedCard?.summary || '',
-        cardId: cardId,
-        x: posX,
-        y: posY,
-        color: '#0d99ff',
-      };
-
-      const updatedPins = [...currentMap.pins, newPin];
-      onSaveMap({
-        ...currentMap,
-        pins: updatedPins,
-        updatedAt: Date.now(),
-      });
-
-      setSelectedPinId(newPin.id);
-    } else {
-      if (onCreatePinCard) {
-        onCreatePinCard(currentMap.id, posX, posY);
-      }
-    }
-  };
-
   // Center viewport on context menu coordinate
   const handleCenterOnPos = (screenX: number, screenY: number) => {
     if (!containerRef.current) return;
@@ -1210,7 +1182,9 @@ export const MapView: React.FC<MapViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      handleAddPinAtPos(contextMenu.mapPercentX!, contextMenu.mapPercentY!);
+                      if (currentMap && onCreatePinCard) {
+                        onCreatePinCard(currentMap.id, contextMenu.mapPercentX!, contextMenu.mapPercentY!);
+                      }
                       setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
                     className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-emerald-400 font-semibold cursor-pointer"
@@ -1219,11 +1193,11 @@ export const MapView: React.FC<MapViewProps> = ({
                     <span>{t.map.addPinHere}</span>
                   </button>
 
-                  {/* Tautkan Kartu di Sini */}
+                  {/* Tambah Kartu dari Galeri */}
                   <button
                     type="button"
                     onClick={() => {
-                      setShowLinkCardModal({
+                      setGalleryTargetPos({
                         x: contextMenu.mapPercentX!,
                         y: contextMenu.mapPercentY!,
                       });
@@ -1231,8 +1205,8 @@ export const MapView: React.FC<MapViewProps> = ({
                     }}
                     className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-[#0d99ff] font-semibold cursor-pointer"
                   >
-                    <Icons.Link size={14} />
-                    <span>{t.map.linkCardHere}</span>
+                    <Icons.LayoutGrid size={14} />
+                    <span>{t.map.addFromGalleryHere}</span>
                   </button>
 
                   <div className="my-1 border-t border-[#383838]" />
@@ -1272,77 +1246,43 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      {/* SELECT CARD TO LINK MODAL */}
-      {showLinkCardModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none">
-          <div className="bg-[#222222] border border-[#383838] rounded-2xl max-w-md w-full p-5 text-white shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#383838] pb-3">
-              <h3 className="font-bold text-base flex items-center gap-2 text-white">
-                <Icons.Link size={18} className="text-[#0d99ff]" />
-                <span>{t.map.selectCardToLinkModal}</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowLinkCardModal(null)}
-                className="text-slate-400 hover:text-white"
-              >
-                <Icons.X size={18} />
-              </button>
-            </div>
+      {/* ADD CARD FROM GALLERY MODAL */}
+      <AddCardFromGalleryModal
+        isOpen={!!galleryTargetPos}
+        onClose={() => setGalleryTargetPos(null)}
+        allCards={cards}
+        allDecks={decks}
+        targetPosition={galleryTargetPos || { x: 0, y: 0 }}
+        title={t.map.addCardToMapModal}
+        description={t.map.addCardToMapDesc}
+        submitLabel={
+          language === 'en'
+            ? 'Add ($COUNT) Pins to Map'
+            : 'Tambahkan ($COUNT) Pin ke Peta'
+        }
+        onAddCardsToCanvas={(cardIds, pos) => {
+          if (!currentMap) return;
+          const selectedCards = cards.filter((c) => cardIds.includes(c.id));
+          const newPins: MapPin[] = selectedCards.map((card, index) => ({
+            id: `pin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${index}`,
+            mapId: currentMap.id,
+            cardId: card.id,
+            title: card.title,
+            description: card.summary || '',
+            x: Math.min(100, Math.max(0, pos.x + (index * 2))),
+            y: Math.min(100, Math.max(0, pos.y + (index * 2))),
+            color: '#0d99ff',
+            createdAt: Date.now(),
+          }));
 
-            <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
-              {cards.map((card) => (
-                <button
-                  key={card.id}
-                  type="button"
-                  onClick={() => {
-                    handleAddPinAtPos(showLinkCardModal.x, showLinkCardModal.y, card.id);
-                    setShowLinkCardModal(null);
-                  }}
-                  className="w-full text-left p-2.5 rounded-xl bg-[#181818] hover:bg-[#2a2a2a] border border-[#383838] hover:border-[#0d99ff] flex items-center gap-3 transition-colors cursor-pointer group"
-                >
-                  {card.imageUrl ? (
-                    <img
-                      src={card.imageUrl}
-                      alt={card.title}
-                      className="w-10 h-10 rounded-lg object-cover border border-[#383838] shrink-0"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-lg bg-[#252525] border border-[#383838] flex items-center justify-center shrink-0 text-slate-400">
-                      <Icons.FileText size={18} />
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="font-bold text-xs text-white group-hover:text-[#0d99ff] truncate">
-                        {card.title}
-                      </span>
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-[#0d99ff]/20 text-[#0d99ff] shrink-0">
-                        {getCategoryLabel(card.category)}
-                      </span>
-                    </div>
-                    {card.summary && (
-                      <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
-                        {card.summary}
-                      </p>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-[#383838]">
-              <button
-                type="button"
-                onClick={() => setShowLinkCardModal(null)}
-                className="px-4 py-2 rounded-xl bg-[#181818] hover:bg-[#383838] text-slate-300 text-xs font-semibold cursor-pointer"
-              >
-                {t.map.cancel}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          onSaveMap({
+            ...currentMap,
+            pins: [...currentMap.pins, ...newPins],
+            updatedAt: Date.now(),
+          });
+          setGalleryTargetPos(null);
+        }}
+      />
 
       {showMapModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none">

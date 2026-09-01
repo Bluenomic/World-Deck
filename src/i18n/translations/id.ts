@@ -549,10 +549,11 @@ export const id = {
     saveMap: 'Simpan Peta',
     cancel: 'Batal',
     addPinHere: 'Tambah Pin di Sini',
-    linkCardHere: 'Tautkan Kartu di Sini',
+    addFromGalleryHere: 'Tambah Kartu dari Galeri',
     centerMapHere: 'Pusatkan Peta ke Sini',
     editPin: 'Edit Pin',
     quickColor: 'Warna Pin',
-    selectCardToLinkModal: 'Pilih Kartu untuk Ditautkan',
+    addCardToMapModal: 'Tambah Kartu dari Galeri ke Peta',
+    addCardToMapDesc: 'Pilih kartu atau Deck dari galeri untuk ditambahkan sebagai Pin di peta ini',
   },
 };
