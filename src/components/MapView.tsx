@@ -9,6 +9,9 @@ interface MapViewProps {
   onSaveMap: (map: WorldMap) => void;
   onDeleteMap: (mapId: string) => void;
   onOpenCard: (cardId: string) => void;
+  onAddCard?: (card: WorldCard) => void;
+  onUpdateCard?: (card: WorldCard) => void;
+  onEditCard?: (card: WorldCard) => void;
 }
 
 const PIN_COLORS = [
@@ -26,8 +29,11 @@ export const MapView: React.FC<MapViewProps> = ({
   onSaveMap,
   onDeleteMap,
   onOpenCard,
+  onAddCard,
+  onUpdateCard,
+  onEditCard,
 }) => {
-  const { t, getCategoryLabel } = useLanguage();
+  const { language, t, getCategoryLabel } = useLanguage();
   
   const [selectedMapId, setSelectedMapId] = useState<string | null>(() => 
     worldMaps.length > 0 ? worldMaps[0].id : null
@@ -229,53 +235,71 @@ export const MapView: React.FC<MapViewProps> = ({
     zoomAtPoint(zoomRef.current + delta, centerX, centerY, true);
   };
 
-  // Wheel zoom centered at mouse cursor position with momentum smoothing like Google Maps
+  // Wheel zoom (Ctrl + Wheel) & Smooth 2D Scroll navigation (Horizontal & Vertical with inertia damping)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
     let targetZoomLevel = zoomRef.current;
+    let targetPanX = panRef.current.x;
+    let targetPanY = panRef.current.y;
     let lastClientX = 0;
     let lastClientY = 0;
+    let isZoomingMode = false;
 
-    const updateSmoothWheelZoom = () => {
-      const current = zoomRef.current;
-      const diff = targetZoomLevel - current;
+    const updateSmoothWheel = () => {
+      if (isZoomingMode) {
+        const current = zoomRef.current;
+        const diff = targetZoomLevel - current;
 
-      if (Math.abs(diff) > 0.001) {
-        // Interpolate toward target zoom (smooth damping factor 0.22 per frame)
-        const nextStepZoom = current + diff * 0.22;
-        zoomAtPoint(nextStepZoom, lastClientX, lastClientY, false);
-        wheelRafRef.current = requestAnimationFrame(updateSmoothWheelZoom);
+        if (Math.abs(diff) > 0.001) {
+          // Interpolate toward target zoom (smooth damping factor 0.22 per frame)
+          const nextStepZoom = current + diff * 0.22;
+          zoomAtPoint(nextStepZoom, lastClientX, lastClientY, false);
+          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
+        } else {
+          zoomAtPoint(targetZoomLevel, lastClientX, lastClientY, false);
+          wheelRafRef.current = null;
+        }
       } else {
-        zoomAtPoint(targetZoomLevel, lastClientX, lastClientY, false);
-        wheelRafRef.current = null;
+        // Smooth scroll damping (vertical & horizontal pan)
+        const currentPanX = panRef.current.x;
+        const currentPanY = panRef.current.y;
+        const diffX = targetPanX - currentPanX;
+        const diffY = targetPanY - currentPanY;
+
+        if (Math.abs(diffX) > 0.4 || Math.abs(diffY) > 0.4) {
+          const nextPx = currentPanX + diffX * 0.22;
+          const nextPy = currentPanY + diffY * 0.22;
+          panRef.current = { x: nextPx, y: nextPy };
+          setPan({ x: nextPx, y: nextPy });
+          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
+        } else {
+          panRef.current = { x: targetPanX, y: targetPanY };
+          setPan({ x: targetPanX, y: targetPanY });
+          wheelRafRef.current = null;
+        }
       }
     };
 
     const onNativeWheel = (e: WheelEvent) => {
       e.preventDefault();
 
-      if (e.shiftKey) {
-        // Shift + Wheel = Horizontal pan
-        if (animFrameRef.current) {
-          cancelAnimationFrame(animFrameRef.current);
-          animFrameRef.current = null;
-        }
-        if (wheelRafRef.current) {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        // Smooth Zoom mode (Ctrl + Wheel)
+        if (!isZoomingMode && wheelRafRef.current) {
           cancelAnimationFrame(wheelRafRef.current);
           wheelRafRef.current = null;
         }
-        const scrollDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-        const nextPanX = panRef.current.x - scrollDelta * 0.8;
-        panRef.current = { ...panRef.current, x: nextPanX };
-        setPan((prev) => ({ ...prev, x: nextPanX }));
-      } else {
-        // Track mouse position for anchor
+        isZoomingMode = true;
         lastClientX = e.clientX;
         lastClientY = e.clientY;
 
-        // If user started wheeling from a fresh state, sync target to current
         if (wheelRafRef.current === null) {
           targetZoomLevel = zoomRef.current;
         }
@@ -283,11 +307,52 @@ export const MapView: React.FC<MapViewProps> = ({
         // Proportional exponential zoom per wheel notch (smooth Google Maps feeling)
         const delta = Math.max(-100, Math.min(100, e.deltaY));
         const factor = Math.exp(-delta * 0.0016);
-
         targetZoomLevel = Math.max(0.2, Math.min(5.0, targetZoomLevel * factor));
 
         if (!wheelRafRef.current) {
-          wheelRafRef.current = requestAnimationFrame(updateSmoothWheelZoom);
+          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
+        }
+      } else if (e.shiftKey) {
+        // Shift + Wheel = Smooth horizontal pan
+        if (isZoomingMode && wheelRafRef.current) {
+          cancelAnimationFrame(wheelRafRef.current);
+          wheelRafRef.current = null;
+        }
+        isZoomingMode = false;
+
+        if (wheelRafRef.current === null) {
+          targetPanX = panRef.current.x;
+          targetPanY = panRef.current.y;
+        }
+
+        const scrollDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        const clampedDelta = Math.max(-200, Math.min(200, scrollDelta));
+        targetPanX -= clampedDelta * 0.9;
+
+        if (!wheelRafRef.current) {
+          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
+        }
+      } else {
+        // Standard Wheel = Smooth 2D pan (vertical deltaY & horizontal deltaX)
+        if (isZoomingMode && wheelRafRef.current) {
+          cancelAnimationFrame(wheelRafRef.current);
+          wheelRafRef.current = null;
+        }
+        isZoomingMode = false;
+
+        if (wheelRafRef.current === null) {
+          targetPanX = panRef.current.x;
+          targetPanY = panRef.current.y;
+        }
+
+        const clampedDeltaX = Math.max(-200, Math.min(200, e.deltaX));
+        const clampedDeltaY = Math.max(-200, Math.min(200, e.deltaY));
+
+        targetPanX -= clampedDeltaX * 0.9;
+        targetPanY -= clampedDeltaY * 0.9;
+
+        if (!wheelRafRef.current) {
+          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
         }
       }
     };
@@ -404,7 +469,7 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   };
 
-  // Handle click on Map Image to add pin
+  // Handle click on Map Image to add pin (automatically creates a Location Card)
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (hasDragged) {
       setHasDragged(false);
@@ -426,24 +491,51 @@ export const MapView: React.FC<MapViewProps> = ({
     const percentX = Math.min(100, Math.max(0, (clickX / rect.width) * 100));
     const percentY = Math.min(100, Math.max(0, (clickY / rect.height) * 100));
 
+    const now = Date.now();
+    const newCardId = `card_${now}_${Math.random().toString(36).substr(2, 6)}`;
+    const defaultTitle = language === 'en' ? 'New Location' : 'Lokasi Baru';
+
+    // 1. Create a corresponding WorldCard with Category 'location'
+    const newCard: WorldCard = {
+      id: newCardId,
+      title: defaultTitle,
+      subtitle: '',
+      category: 'location',
+      summary: '',
+      content: '',
+      tags: [],
+      attributes: [],
+      x: 300,
+      y: 300,
+      canvasId: undefined,
+      canvasIds: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // 2. Create the MapPin linked to the new Location Card
     const newPin: MapPin = {
-      id: `pin_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      title: t.map.pinTitlePlaceholder,
+      id: `pin_${now}_${Math.random().toString(36).substr(2, 5)}`,
+      title: defaultTitle,
       description: '',
+      cardId: newCardId,
       x: Math.round(percentX * 10) / 10,
       y: Math.round(percentY * 10) / 10,
       color: '#0d99ff',
     };
 
+    if (onAddCard) {
+      onAddCard(newCard);
+    }
+
     const updatedPins = [...currentMap.pins, newPin];
     onSaveMap({
       ...currentMap,
       pins: updatedPins,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
 
     setSelectedPinId(newPin.id);
-    setEditingPin(newPin);
     setIsAddPinMode(false);
   };
 
@@ -469,15 +561,30 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   };
 
-  // Update Pin
+  // Update Pin & Synchronize linked card
   const handleSavePin = (updatedPin: MapPin) => {
     if (!currentMap) return;
+    const now = Date.now();
     const newPins = currentMap.pins.map((p) => (p.id === updatedPin.id ? updatedPin : p));
     onSaveMap({
       ...currentMap,
       pins: newPins,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
+
+    // Synchronize title/description with linked card
+    if (updatedPin.cardId && onUpdateCard) {
+      const linkedCard = cards.find((c) => c.id === updatedPin.cardId);
+      if (linkedCard && (linkedCard.title !== updatedPin.title || linkedCard.summary !== updatedPin.description)) {
+        onUpdateCard({
+          ...linkedCard,
+          title: updatedPin.title,
+          summary: updatedPin.description || linkedCard.summary,
+          updatedAt: now,
+        });
+      }
+    }
+
     setEditingPin(null);
   };
 
@@ -531,6 +638,7 @@ export const MapView: React.FC<MapViewProps> = ({
       if (Math.abs(newPanX - pan.x) > 3 || Math.abs(newPanY - pan.y) > 3) {
         setHasDragged(true);
       }
+      panRef.current = { x: newPanX, y: newPanY };
       setPan({ x: newPanX, y: newPanY });
       return;
     }
@@ -620,16 +728,51 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   };
 
-  // Create Pin at exact context menu position
+  // Create Pin at exact context menu position (auto-creates Location card if none provided)
   const handleAddPinAtPos = (posX: number, posY: number, cardId?: string) => {
     if (!currentMap) return;
-    const linkedCard = cardId ? cards.find((c) => c.id === cardId) : undefined;
+    const now = Date.now();
+
+    let finalCardId = cardId;
+    let pinTitle = language === 'en' ? 'New Location' : 'Lokasi Baru';
+    let pinDescription = '';
+
+    if (cardId) {
+      const linkedCard = cards.find((c) => c.id === cardId);
+      if (linkedCard) {
+        pinTitle = linkedCard.title;
+        pinDescription = linkedCard.summary || '';
+      }
+    } else {
+      // Automatically create a new Card with Category 'location'
+      finalCardId = `card_${now}_${Math.random().toString(36).substr(2, 6)}`;
+      const newCard: WorldCard = {
+        id: finalCardId,
+        title: pinTitle,
+        subtitle: '',
+        category: 'location',
+        summary: '',
+        content: '',
+        tags: [],
+        attributes: [],
+        x: 300,
+        y: 300,
+        canvasId: undefined,
+        canvasIds: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (onAddCard) {
+        onAddCard(newCard);
+      }
+    }
 
     const newPin: MapPin = {
-      id: `pin_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      title: linkedCard ? linkedCard.title : t.map.pinTitlePlaceholder,
-      description: linkedCard?.summary || '',
-      cardId: cardId,
+      id: `pin_${now}_${Math.random().toString(36).substr(2, 5)}`,
+      title: pinTitle,
+      description: pinDescription,
+      cardId: finalCardId,
       x: posX,
       y: posY,
       color: '#0d99ff',
@@ -639,13 +782,10 @@ export const MapView: React.FC<MapViewProps> = ({
     onSaveMap({
       ...currentMap,
       pins: updatedPins,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
 
     setSelectedPinId(newPin.id);
-    if (!cardId) {
-      setEditingPin(newPin);
-    }
   };
 
   // Center viewport on context menu coordinate
@@ -723,16 +863,6 @@ export const MapView: React.FC<MapViewProps> = ({
     const targetVisualScale = Math.max(1.0, Math.min(1.45, 0.95 + 0.15 * zoom));
     return targetVisualScale / zoom;
   }, [zoom]);
-
-  const selectedPin = useMemo(
-    () => currentMap?.pins.find((p) => p.id === selectedPinId) || null,
-    [currentMap, selectedPinId]
-  );
-
-  const selectedPinCard = useMemo(
-    () => (selectedPin?.cardId ? cards.find((c) => c.id === selectedPin.cardId) || null : null),
-    [selectedPin, cards]
-  );
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#181818] overflow-hidden select-none">
@@ -934,8 +1064,9 @@ export const MapView: React.FC<MapViewProps> = ({
                   const isSelected = selectedPinId === pin.id;
                   const pinColor = pin.color || '#0d99ff';
                   const baseScale = pinScale * (isSelected ? 1.25 : 1);
-
                   const isDragging = draggingPinId === pin.id;
+                  const linkedCard = pin.cardId ? cards.find((c) => c.id === pin.cardId) : undefined;
+                  const displayTitle = linkedCard ? linkedCard.title : pin.title;
 
                   return (
                     <div
@@ -951,6 +1082,9 @@ export const MapView: React.FC<MapViewProps> = ({
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedPinId(pin.id);
+                        if (pin.cardId) {
+                          onOpenCard(pin.cardId);
+                        }
                       }}
                       title={t.map.dragPinHint}
                       className={`map-pin-element absolute z-10 will-change-transform group select-none ${
@@ -982,8 +1116,8 @@ export const MapView: React.FC<MapViewProps> = ({
                         </div>
 
                         {/* Title Label below pin */}
-                        <div className="mt-1 bg-slate-950/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-xs border border-white/20 whitespace-nowrap max-w-[120px] truncate shadow-md">
-                          {pin.title}
+                        <div className="mt-1 bg-slate-950/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-xs border border-white/20 whitespace-nowrap max-w-[130px] truncate shadow-md">
+                          {displayTitle}
                         </div>
                       </div>
                     </div>
@@ -991,125 +1125,6 @@ export const MapView: React.FC<MapViewProps> = ({
                 })}
               </div>
             </div>
-
-            {/* PIN DRAWER / SIDEBAR DETAILS */}
-            {selectedPin && (
-              <div className="absolute right-4 top-4 bottom-4 w-80 bg-[#222222]/95 backdrop-blur-md border border-[#383838] rounded-2xl shadow-2xl flex flex-col z-30 overflow-hidden text-white animate-in slide-in-from-right-5 duration-200">
-                {/* Drawer Header */}
-                <div className="p-4 border-b border-[#383838] flex items-center justify-between bg-[#1e1e1e]">
-                  <div className="flex items-center gap-2">
-                    <div
-                      style={{ backgroundColor: selectedPin.color || '#0d99ff' }}
-                      className="w-4 h-4 rounded-full"
-                    />
-                    <h3 className="font-bold text-sm truncate max-w-[180px]">
-                      {selectedPin.title}
-                    </h3>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setEditingPin(selectedPin)}
-                      className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-[#383838] transition-colors"
-                      title={t.map.savePin}
-                    >
-                      <Icons.Edit3 size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePin(selectedPin.id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-[#383838] transition-colors"
-                      title={t.map.deletePin}
-                    >
-                      <Icons.Trash2 size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPinId(null)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#383838] transition-colors"
-                    >
-                      <Icons.X size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Drawer Body */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {/* Pin Description */}
-                  {selectedPin.description ? (
-                    <div className="text-xs text-slate-300 bg-[#1a1a1a] p-3 rounded-xl border border-[#323232] leading-relaxed whitespace-pre-wrap">
-                      {selectedPin.description}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-slate-500 italic">
-                      Tidak ada deskripsi pin.
-                    </div>
-                  )}
-
-                  {/* Linked Card Preview */}
-                  <div className="border-t border-[#383838] pt-3">
-                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                      <span>{t.map.linkedCard}</span>
-                    </div>
-
-                    {selectedPinCard ? (
-                      <div className="bg-[#1a1a1a] border border-[#383838] rounded-xl p-3 space-y-2">
-                        {selectedPinCard.imageUrl && (
-                          <img
-                            src={selectedPinCard.imageUrl}
-                            alt={selectedPinCard.title}
-                            className="w-full h-28 object-cover rounded-lg border border-[#323232]"
-                          />
-                        )}
-                        <div>
-                          <div className="flex items-center justify-between gap-2">
-                            <h4 className="font-bold text-sm text-white truncate">
-                              {selectedPinCard.title}
-                            </h4>
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[#0d99ff]/20 text-[#0d99ff] border border-[#0d99ff]/30 shrink-0">
-                              {getCategoryLabel(selectedPinCard.category)}
-                            </span>
-                          </div>
-                          {selectedPinCard.summary && (
-                            <p className="text-xs text-slate-300 mt-1 line-clamp-3 leading-snug">
-                              {selectedPinCard.summary}
-                            </p>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => onOpenCard(selectedPinCard.id)}
-                          className="w-full mt-2 py-1.5 px-3 rounded-lg bg-[#0d99ff] hover:bg-[#0088eb] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <Icons.ExternalLink size={13} />
-                          <span>{t.map.viewCard}</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-slate-400 bg-[#1a1a1a] p-3 rounded-xl border border-[#323232] text-center space-y-2">
-                        <p>{t.map.noLinkedCard}</p>
-                        <button
-                          type="button"
-                          onClick={() => setEditingPin(selectedPin)}
-                          className="text-xs text-[#0d99ff] underline hover:text-white font-medium cursor-pointer"
-                        >
-                          Hubungkan Kartu
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Drawer Footer */}
-                <div className="p-3 border-t border-[#383838] bg-[#1e1e1e] text-[11px] text-slate-400 flex items-center justify-between">
-                  <span>{t.map.dragPinHint}</span>
-                  <span className="font-mono text-slate-500">
-                    X: {selectedPin.x}% Y: {selectedPin.y}%
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -1121,7 +1136,7 @@ export const MapView: React.FC<MapViewProps> = ({
             <div className="flex items-center justify-between border-b border-[#383838] pb-3">
               <h3 className="font-bold text-base flex items-center gap-2 text-white">
                 <Icons.MapPin size={18} className="text-[#0d99ff]" />
-                <span>Edit Pin</span>
+                <span>Pengaturan Pin</span>
               </h3>
               <button
                 type="button"
@@ -1165,9 +1180,16 @@ export const MapView: React.FC<MapViewProps> = ({
                 </label>
                 <select
                   value={editingPin.cardId || ''}
-                  onChange={(e) =>
-                    setEditingPin({ ...editingPin, cardId: e.target.value || undefined })
-                  }
+                  onChange={(e) => {
+                    const nextCardId = e.target.value || undefined;
+                    const selectedCard = nextCardId ? cards.find((c) => c.id === nextCardId) : undefined;
+                    setEditingPin({
+                      ...editingPin,
+                      cardId: nextCardId,
+                      title: selectedCard ? selectedCard.title : editingPin.title,
+                      description: selectedCard?.summary || editingPin.description,
+                    });
+                  }}
                   className="w-full bg-[#181818] border border-[#383838] focus:border-[#0d99ff] rounded-xl px-3 py-2 text-white outline-none cursor-pointer"
                 >
                   <option value="">-- {t.map.noLinkedCard} --</option>
@@ -1203,14 +1225,14 @@ export const MapView: React.FC<MapViewProps> = ({
               <button
                 type="button"
                 onClick={() => setEditingPin(null)}
-                className="px-4 py-2 rounded-xl bg-[#181818] hover:bg-[#383838] text-slate-300 text-xs font-semibold"
+                className="px-4 py-2 rounded-xl bg-[#181818] hover:bg-[#383838] text-slate-300 text-xs font-semibold cursor-pointer"
               >
                 {t.map.cancel}
               </button>
               <button
                 type="button"
                 onClick={() => handleSavePin(editingPin)}
-                className="px-4 py-2 rounded-xl bg-[#0d99ff] hover:bg-[#0088eb] text-white text-xs font-bold"
+                className="px-4 py-2 rounded-xl bg-[#0d99ff] hover:bg-[#0088eb] text-white text-xs font-bold cursor-pointer"
               >
                 {t.map.savePin}
               </button>
@@ -1244,22 +1266,38 @@ export const MapView: React.FC<MapViewProps> = ({
                     style={{ backgroundColor: pin.color || '#0d99ff' }}
                     className="w-2.5 h-2.5 rounded-full shrink-0"
                   />
-                  <span className="truncate">{pin.title}</span>
+                  <span className="truncate">{linkedCard ? linkedCard.title : pin.title}</span>
                 </div>
 
                 {/* Buka Kartu Terkait */}
                 {linkedCard && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenCard(linkedCard.id);
-                      setContextMenu((prev) => ({ ...prev, visible: false }));
-                    }}
-                    className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-white font-semibold cursor-pointer"
-                  >
-                    <Icons.ExternalLink size={14} className="text-[#0d99ff]" />
-                    <span className="truncate">{t.map.viewCard}: {linkedCard.title}</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onOpenCard(linkedCard.id);
+                        setContextMenu((prev) => ({ ...prev, visible: false }));
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-white font-semibold cursor-pointer"
+                    >
+                      <Icons.BookOpen size={14} className="text-[#0d99ff]" />
+                      <span className="truncate">{t.map.viewCard}: {linkedCard.title}</span>
+                    </button>
+
+                    {onEditCard && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onEditCard(linkedCard);
+                          setContextMenu((prev) => ({ ...prev, visible: false }));
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-200 cursor-pointer"
+                      >
+                        <Icons.Edit3 size={14} className="text-amber-400" />
+                        <span>Edit Kartu</span>
+                      </button>
+                    )}
+                  </>
                 )}
 
                 {/* Edit Pin */}
@@ -1271,8 +1309,8 @@ export const MapView: React.FC<MapViewProps> = ({
                   }}
                   className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-200 cursor-pointer"
                 >
-                  <Icons.Edit3 size={14} className="text-amber-400" />
-                  <span>{t.map.editPin}</span>
+                  <Icons.Sliders size={14} className="text-slate-400" />
+                  <span>Pengaturan Pin</span>
                 </button>
 
                 {/* Quick Color Palette */}
