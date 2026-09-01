@@ -768,13 +768,38 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   };
 
+  // Filter out any orphan pins where the linked card has been deleted
+  const validPins = useMemo(() => {
+    if (!currentMap) return [];
+    return currentMap.pins.filter((pin) => {
+      if (pin.cardId) {
+        return cards.some((c) => c.id === pin.cardId);
+      }
+      return true;
+    });
+  }, [currentMap, cards]);
+
+  // Auto-sync & persist pin cleanup if any linked card was deleted
+  useEffect(() => {
+    if (!currentMap) return;
+    const hasOrphans = currentMap.pins.some((pin) => pin.cardId && !cards.some((c) => c.id === pin.cardId));
+    if (hasOrphans) {
+      const cleanedPins = currentMap.pins.filter((pin) => !pin.cardId || cards.some((c) => c.id === pin.cardId));
+      onSaveMap({
+        ...currentMap,
+        pins: cleanedPins,
+        updatedAt: Date.now(),
+      });
+    }
+  }, [currentMap, cards, onSaveMap]);
+
   // Filtered pins based on search query
   const filteredPins = useMemo(() => {
-    if (!currentMap) return [];
-    if (!searchQuery.trim()) return currentMap.pins;
+    if (!validPins.length) return [];
+    if (!searchQuery.trim()) return validPins;
 
     const q = searchQuery.toLowerCase();
-    return currentMap.pins.filter((pin) => {
+    return validPins.filter((pin) => {
       const titleMatch = pin.title.toLowerCase().includes(q);
       const descMatch = (pin.description || '').toLowerCase().includes(q);
       const linkedCard = cards.find((c) => c.id === pin.cardId);
@@ -784,7 +809,7 @@ export const MapView: React.FC<MapViewProps> = ({
         : false;
       return titleMatch || descMatch || cardMatch;
     });
-  }, [currentMap, searchQuery, cards]);
+  }, [validPins, searchQuery, cards]);
 
   // Dynamic pin scaling: pins counter-scale with zoom so they remain readable without becoming excessively tiny or overwhelmingly huge
   const pinScale = useMemo(() => {
@@ -812,11 +837,14 @@ export const MapView: React.FC<MapViewProps> = ({
                 onChange={(e) => setSelectedMapId(e.target.value)}
                 className="bg-[#1e1e1e] hover:bg-[#2c2c2c] border border-[#383838] hover:border-[#0d99ff] text-xs font-semibold text-white px-3 py-1.5 pr-8 rounded-lg outline-none cursor-pointer transition-all appearance-none"
               >
-                {worldMaps.map((map) => (
-                  <option key={map.id} value={map.id}>
-                    {map.name} ({map.pins.length} {t.map.pinsCount})
-                  </option>
-                ))}
+                {worldMaps.map((map) => {
+                  const count = map.pins.filter((p) => !p.cardId || cards.some((c) => c.id === p.cardId)).length;
+                  return (
+                    <option key={map.id} value={map.id}>
+                      {map.name} ({count} {t.map.pinsCount})
+                    </option>
+                  );
+                })}
               </select>
               <Icons.ChevronDown size={14} className="absolute right-2.5 text-slate-400 pointer-events-none" />
             </div>

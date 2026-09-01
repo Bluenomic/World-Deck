@@ -988,6 +988,10 @@ export const App: React.FC = () => {
       connections: prev.connections.filter(
         (conn) => !deleteIds.includes(conn.sourceId) && !deleteIds.includes(conn.targetId)
       ),
+      worldMaps: (prev.worldMaps || []).map((m) => ({
+        ...m,
+        pins: m.pins.filter((p) => !p.cardId || !deleteIds.includes(p.cardId)),
+      })),
     }));
 
     if (selectedCardId && deleteIds.includes(selectedCardId)) {
@@ -1013,6 +1017,10 @@ export const App: React.FC = () => {
       connections: prev.connections.filter(
         (conn) => conn.sourceId !== cardId && conn.targetId !== cardId
       ),
+      worldMaps: (prev.worldMaps || []).map((m) => ({
+        ...m,
+        pins: m.pins.filter((p) => !p.cardId || p.cardId !== cardId),
+      })),
     }));
     if (selectedCardId === cardId) {
       setSelectedCardId(null);
