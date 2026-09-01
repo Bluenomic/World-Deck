@@ -350,7 +350,13 @@ export const App: React.FC = () => {
       }
 
       if (!('showDirectoryPicker' in window)) {
-        alert('Browser Anda tidak mendukung File System Access API. Silakan gunakan Chrome, Edge, atau Opera.');
+        showAlertModal(
+          language === 'en' ? 'Browser Unsupported' : 'Browser Tidak Didukung',
+          language === 'en'
+            ? 'Your browser does not support the File System Access API. Please use Chrome, Edge, or Opera.'
+            : 'Browser Anda tidak mendukung File System Access API. Silakan gunakan Chrome, Edge, atau Opera.',
+          'warning'
+        );
         return;
       }
 
@@ -379,7 +385,13 @@ export const App: React.FC = () => {
     } catch (err: any) {
       isSwitchingFolderRef.current = false;
       if (err.name !== 'AbortError') {
-        alert('Gagal membuka direktori folder workspace.');
+        showAlertModal(
+          language === 'en' ? 'Failed to Open Folder' : 'Gagal Membuka Folder',
+          language === 'en'
+            ? 'Could not open the selected workspace folder directory.'
+            : 'Gagal membuka direktori folder workspace.',
+          'danger'
+        );
       }
     }
   };

@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import type { WorldMap, MapPin, WorldCard } from '../types';
 import * as Icons from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
+import { ConfirmModal } from './ConfirmModal';
+import type { ConfirmModalConfig } from './ConfirmModal';
 
 interface MapViewProps {
   worldMaps: WorldMap[];
@@ -35,6 +37,8 @@ export const MapView: React.FC<MapViewProps> = ({
 }) => {
   const { language, t, getCategoryLabel } = useLanguage();
   
+  const [confirmModalConfig, setConfirmModalConfig] = useState<ConfirmModalConfig | null>(null);
+
   const [selectedMapId, setSelectedMapId] = useState<string | null>(() => 
     worldMaps.length > 0 ? worldMaps[0].id : null
   );
@@ -464,9 +468,19 @@ export const MapView: React.FC<MapViewProps> = ({
   // Delete Map
   const handleDeleteCurrentMap = () => {
     if (!currentMap) return;
-    if (window.confirm(t.map.deleteMapConfirm)) {
-      onDeleteMap(currentMap.id);
-    }
+    setConfirmModalConfig({
+      isOpen: true,
+      title: t.map.deleteMap,
+      description: `${t.map.deleteMapConfirm} ("${currentMap.name}")`,
+      confirmLabel: t.common.delete || (language === 'en' ? 'Delete' : 'Hapus'),
+      cancelLabel: t.common.cancel || (language === 'en' ? 'Cancel' : 'Batal'),
+      variant: 'danger',
+      onConfirm: () => {
+        onDeleteMap(currentMap.id);
+        setConfirmModalConfig(null);
+      },
+      onCancel: () => setConfirmModalConfig(null),
+    });
   };
 
   // Handle click on Map Image to add pin (triggers card creation modal)
@@ -552,16 +566,29 @@ export const MapView: React.FC<MapViewProps> = ({
   // Delete Pin
   const handleDeletePin = (pinId: string) => {
     if (!currentMap) return;
-    if (window.confirm(t.map.deletePinConfirm)) {
-      const newPins = currentMap.pins.filter((p) => p.id !== pinId);
-      onSaveMap({
-        ...currentMap,
-        pins: newPins,
-        updatedAt: Date.now(),
-      });
-      if (selectedPinId === pinId) setSelectedPinId(null);
-      if (editingPin?.id === pinId) setEditingPin(null);
-    }
+    const targetPin = currentMap.pins.find((p) => p.id === pinId);
+    const pinName = targetPin?.title || (language === 'en' ? 'this pin' : 'pin ini');
+
+    setConfirmModalConfig({
+      isOpen: true,
+      title: t.map.deletePin,
+      description: `${t.map.deletePinConfirm} ("${pinName}")`,
+      confirmLabel: t.common.delete || (language === 'en' ? 'Delete' : 'Hapus'),
+      cancelLabel: t.common.cancel || (language === 'en' ? 'Cancel' : 'Batal'),
+      variant: 'danger',
+      onConfirm: () => {
+        const newPins = currentMap.pins.filter((p) => p.id !== pinId);
+        onSaveMap({
+          ...currentMap,
+          pins: newPins,
+          updatedAt: Date.now(),
+        });
+        if (selectedPinId === pinId) setSelectedPinId(null);
+        if (editingPin?.id === pinId) setEditingPin(null);
+        setConfirmModalConfig(null);
+      },
+      onCancel: () => setConfirmModalConfig(null),
+    });
   };
 
   // Drag pin handlers
@@ -1544,6 +1571,12 @@ export const MapView: React.FC<MapViewProps> = ({
           </form>
         </div>
       )}
+
+      {/* CUSTOM CONFIRMATION & ALERT MODAL */}
+      <ConfirmModal
+        config={confirmModalConfig}
+        onClose={() => setConfirmModalConfig(null)}
+      />
     </div>
   );
 };
