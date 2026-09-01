@@ -11,7 +11,6 @@ interface MapViewProps {
   onSaveMap: (map: WorldMap) => void;
   onDeleteMap: (mapId: string) => void;
   onOpenCard: (cardId: string) => void;
-  onUpdateCard?: (card: WorldCard) => void;
   onEditCard?: (card: WorldCard) => void;
   onCreatePinCard?: (mapId: string, x: number, y: number) => void;
 }
@@ -31,7 +30,6 @@ export const MapView: React.FC<MapViewProps> = ({
   onSaveMap,
   onDeleteMap,
   onOpenCard,
-  onUpdateCard,
   onEditCard,
   onCreatePinCard,
 }) => {
@@ -63,7 +61,6 @@ export const MapView: React.FC<MapViewProps> = ({
   const [isAddPinMode, setIsAddPinMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
-  const [editingPin, setEditingPin] = useState<MapPin | null>(null);
 
   // Pan & Zoom state
   const [zoom, setZoom] = useState(1);
@@ -145,7 +142,6 @@ export const MapView: React.FC<MapViewProps> = ({
     setZoom(1);
     setPan({ x: 0, y: 0 });
     setSelectedPinId(null);
-    setEditingPin(null);
     setIsAddPinMode(false);
     setHasDragged(false);
   }, [selectedMapId]);
@@ -536,33 +532,6 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   };
 
-  // Update Pin & Synchronize linked card
-  const handleSavePin = (updatedPin: MapPin) => {
-    if (!currentMap) return;
-    const now = Date.now();
-    const newPins = currentMap.pins.map((p) => (p.id === updatedPin.id ? updatedPin : p));
-    onSaveMap({
-      ...currentMap,
-      pins: newPins,
-      updatedAt: now,
-    });
-
-    // Synchronize title/description with linked card
-    if (updatedPin.cardId && onUpdateCard) {
-      const linkedCard = cards.find((c) => c.id === updatedPin.cardId);
-      if (linkedCard && (linkedCard.title !== updatedPin.title || linkedCard.summary !== updatedPin.description)) {
-        onUpdateCard({
-          ...linkedCard,
-          title: updatedPin.title,
-          summary: updatedPin.description || linkedCard.summary,
-          updatedAt: now,
-        });
-      }
-    }
-
-    setEditingPin(null);
-  };
-
   // Delete Pin
   const handleDeletePin = (pinId: string) => {
     if (!currentMap) return;
@@ -584,7 +553,6 @@ export const MapView: React.FC<MapViewProps> = ({
           updatedAt: Date.now(),
         });
         if (selectedPinId === pinId) setSelectedPinId(null);
-        if (editingPin?.id === pinId) setEditingPin(null);
         setConfirmModalConfig(null);
       },
       onCancel: () => setConfirmModalConfig(null),
@@ -1096,118 +1064,6 @@ export const MapView: React.FC<MapViewProps> = ({
         )}
       </div>
 
-      {/* EDIT PIN MODAL */}
-      {editingPin && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none">
-          <div className="bg-[#222222] border border-[#383838] rounded-2xl max-w-md w-full p-5 text-white shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#383838] pb-3">
-              <h3 className="font-bold text-base flex items-center gap-2 text-white">
-                <Icons.MapPin size={18} className="text-[#0d99ff]" />
-                <span>Pengaturan Pin</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setEditingPin(null)}
-                className="text-slate-400 hover:text-white"
-              >
-                <Icons.X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  {t.map.pinTitle}
-                </label>
-                <input
-                  type="text"
-                  value={editingPin.title}
-                  onChange={(e) => setEditingPin({ ...editingPin, title: e.target.value })}
-                  placeholder={t.map.pinTitlePlaceholder}
-                  className="w-full bg-[#181818] border border-[#383838] focus:border-[#0d99ff] rounded-xl px-3 py-2 text-white outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  {t.map.pinDescription}
-                </label>
-                <textarea
-                  value={editingPin.description || ''}
-                  onChange={(e) => setEditingPin({ ...editingPin, description: e.target.value })}
-                  placeholder={t.map.pinDescriptionPlaceholder}
-                  rows={3}
-                  className="w-full bg-[#181818] border border-[#383838] focus:border-[#0d99ff] rounded-xl px-3 py-2 text-white outline-none resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  {t.map.linkedCard}
-                </label>
-                <select
-                  value={editingPin.cardId || ''}
-                  onChange={(e) => {
-                    const nextCardId = e.target.value || undefined;
-                    const selectedCard = nextCardId ? cards.find((c) => c.id === nextCardId) : undefined;
-                    setEditingPin({
-                      ...editingPin,
-                      cardId: nextCardId,
-                      title: selectedCard ? selectedCard.title : editingPin.title,
-                      description: selectedCard?.summary || editingPin.description,
-                    });
-                  }}
-                  className="w-full bg-[#181818] border border-[#383838] focus:border-[#0d99ff] rounded-xl px-3 py-2 text-white outline-none cursor-pointer"
-                >
-                  <option value="">-- {t.map.noLinkedCard} --</option>
-                  {cards.map((card) => (
-                    <option key={card.id} value={card.id}>
-                      [{getCategoryLabel(card.category)}] {card.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Color Accent</label>
-                <div className="flex items-center gap-2">
-                  {PIN_COLORS.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      onClick={() => setEditingPin({ ...editingPin, color: c.value })}
-                      style={{ backgroundColor: c.value }}
-                      className={`w-6 h-6 rounded-full border-2 transition-transform cursor-pointer ${
-                        (editingPin.color || '#0d99ff') === c.value
-                          ? 'border-white scale-110 shadow-md'
-                          : 'border-transparent opacity-80 hover:opacity-100'
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#383838]">
-              <button
-                type="button"
-                onClick={() => setEditingPin(null)}
-                className="px-4 py-2 rounded-xl bg-[#181818] hover:bg-[#383838] text-slate-300 text-xs font-semibold cursor-pointer"
-              >
-                {t.map.cancel}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSavePin(editingPin)}
-                className="px-4 py-2 rounded-xl bg-[#0d99ff] hover:bg-[#0088eb] text-white text-xs font-bold cursor-pointer"
-              >
-                {t.map.savePin}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* CONTEXT MENU */}
       {contextMenu.visible && (
         <div
@@ -1266,19 +1122,6 @@ export const MapView: React.FC<MapViewProps> = ({
                     )}
                   </>
                 )}
-
-                {/* Edit Pin */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingPin(pin);
-                    setContextMenu((prev) => ({ ...prev, visible: false }));
-                  }}
-                  className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-200 cursor-pointer"
-                >
-                  <Icons.Sliders size={14} className="text-slate-400" />
-                  <span>Pengaturan Pin</span>
-                </button>
 
                 {/* Quick Color Palette */}
                 <div className="px-3 py-1.5 flex items-center gap-1.5">

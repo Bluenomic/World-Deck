@@ -1556,13 +1556,6 @@ export const App: React.FC = () => {
               onSaveMap={handleSaveMap}
               onDeleteMap={handleDeleteMap}
               onOpenCard={(cardId) => setReaderCardId(cardId)}
-              onUpdateCard={(updatedCard) => {
-                updateActiveWorld((prev) => ({
-                  ...prev,
-                  updatedAt: Date.now(),
-                  cards: prev.cards.map((c) => (c.id === updatedCard.id ? updatedCard : c)),
-                }));
-              }}
               onEditCard={(card) => setEditingCard(card)}
               onCreatePinCard={handleCreateLocationPinCard}
             />
