@@ -1,4 +1,6 @@
-@import url('https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Minimalist 2-Theme System: Dark & Light */
 :root {
@@ -594,3 +596,5 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 
+
+[data-broken-reference] { text-decoration: underline wavy #f59e0b; cursor: help; }

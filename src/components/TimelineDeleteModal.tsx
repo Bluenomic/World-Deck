@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 export type DeleteTargetType = 'node' | 'track' | 'branch' | 'clear_all';
 

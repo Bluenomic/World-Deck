@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ViewMode, AppTheme } from '../types';
-import * as Icons from 'lucide-react';
-import { useLanguage } from '../i18n/LanguageContext';
+import * as Icons from '../utils/icons';
+import { useLanguage } from '../i18n/useLanguage';
 import {
   isTauriAvailable,
   minimizeTauriWindow,
@@ -23,6 +23,7 @@ interface NavbarProps {
   onOpenWorldManager: () => void;
   localDirectoryName: string | null;
   onChangeDirectory: () => void;
+  beforeClose?: () => Promise<boolean>;
 }
 
 const VIEW_TABS: { id: ViewMode; labelKey: 'canvas' | 'library' | 'timeline' | 'documents' | 'map'; icon: any }[] = [
@@ -46,6 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenWorldManager,
   localDirectoryName,
   onChangeDirectory,
+  beforeClose,
 }) => {
   const { language, setLanguage, t } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -84,7 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleClose = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    await closeTauriWindow();
+    if (!beforeClose || await beforeClose()) await closeTauriWindow();
   };
 
   const handleHeaderDoubleClick = (e: React.MouseEvent<HTMLElement>) => {
@@ -143,7 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             data-tauri-drag-region={false}
             onClick={onChangeDirectory}
             className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1e1e1e] hover:bg-[#383838] border border-[#383838] hover:border-[#0d99ff] text-slate-300 hover:text-white text-[11px] font-mono transition-all cursor-pointer shadow-xs"
-            title="Ganti Folder Workspace"
+            title={language === "en" ? "Change workspace folder" : "Ganti folder workspace"}
           >
             <Icons.Folder size={13} className="text-[#0d99ff]" />
             <span className="truncate max-w-[150px] font-bold">{localDirectoryName}</span>
@@ -394,7 +396,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               data-tauri-drag-region={false}
               onClick={handleMinimize}
               className="w-12 h-full flex items-center justify-center hover:bg-[#383838] active:bg-[#484848] text-slate-300 hover:text-white transition-colors cursor-pointer outline-none"
-              title="Minimize Window"
+              title={language === "en" ? "Minimize Window" : "Minimalkan jendela"}
             >
               <Icons.Minus size={16} className="stroke-[2.5]" />
             </button>
@@ -404,7 +406,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               data-tauri-drag-region={false}
               onClick={handleMaximize}
               className="w-12 h-full flex items-center justify-center hover:bg-[#383838] active:bg-[#484848] text-slate-300 hover:text-white transition-colors cursor-pointer outline-none"
-              title={isMaximized ? "Restore Window" : "Maximize Window"}
+              title={language === "en" ? (isMaximized ? "Restore Window" : "Maximize Window") : (isMaximized ? "Pulihkan jendela" : "Maksimalkan jendela")}
             >
               {isMaximized ? (
                 <Icons.Copy size={13} className="rotate-180 stroke-[2.2]" />
@@ -418,7 +420,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               data-tauri-drag-region={false}
               onClick={handleClose}
               className="w-12 h-full flex items-center justify-center hover:bg-[#e81123] active:bg-[#c40e1e] text-slate-300 hover:text-white transition-colors cursor-pointer outline-none"
-              title="Close Application"
+              title={language === "en" ? "Close Application" : "Tutup aplikasi"}
             >
               <Icons.X size={16} className="stroke-[2.5]" />
             </button>

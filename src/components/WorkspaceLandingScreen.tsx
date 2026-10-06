@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 interface WorkspaceLandingScreenProps {
   selectedWorkspacePath: string | null;

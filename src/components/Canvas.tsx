@@ -1,11 +1,12 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import type { WorldCard, WorldDeck, CardConnection, CardCategory } from '../types';
 import { WorldCardNode } from './WorldCardNode';
 import { AddCardFromGalleryModal } from './AddCardFromGalleryModal';
 import { getBezierPath } from '../utils/helpers';
 import { loadCanvasViewport, saveCanvasViewport } from '../utils/storage';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useStableEvent } from '../utils/useStableEvent';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 interface CanvasProps {
   cards: WorldCard[];
@@ -844,17 +845,49 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Track measured DOM heights for precise connection line anchoring
   const cardHeightsRef = useRef<Map<string, number>>(new Map());
 
+  const [viewport, setViewport] = useState({width: window.innerWidth, height: window.innerHeight});
+  useEffect(() => {
+    const element = containerRef.current; if (!element) return;
+    const observer = new ResizeObserver(([entry]) => setViewport({width: entry.contentRect.width, height: entry.contentRect.height}));
+    observer.observe(element); return () => observer.disconnect();
+  }, []);
+  const cardById = useMemo(() => new Map(cards.map(card => [card.id, card])), [cards]);
+  const connectionCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const connection of connections) {
+      counts.set(connection.sourceId, (counts.get(connection.sourceId) || 0) + 1);
+      if (connection.targetId !== connection.sourceId) counts.set(connection.targetId, (counts.get(connection.targetId) || 0) + 1);
+    }
+    return counts;
+  }, [connections]);
+  const bounds = {left: (-pan.x - 200) / zoom, top: (-pan.y - 200) / zoom,
+    right: (viewport.width - pan.x + 200) / zoom, bottom: (viewport.height - pan.y + 200) / zoom};
+  const visibleCards = useMemo(() => cards.filter(card => {
+    if (card.id === selectedCardId || selectedCardIds.includes(card.id) || card.id === connectingSourceId || localDragPositions[card.id]) return true;
+    const height = cardHeightsRef.current.get(card.id) || card.height || 400;
+    return card.x <= bounds.right && card.x + (card.width || 288) >= bounds.left && card.y <= bounds.bottom && card.y + height >= bounds.top;
+  }), [cards, selectedCardId, selectedCardIds, connectingSourceId, localDragPositions, bounds.left, bounds.top, bounds.right, bounds.bottom]);
+  const selectCard = useStableEvent(handleCardSelect);
+  const startConnection = useStableEvent(handleStartConnection);
+  const measureCard = useCallback((id: string, height: number) => { cardHeightsRef.current.set(id, height); }, []);
+
   // Render SVG Connections
   const renderConnections = () => {
     return connections.map((conn) => {
-      const sourceCard = cards.find((c) => c.id === conn.sourceId);
-      const targetCard = cards.find((c) => c.id === conn.targetId);
+      const sourceCard = cardById.get(conn.sourceId);
+      const targetCard = cardById.get(conn.targetId);
 
       if (!sourceCard || !targetCard) return null;
 
       const sourcePos = localDragPositions[sourceCard.id] || { x: sourceCard.x, y: sourceCard.y };
       const targetPos = localDragPositions[targetCard.id] || { x: targetCard.x, y: targetCard.y };
 
+      // The Bezier control points stay inside this conservative expanded bounding box.
+      if (!selectedConnectionIds.includes(conn.id) &&
+        (Math.max(sourcePos.x + (sourceCard.width || 288), targetPos.x + (targetCard.width || 288)) + 200 < bounds.left ||
+         Math.min(sourcePos.x, targetPos.x) - 200 > bounds.right ||
+         Math.max(sourcePos.y + (cardHeightsRef.current.get(sourceCard.id) || sourceCard.height || 400), targetPos.y + (cardHeightsRef.current.get(targetCard.id) || targetCard.height || 400)) + 200 < bounds.top ||
+         Math.min(sourcePos.y, targetPos.y) - 200 > bounds.bottom)) return null;
       const sourceW = sourceCard.width || 288;
       const targetW = targetCard.width || 288;
       const sourceH = cardHeightsRef.current.get(sourceCard.id) || sourceCard.height || 180;
@@ -1048,6 +1081,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   return (
     <div
       ref={containerRef}
+      data-testid="world-canvas"
       className={`relative w-full h-full app-bg-main overflow-hidden select-none transition-colors ${
         isSpacePressed ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
       }`}
@@ -1147,10 +1181,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         </svg>
 
         {/* Card Nodes */}
-        {cards.map((card) => {
-          const connCount = connections.filter(
-            (c) => c.sourceId === card.id || c.targetId === card.id
-          ).length;
+        {visibleCards.map((card) => {
+          const connCount = connectionCounts.get(card.id) || 0;
 
           const q = searchQuery.trim().toLowerCase();
           const matchesCategory = selectedCategory === 'all' || card.category === selectedCategory;
@@ -1177,11 +1209,11 @@ export const Canvas: React.FC<CanvasProps> = ({
               isDimmed={isDimmed}
               isCategoryHighlighted={isCategoryHighlighted}
               zoom={zoom}
-              onSelect={handleCardSelect}
+              onSelect={selectCard}
               onDoubleClick={onDoubleClickCard}
-              onStartConnection={handleStartConnection}
+              onStartConnection={startConnection}
               connectionCount={connCount}
-              onMeasureHeight={(id, h) => cardHeightsRef.current.set(id, h)}
+              onMeasureHeight={measureCard}
               onUpdateDimensions={onUpdateCardDimensions}
               onUpdateImageHeight={onUpdateCardImageHeight}
               onAdjustImageFocalPointRequest={onAdjustImageFocalPointRequest}

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import type { WorldCard, WorldDeck, CardCategory } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 interface AddCardFromGalleryModalProps {
   isOpen: boolean;

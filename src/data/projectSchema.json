@@ -1,0 +1,200 @@
+{
+  "objects": {
+    "WorldProject": {
+      "id": "id",
+      "name": "string",
+      "description": "string?",
+      "author": "string?",
+      "version": "string?",
+      "schemaVersion": "schema?",
+      "cards": "WorldCard[]",
+      "connections": "CardConnection[]?",
+      "canvases": "WorldCanvas[]?",
+      "decks": "WorldDeck[]?",
+      "documents": "WorldDocument[]?",
+      "timelineTracks": "TimelineTrack[]?",
+      "timelineNodes": "TimelineNode[]?",
+      "timelineBranches": "TimelineBranch[]?",
+      "worldMaps": "WorldMap[]?",
+      "createdAt": "number",
+      "updatedAt": "number"
+    },
+    "WorldCard": {
+      "id": "id",
+      "title": "string",
+      "subtitle": "string?",
+      "category": "category",
+      "summary": "string",
+      "content": "string",
+      "imageUrl": "string?",
+      "imageHeight": "number?",
+      "imageFocalX": "percent?",
+      "imageFocalY": "percent?",
+      "images": "string[]?",
+      "tags": "string[]",
+      "attributes": "CustomAttribute[]",
+      "x": "number",
+      "y": "number",
+      "width": "positive?",
+      "height": "positive?",
+      "pinned": "boolean?",
+      "canvasId": "string?",
+      "canvasIds": "string[]?",
+      "canvasPositions": "CardPosition{}?",
+      "deckId": "string?",
+      "createdAt": "number",
+      "updatedAt": "number"
+    },
+    "CustomAttribute": {
+      "id": "id",
+      "key": "string",
+      "value": "string"
+    },
+    "CardPosition": {
+      "x": "number",
+      "y": "number"
+    },
+    "WorldCanvas": {
+      "id": "id",
+      "name": "string",
+      "createdAt": "number"
+    },
+    "WorldDeck": {
+      "id": "id",
+      "name": "string",
+      "description": "string?",
+      "color": "string?",
+      "cardIds": "string[]",
+      "createdAt": "number",
+      "updatedAt": "number"
+    },
+    "CardConnection": {
+      "id": "id",
+      "sourceId": "string",
+      "targetId": "string",
+      "label": "string",
+      "type": "relation?",
+      "direction": "direction?",
+      "description": "string?"
+    },
+    "WorldDocument": {
+      "id": "id",
+      "title": "string",
+      "content": "string",
+      "category": "documentCategory",
+      "summary": "string?",
+      "tags": "string[]?",
+      "associatedCardIds": "string[]?",
+      "createdAt": "number",
+      "updatedAt": "number"
+    },
+    "TimelineTrack": {
+      "id": "id",
+      "name": "string",
+      "order": "number"
+    },
+    "TimelineNode": {
+      "id": "id",
+      "trackId": "string",
+      "x": "number",
+      "title": "string",
+      "dateLabel": "string?",
+      "description": "string?",
+      "cardId": "string?",
+      "images": "string[]?",
+      "imageUrl": "string?"
+    },
+    "TimelineBranch": {
+      "id": "id",
+      "sourceTrackId": "string",
+      "sourceX": "number",
+      "sourceNodeId": "string?",
+      "targetTrackId": "string",
+      "targetX": "number",
+      "targetNodeId": "string?",
+      "label": "string?"
+    },
+    "MapPin": {
+      "id": "id",
+      "cardId": "string?",
+      "title": "string",
+      "description": "string?",
+      "x": "percent",
+      "y": "percent",
+      "color": "string?",
+      "icon": "string?",
+      "layerId": "string?",
+      "targetMapId": "string?",
+      "positions": "MapPosition[]?"
+    },
+    "MapPosition": {
+      "eventId": "string",
+      "x": "percent",
+      "y": "percent"
+    },
+    "MapLayer": {
+      "id": "id",
+      "name": "string",
+      "color": "string"
+    },
+    "MapShape": {
+      "id": "id",
+      "name": "string",
+      "kind": "shapeKind",
+      "points": "MapPoint[]",
+      "color": "string",
+      "layerId": "string?",
+      "factionId": "string?",
+      "fromEventId": "string?",
+      "untilEventId": "string?"
+    },
+    "MapPoint": {
+      "x": "percent",
+      "y": "percent"
+    },
+    "WorldMap": {
+      "id": "id",
+      "name": "string",
+      "imageUrl": "string",
+      "description": "string?",
+      "pins": "MapPin[]",
+      "createdAt": "number",
+      "updatedAt": "number",
+      "parentMapId": "string?",
+      "layers": "MapLayer[]?",
+      "shapes": "MapShape[]?"
+    }
+  },
+  "enums": {
+    "category": [
+      "character",
+      "faction",
+      "location",
+      "lore",
+      "timeline",
+      "item",
+      "realm"
+    ],
+    "relation": [
+      "ally",
+      "enemy",
+      "member",
+      "leader",
+      "located_in",
+      "creator",
+      "owner",
+      "caused_by",
+      "involved_in",
+      "custom"
+    ],
+    "direction": ["directed", "bidirectional", "undirected"],
+    "documentCategory": [
+      "story",
+      "note",
+      "chapter",
+      "world_guide",
+      "character_log"
+    ],
+    "shapeKind": ["route", "region"]
+  }
+}

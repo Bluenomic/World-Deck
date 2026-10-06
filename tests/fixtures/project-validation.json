@@ -1,0 +1,397 @@
+[
+  {
+    "name": "legacy",
+    "valid": true,
+    "project": {
+      "id": "fixture",
+      "name": "Fixture",
+      "description": "",
+      "version": "1",
+      "cards": [
+        {
+          "id": "card",
+          "title": "Harbor",
+          "category": "location",
+          "summary": "",
+          "content": "",
+          "tags": [],
+          "attributes": [],
+          "x": 0,
+          "y": 0,
+          "createdAt": 1,
+          "updatedAt": 1
+        }
+      ],
+      "connections": [],
+      "createdAt": 1,
+      "updatedAt": 1
+    }
+  },
+  {
+    "name": "future-version",
+    "valid": false,
+    "project": {
+      "id": "fixture",
+      "name": "Fixture",
+      "description": "",
+      "version": "1",
+      "cards": [
+        {
+          "id": "card",
+          "title": "Harbor",
+          "category": "location",
+          "summary": "",
+          "content": "",
+          "tags": [],
+          "attributes": [],
+          "x": 0,
+          "y": 0,
+          "createdAt": 1,
+          "updatedAt": 1
+        }
+      ],
+      "connections": [],
+      "createdAt": 1,
+      "updatedAt": 1,
+      "schemaVersion": 99
+    }
+  },
+  {
+    "name": "duplicate-card",
+    "valid": false,
+    "project": {
+      "id": "fixture",
+      "name": "Fixture",
+      "description": "",
+      "version": "1",
+      "cards": [
+        {
+          "id": "card",
+          "title": "Harbor",
+          "category": "location",
+          "summary": "",
+          "content": "",
+          "tags": [],
+          "attributes": [],
+          "x": 0,
+          "y": 0,
+          "createdAt": 1,
+          "updatedAt": 1
+        },
+        {
+          "id": "card",
+          "title": "Harbor",
+          "category": "location",
+          "summary": "",
+          "content": "",
+          "tags": [],
+          "attributes": [],
+          "x": 0,
+          "y": 0,
+          "createdAt": 1,
+          "updatedAt": 1
+        }
+      ],
+      "connections": [],
+      "createdAt": 1,
+      "updatedAt": 1
+    }
+  },
+  {
+    "name": "invalid-category",
+    "valid": false,
+    "project": {
+      "id": "fixture",
+      "name": "Fixture",
+      "description": "",
+      "version": "1",
+      "cards": [
+        {
+          "id": "card",
+          "title": "Harbor",
+          "category": "unknown",
+          "summary": "",
+          "content": "",
+          "tags": [],
+          "attributes": [],
+          "x": 0,
+          "y": 0,
+          "createdAt": 1,
+          "updatedAt": 1
+        }
+      ],
+      "connections": [],
+      "createdAt": 1,
+      "updatedAt": 1
+    }
+  },
+  {
+    "name": "broken-reference",
+    "valid": true,
+    "project": {
+      "id": "fixture",
+      "name": "Fixture",
+      "description": "",
+      "version": "1",
+      "cards": [
+        {
+          "id": "card",
+          "title": "Harbor",
+          "category": "location",
+          "summary": "",
+          "content": "",
+          "tags": [],
+          "attributes": [],
+          "x": 0,
+          "y": 0,
+          "createdAt": 1,
+          "updatedAt": 1
+        }
+      ],
+      "connections": [
+        {
+          "id": "relation",
+          "sourceId": "card",
+          "targetId": "missing",
+          "label": "Link"
+        }
+      ],
+      "createdAt": 1,
+      "updatedAt": 1
+    }
+  },
+  {
+    "name": "optional-null",
+    "valid": true,
+    "project": {
+      "id": "fixture",
+      "name": "Fixture",
+      "description": "",
+      "version": "1",
+      "cards": [
+        {
+          "id": "card",
+          "title": "Harbor",
+          "category": "location",
+          "summary": "",
+          "content": "",
+          "tags": [],
+          "attributes": [],
+          "x": 0,
+          "y": 0,
+          "createdAt": 1,
+          "updatedAt": 1,
+          "images": null,
+          "deckId": null
+        }
+      ],
+      "connections": [],
+      "createdAt": 1,
+      "updatedAt": 1
+    }
+  },
+  {
+    "name": "invalid-map-coordinate",
+    "valid": false,
+    "project": {
+      "id": "fixture",
+      "name": "Fixture",
+      "description": "",
+      "version": "1",
+      "cards": [
+        {
+          "id": "card",
+          "title": "Harbor",
+          "category": "location",
+          "summary": "",
+          "content": "",
+          "tags": [],
+          "attributes": [],
+          "x": 0,
+          "y": 0,
+          "createdAt": 1,
+          "updatedAt": 1
+        }
+      ],
+      "connections": [],
+      "createdAt": 1,
+      "updatedAt": 1,
+      "worldMaps": [
+        {
+          "id": "map",
+          "name": "Map",
+          "imageUrl": "",
+          "pins": [
+            {
+              "id": "pin",
+              "title": "Pin",
+              "x": 101,
+              "y": 0
+            }
+          ],
+          "createdAt": 1,
+          "updatedAt": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "typed-map-metadata",
+    "valid": true,
+    "project": {
+      "id": "fixture",
+      "name": "Fixture",
+      "description": "",
+      "version": "1",
+      "cards": [
+        {
+          "id": "card",
+          "title": "Harbor",
+          "category": "location",
+          "summary": "",
+          "content": "",
+          "tags": [],
+          "attributes": [],
+          "x": 0,
+          "y": 0,
+          "createdAt": 1,
+          "updatedAt": 1
+        }
+      ],
+      "connections": [],
+      "createdAt": 1,
+      "updatedAt": 1,
+      "worldMaps": [
+        {
+          "id": "map",
+          "name": "Map",
+          "imageUrl": "",
+          "pins": [
+            {
+              "id": "pin",
+              "title": "Pin",
+              "x": 20,
+              "y": 30,
+              "positions": [
+                {
+                  "eventId": "missing",
+                  "x": 40,
+                  "y": 50
+                }
+              ]
+            }
+          ],
+          "layers": [
+            {
+              "id": "layer",
+              "name": "Layer",
+              "color": "#fff"
+            }
+          ],
+          "shapes": [
+            {
+              "id": "region",
+              "name": "Region",
+              "kind": "region",
+              "points": [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 50,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 50
+                }
+              ],
+              "color": "#fff"
+            }
+          ],
+          "createdAt": 1,
+          "updatedAt": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate-pin-across-maps",
+    "valid": false,
+    "project": {
+      "id": "fixture",
+      "name": "Fixture",
+      "description": "",
+      "version": "1",
+      "cards": [
+        {
+          "id": "card",
+          "title": "Harbor",
+          "category": "location",
+          "summary": "",
+          "content": "",
+          "tags": [],
+          "attributes": [],
+          "x": 0,
+          "y": 0,
+          "createdAt": 1,
+          "updatedAt": 1
+        }
+      ],
+      "connections": [],
+      "createdAt": 1,
+      "updatedAt": 1,
+      "worldMaps": [
+        {
+          "id": "map",
+          "name": "Map",
+          "imageUrl": "",
+          "pins": [
+            {
+              "id": "pin",
+              "title": "Pin",
+              "x": 20,
+              "y": 30,
+              "positions": [
+                {
+                  "eventId": "missing",
+                  "x": 40,
+                  "y": 50
+                }
+              ]
+            }
+          ],
+          "layers": [],
+          "shapes": [],
+          "createdAt": 1,
+          "updatedAt": 1
+        },
+        {
+          "id": "another-map",
+          "name": "Map",
+          "imageUrl": "",
+          "pins": [
+            {
+              "id": "pin",
+              "title": "Pin",
+              "x": 20,
+              "y": 30,
+              "positions": [
+                {
+                  "eventId": "missing",
+                  "x": 40,
+                  "y": 50
+                }
+              ]
+            }
+          ],
+          "layers": [],
+          "shapes": [],
+          "createdAt": 1,
+          "updatedAt": 1
+        }
+      ]
+    }
+  }
+]

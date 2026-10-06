@@ -1,6 +1,7 @@
 pub mod models;
 pub mod processor;
 pub mod storage;
+pub mod validation;
 
 use models::{
     BezierResult, ProjectStats, TextSegment, WorldCard, WorldProject,
@@ -45,6 +46,11 @@ fn save_project_to_folder(folder_path: String, project: WorldProject) -> Result<
 #[tauri::command]
 fn list_projects_in_folder(folder_path: String) -> Result<Vec<WorldProject>, String> {
     storage::list_projects_in_folder_path(&folder_path)
+}
+
+#[tauri::command]
+fn read_workspace(folder_path: String) -> Result<models::WorkspaceLoadReport, String> {
+    storage::read_workspace_report(&folder_path)
 }
 
 #[tauri::command]
@@ -155,6 +161,7 @@ pub fn run() {
             import_world_project,
             save_project_to_folder,
             list_projects_in_folder,
+            read_workspace,
             delete_project_from_folder,
             select_workspace_folder_dialog,
             save_image_asset,

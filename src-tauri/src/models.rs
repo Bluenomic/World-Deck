@@ -164,6 +164,47 @@ pub struct TimelineBranch {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MapPosition {
+    pub event_id: String,
+    pub x: f64,
+    pub y: f64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapPoint {
+    pub x: f64,
+    pub y: f64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapLayer {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapShape {
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    pub points: Vec<MapPoint>,
+    pub color: String,
+    #[serde(default)]
+    pub layer_id: Option<String>,
+    #[serde(default)]
+    pub faction_id: Option<String>,
+    #[serde(default)]
+    pub from_event_id: Option<String>,
+    #[serde(default)]
+    pub until_event_id: Option<String>,
+}
+fn current_schema_version() -> u32 {
+    1
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MapPin {
     pub id: String,
     #[serde(default)]
@@ -177,6 +218,12 @@ pub struct MapPin {
     pub color: Option<String>,
     #[serde(default)]
     pub icon: Option<String>,
+    #[serde(default)]
+    pub layer_id: Option<String>,
+    #[serde(default)]
+    pub target_map_id: Option<String>,
+    #[serde(default)]
+    pub positions: Vec<MapPosition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -189,6 +236,12 @@ pub struct WorldMap {
     pub description: Option<String>,
     #[serde(default)]
     pub pins: Vec<MapPin>,
+    #[serde(default)]
+    pub parent_map_id: Option<String>,
+    #[serde(default)]
+    pub layers: Vec<MapLayer>,
+    #[serde(default)]
+    pub shapes: Vec<MapShape>,
     pub created_at: f64,
     pub updated_at: f64,
 }
@@ -196,6 +249,8 @@ pub struct WorldMap {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorldProject {
+    #[serde(default = "current_schema_version")]
+    pub schema_version: u32,
     pub id: String,
     pub name: String,
     pub description: String,
@@ -243,8 +298,6 @@ pub struct BezierResult {
     pub mid_y: f64,
 }
 
-
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CategoryStat {
@@ -278,4 +331,30 @@ pub struct ProjectStats {
     pub top_tags: Vec<TagStat>,
     pub most_connected_cards: Vec<CardConnectionStat>,
     pub orphan_card_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectIssue {
+    pub code: String,
+    pub path: String,
+    pub severity: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_name: Option<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectSource {
+    pub project_id: String,
+    pub file_name: String,
+    pub source: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceLoadReport {
+    pub projects: Vec<WorldProject>,
+    pub issues: Vec<ProjectIssue>,
+    pub sources: Vec<ProjectSource>,
 }

@@ -137,6 +137,22 @@ export interface MapPin {
   y: number;
   color?: string;
   icon?: string;
+  layerId?: string;
+  targetMapId?: string;
+  positions?: { eventId: string; x: number; y: number }[];
+}
+
+export interface MapLayer { id: string; name: string; color: string }
+export interface MapShape {
+  id: string;
+  name: string;
+  kind: 'route' | 'region';
+  points: { x: number; y: number }[];
+  color: string;
+  layerId?: string;
+  factionId?: string;
+  fromEventId?: string;
+  untilEventId?: string;
 }
 
 export interface WorldMap {
@@ -147,9 +163,13 @@ export interface WorldMap {
   pins: MapPin[];
   createdAt: number;
   updatedAt: number;
+  parentMapId?: string;
+  layers?: MapLayer[];
+  shapes?: MapShape[];
 }
 
 export interface WorldProject {
+  schemaVersion: 1;
   id: string;
   name: string;
   description: string;

@@ -1,8 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import type { WorldCard } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 interface WorldCardNodeProps {
   card: WorldCard;
@@ -21,7 +21,7 @@ interface WorldCardNodeProps {
   onAdjustImageFocalPointRequest?: (card: WorldCard) => void;
 }
 
-export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
+export const WorldCardNode = React.memo<WorldCardNodeProps>(({
   card,
   isSelected,
   isConnectingSource,
@@ -42,8 +42,13 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
   const config = CATEGORY_CONFIGS[card.category] || CATEGORY_CONFIGS.character;
   const IconComponent = (Icons as any)[config.iconName] || Icons.HelpCircle || (() => null);
 
-  const width = card.width || 288;
-  const height = card.height;
+  const [resizePreview, setResizePreview] = useState<{width:number;height:number} | null>(null);
+  const [imagePreview, setImagePreview] = useState<number | null>(null);
+  const cancelPointer = useRef<(() => void) | null>(null);
+  useEffect(() => () => { cancelPointer.current?.(); }, []);
+  const width = resizePreview?.width || card.width || 288;
+  const height = resizePreview?.height || card.height;
+  const imageHeight = imagePreview ?? card.imageHeight;
 
   // Determine Level of Detail (LOD) based on card height & width
   // Compact LOD: height < 140px or width < 240px
@@ -65,6 +70,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
     const currentImgH = card.imageUrl && !isCompact ? (card.imageHeight || (isDetailed ? 144 : 96)) : 0;
     const minCardHeight = Math.max(140, currentImgH + 90);
 
+    let latestSize: {width:number;height:number} | null = null;
     const handlePointerMove = (moveEvent: MouseEvent | TouchEvent) => {
       const moveX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : (moveEvent as MouseEvent).clientX;
       const moveY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
@@ -75,21 +81,19 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       const newWidth = Math.round(Math.max(220, Math.min(700, startW + deltaX)));
       const newHeight = Math.round(Math.max(minCardHeight, Math.min(1000, startH + deltaY)));
 
-      onUpdateDimensions?.(card.id, newWidth, newHeight);
-
-      // If new card height shrinks near current image height, clamp image height down as well
-      if (card.imageHeight && card.imageHeight > newHeight - 90) {
-        const clampedImgH = Math.max(48, newHeight - 90);
-        onUpdateImageHeight?.(card.id, clampedImgH);
-      }
+      latestSize = {width:newWidth,height:newHeight}; setResizePreview(latestSize);
     };
 
+    const cleanup = () => {
+      window.removeEventListener('mousemove', handlePointerMove); window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerMove); window.removeEventListener('touchend', handlePointerUp);
+    };
     const handlePointerUp = () => {
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('mouseup', handlePointerUp);
-      window.removeEventListener('touchmove', handlePointerMove);
-      window.removeEventListener('touchend', handlePointerUp);
+      cleanup(); cancelPointer.current = null;
+      if (latestSize) onUpdateDimensions?.(card.id, latestSize.width, latestSize.height);
+      setResizePreview(null);
     };
+    cancelPointer.current?.(); cancelPointer.current = cleanup;
 
     window.addEventListener('mousemove', handlePointerMove);
     window.addEventListener('mouseup', handlePointerUp);
@@ -110,20 +114,25 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
     const currentCardH = height || nodeRef.current?.offsetHeight || 240;
     const maxImgHeight = Math.max(48, currentCardH - 90);
 
+    let latestHeight: number | null = null;
     const handlePointerMove = (moveEvent: MouseEvent | TouchEvent) => {
       const moveY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
       const deltaY = (moveY - clientY) / (zoom || 1);
 
       const newImageHeight = Math.round(Math.max(48, Math.min(maxImgHeight, startImgH + deltaY)));
-      onUpdateImageHeight?.(card.id, newImageHeight);
+      latestHeight = newImageHeight; setImagePreview(newImageHeight);
     };
 
-    const handlePointerUp = () => {
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('mouseup', handlePointerUp);
-      window.removeEventListener('touchmove', handlePointerMove);
-      window.removeEventListener('touchend', handlePointerUp);
+    const cleanup = () => {
+      window.removeEventListener('mousemove', handlePointerMove); window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerMove); window.removeEventListener('touchend', handlePointerUp);
     };
+    const handlePointerUp = () => {
+      cleanup(); cancelPointer.current = null;
+      if (latestHeight !== null) onUpdateImageHeight?.(card.id, latestHeight);
+      setImagePreview(null);
+    };
+    cancelPointer.current?.(); cancelPointer.current = cleanup;
 
     window.addEventListener('mousemove', handlePointerMove);
     window.addEventListener('mouseup', handlePointerUp);
@@ -135,7 +144,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
     <div
       data-card-id={card.id}
       ref={(el) => {
-        (nodeRef as any).current = el;
+        nodeRef.current = el;
         if (el) {
           onMeasureHeight?.(card.id, el.offsetHeight);
         }
@@ -164,9 +173,9 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       {!isCompact && (
         card.imageUrl ? (
           <div
-            style={{ height: card.imageHeight ? `${card.imageHeight}px` : undefined }}
+            style={{ height: imageHeight ? `${imageHeight}px` : undefined }}
             className={`w-full max-h-[calc(100%-80px)] overflow-hidden relative rounded-t-xl shrink-0 group/img ${
-              !card.imageHeight ? (isDetailed ? 'h-36' : 'h-24') : ''
+              !imageHeight ? (isDetailed ? 'h-36' : 'h-24') : ''
             }`}
           >
             <img
@@ -316,6 +325,7 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       {/* Bottom-Right Drag Resize Handle */}
       {onUpdateDimensions && (
         <div
+          data-card-resize={card.id}
           className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-center justify-end p-1 text-slate-400 hover:text-blue-400 z-40 group-hover:opacity-100 opacity-40 transition-opacity"
           onMouseDown={handleResizeStart}
           onTouchStart={handleResizeStart}
@@ -398,4 +408,4 @@ export const WorldCardNode: React.FC<WorldCardNodeProps> = ({
       </button>
     </div>
   );
-};
+});

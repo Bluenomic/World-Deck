@@ -231,13 +231,11 @@ export const startDraggingTauriWindow = async (): Promise<void> => {
   try {
     const { invoke } = await import('@tauri-apps/api/core');
     await invoke('window_start_dragging');
-  } catch (error) {
+  } catch {
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       await getCurrentWindow().startDragging();
-    } catch (e) {
-      // silent
-    }
+    } catch {}
   }
 };
 
@@ -246,11 +244,11 @@ export const isTauriWindowMaximized = async (): Promise<boolean> => {
   try {
     const { invoke } = await import('@tauri-apps/api/core');
     return await invoke<boolean>('window_is_maximized');
-  } catch (error) {
+  } catch {
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       return await getCurrentWindow().isMaximized();
-    } catch (e) {
+    } catch {
       return false;
     }
   }

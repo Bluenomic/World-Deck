@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useStableEvent } from '../utils/useStableEvent';
+import React, { useEffect, useState } from 'react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 export interface ConfirmModalConfig {
   isOpen: boolean;
@@ -10,7 +11,7 @@ export interface ConfirmModalConfig {
   cancelLabel?: string;
   variant?: 'danger' | 'warning' | 'info' | 'success';
   isAlertOnly?: boolean;
-  onConfirm: () => void;
+  onConfirm: () => void | boolean | Promise<void | boolean>;
   onCancel?: () => void;
 }
 
@@ -21,6 +22,15 @@ interface ConfirmModalProps {
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({ config, onClose }) => {
   const { language, t } = useLanguage();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const confirm = useStableEvent(async () => {
+    if (!config || busy) return;
+    setBusy(true); setFailed(false);
+    try { if (await config.onConfirm() !== false) onClose(); }
+    catch { setFailed(true); }
+    finally { setBusy(false); }
+  });
   useEffect(() => {
     if (!config || !config.isOpen) return;
 
@@ -28,19 +38,15 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({ config, onClose }) =
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
+        if (busy) return;
         if (config.onCancel) config.onCancel();
-        onClose();
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        config.onConfirm();
         onClose();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [config, onClose]);
+  }, [config, onClose, busy]);
 
   if (!config || !config.isOpen) return null;
 
@@ -81,6 +87,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({ config, onClose }) =
       }}
     >
       <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={config.title}
         className="app-bg-secondary border app-border rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 modal-animate-appear cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
@@ -95,10 +104,12 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({ config, onClose }) =
           </div>
         </div>
 
+        {failed && <p role="alert">{language === 'en' ? 'Operation failed. Please retry.' : 'Operasi gagal. Coba lagi.'}</p>}
         <div className="flex items-center justify-end gap-2.5 pt-3 border-t app-border">
           {!isAlert && (
             <button
               type="button"
+              disabled={busy}
               onClick={() => {
                 if (config.onCancel) config.onCancel();
                 onClose();
@@ -111,10 +122,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({ config, onClose }) =
 
           <button
             type="button"
-            onClick={() => {
-              config.onConfirm();
-              onClose();
-            }}
+            disabled={busy}
+            onClick={() => { void confirm(); }}
             className={`px-5 py-2 rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 ${iconConfig.btn}`}
           >
             <span>{config.confirmLabel || (isAlert ? (language === 'en' ? 'Got it' : 'Mengerti') : (language === 'en' ? 'Confirm' : 'Konfirmasi'))}</span>

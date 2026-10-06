@@ -1,0 +1,38 @@
+name: Quality
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      CI: true
+      WORLD_DECK_VITE_CACHE: node_modules/.tmp/ci-vite-cache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:rust
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-windows
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: ignore

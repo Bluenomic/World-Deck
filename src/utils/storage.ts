@@ -68,7 +68,7 @@ export const loadCanvasViewport = (canvasId: string): CanvasViewport => {
     if (prefs.canvasViewports && prefs.canvasViewports[canvasId]) {
       return prefs.canvasViewports[canvasId];
     }
-  } catch (err) {}
+  } catch {}
   return { zoom: 1, pan: { x: 40, y: 40 } };
 };
 
@@ -113,7 +113,7 @@ export const saveAppState = async (worlds: WorldProject[], activeWorldId: string
   try {
     localStorage.setItem('worlddeck_worlds_v2', JSON.stringify(worlds));
     localStorage.setItem('worlddeck_active_id_v2', activeWorldId);
-  } catch (err) {
+  } catch {
     // Quota exceeded in localStorage, IndexedDB already has the full backup
     console.warn('LocalStorage quota limit reached, saved to IndexedDB instead.');
   }
@@ -177,7 +177,7 @@ export const loadAppState = async (): Promise<{ worlds: WorldProject[]; activeWo
 /**
  * Saves FileSystemFileHandle to IndexedDB
  */
-export const saveLocalFileHandle = async (handle: any) => {
+export const saveLocalFileHandle = async (handle: FileSystemDirectoryHandle | null) => {
   try {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -195,7 +195,7 @@ export const saveLocalFileHandle = async (handle: any) => {
 /**
  * Loads FileSystemFileHandle from IndexedDB
  */
-export const loadLocalFileHandle = async (): Promise<any | null> => {
+export const loadLocalFileHandle = async (): Promise<FileSystemDirectoryHandle | null> => {
   try {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
@@ -205,7 +205,26 @@ export const loadLocalFileHandle = async (): Promise<any | null> => {
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => resolve(null);
     });
-  } catch (err) {
+  } catch {
     return null;
   }
+};
+
+/** Persist folder identity separately from its name: equal names may be different folders. */
+export const getDirectoryWorkspaceId = async (handle: FileSystemDirectoryHandle): Promise<string> => {
+  const db = await openDB();
+  try {
+    const entries = await new Promise<{ handle: FileSystemDirectoryHandle; id: string }[]>((resolve,reject) => {
+      const request = db.transaction(STORE_NAME,'readonly').objectStore(STORE_NAME).get('workspace_identities');
+      request.onsuccess = () => resolve(request.result || []); request.onerror = () => reject(request.error);
+    });
+    for (const entry of entries) if (await handle.isSameEntry(entry.handle)) return entry.id;
+    const id = `browser:${crypto.randomUUID()}`;
+    await new Promise<void>((resolve,reject) => {
+      const tx = db.transaction(STORE_NAME,'readwrite');
+      tx.objectStore(STORE_NAME).put([...entries,{ handle,id }],'workspace_identities');
+      tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+    });
+    return id;
+  } finally { db.close(); }
 };

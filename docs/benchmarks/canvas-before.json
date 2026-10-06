@@ -1,0 +1,52 @@
+{
+  "environment": {
+    "platform": "win32",
+    "release": "10.0.26100",
+    "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
+    "memoryGiB": 15,
+    "node": "v22.16.0",
+    "browser": "154.0.4258.53",
+    "capturedAt": "2026-10-06T01:39:59.748Z"
+  },
+  "fixture": {
+    "cards": 1000,
+    "connections": 2000,
+    "documents": 100,
+    "viewport": "1280x800"
+  },
+  "url": "http://127.0.0.1:5180",
+  "samples": [
+    {
+      "run": 1,
+      "readyMs": 1665,
+      "panMedianMs": 148.09999999962747,
+      "renderedCards": 1000
+    },
+    {
+      "run": 2,
+      "readyMs": 1330.7000000001863,
+      "panMedianMs": 158,
+      "renderedCards": 1000
+    },
+    {
+      "run": 3,
+      "readyMs": 1623.9000000003725,
+      "panMedianMs": 191.09999999962747,
+      "renderedCards": 1000
+    },
+    {
+      "run": 4,
+      "readyMs": 1658.3999999994412,
+      "panMedianMs": 140.29999999981374,
+      "renderedCards": 1000
+    },
+    {
+      "run": 5,
+      "readyMs": 1280.7000000001863,
+      "panMedianMs": 144.40000000037253,
+      "renderedCards": 1000
+    }
+  ],
+  "medianReadyMs": 1623.9000000003725,
+  "medianPanMs": 148.09999999962747
+}

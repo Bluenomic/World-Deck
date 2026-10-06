@@ -1,32 +1,17 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import type { WorldCard, CardConnection, TimelineBranch } from '../types';
+import type { WorldCard, CardConnection, TimelineBranch, TimelineTrack, TimelineNode as SimpleTimelineNode } from '../types';
+import { useTimelineState } from '../utils/useTimelineState';
+import { useStableEvent } from '../utils/useStableEvent';
 import { generateId } from '../utils/helpers';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 import { TimelineDeleteModal } from './TimelineDeleteModal';
 import type { TimelineDeleteTarget } from './TimelineDeleteModal';
 import { ConfirmModal } from './ConfirmModal';
 import type { ConfirmModalConfig } from './ConfirmModal';
 
-interface TimelineTrack {
-  id: string;
-  name: string;
-  order: number; // Vertical order index (-2, -1, 0, 1, 2...)
-}
-
-interface SimpleTimelineNode {
-  id: string;
-  trackId: string;
-  x: number;
-  title: string;
-  dateLabel?: string;
-  description?: string;
-  cardId?: string;
-  images?: string[];
-  imageUrl?: string;
-}
-
 interface TimelineViewProps {
+  focusNodeId?: string;
   cards: WorldCard[];
   connections?: CardConnection[];
   onCardClick: (card: WorldCard) => void;
@@ -103,7 +88,7 @@ const calculateTrackLayout = (sortedTracks: TimelineTrack[], allNodes: SimpleTim
 export const TimelineView: React.FC<TimelineViewProps> = ({
   cards,
   onCardClick,
-  activeWorldId = 'default',
+  focusNodeId,
   timelineTracks,
   timelineNodes,
   timelineBranches,
@@ -116,28 +101,17 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     { id: 'track_main', name: t.timeline.mainTimeline, order: 0 },
   ], [t.timeline.mainTimeline]);
 
-  // Timeline Tracks State
-  const [tracks, setTracks] = useState<TimelineTrack[]>(() => {
-    return timelineTracks && timelineTracks.length > 0 ? timelineTracks : defaultTracks;
-  });
+  const {tracks, nodes, branches, setTracks, setNodes, setBranches, previewRef, showPreview} = useTimelineState({
+    tracks: timelineTracks?.length ? timelineTracks : defaultTracks,
+    nodes: timelineNodes || [], branches: timelineBranches || [],
+  }, onSaveTimeline);
 
-  // Timeline Nodes State
-  const [nodes, setNodes] = useState<SimpleTimelineNode[]>(() => {
-    return timelineNodes || [];
-  });
-
-  // Timeline Branches State
-  const [branches, setBranches] = useState<TimelineBranch[]>(() => {
-    return timelineBranches || [];
-  });
-
-  // Sync state when activeWorld or props change
   useEffect(() => {
-    setTracks(timelineTracks && timelineTracks.length > 0 ? timelineTracks : defaultTracks);
-    const rawNodes = timelineNodes || [];
-    setNodes(rawNodes.length > 0 ? applyAutoSpacing(rawNodes) : rawNodes);
-    setBranches(timelineBranches || []);
-  }, [activeWorldId, timelineTracks, timelineNodes, timelineBranches, defaultTracks]);
+    const node = (timelineNodes || []).find(n => n.id === focusNodeId);
+    if (!node) return;
+    setSelectedNode(node);
+    setScrollX((containerRef.current?.clientWidth || 800) / 2 - node.x);
+  }, [focusNodeId, timelineNodes]);
 
   // Interactive Branch Drafting State
   const [draftBranch, setDraftBranch] = useState<{
@@ -271,12 +245,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const sortedTracks = [...tracks].sort((a, b) => a.order - b.order);
   const { relativeYMap, totalSpan, stackCenter } = calculateTrackLayout(sortedTracks, nodes);
 
-  // Persist State to Parent World state (skip during node dragging)
-  useEffect(() => {
-    if (draggingNodeId) return;
-    onSaveTimeline?.(tracks, nodes, branches);
-  }, [tracks, nodes, branches, draggingNodeId]);
-
   // Cancel draft branch on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -312,6 +280,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     return track.name;
   };
 
+  const finishDrag = useStableEvent(() => {
+    const preview = previewRef.current;
+    if (preview) { setNodes(preview); showPreview(null); }
+    setDraggingNodeId(null);
+  });
+
   // Global Window Mouse Move & Mouse Up Listener for Dragging Nodes Smoothly
   useEffect(() => {
     if (!draggingNodeId) return;
@@ -321,19 +295,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       const rawNextX = initialNodeX + deltaX;
       const clampedX = Math.max(20, Math.round(rawNextX));
 
-      setNodes((prev) => prev.map((n) => (n.id === draggingNodeId ? { ...n, x: clampedX } : n)));
+      showPreview((timelineNodes || []).map((n) => (n.id === draggingNodeId ? { ...n, x: clampedX } : n)));
     };
 
-    const handleWindowMouseUp = () => {
-      setNodes((prev) => {
-        const draggedNode = prev.find((n) => n.id === draggingNodeId);
-        if (draggedNode) {
-          return applyAutoSpacing(prev, draggedNode.trackId);
-        }
-        return prev;
-      });
-      setDraggingNodeId(null);
+    const handleWindowMouseUp = () => finishDrag();
+    const cancelDrag = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { showPreview(null); setDraggingNodeId(null); }
     };
+    window.addEventListener('keydown', cancelDrag);
 
     window.addEventListener('mousemove', handleWindowMouseMove);
     window.addEventListener('mouseup', handleWindowMouseUp);
@@ -341,8 +310,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     return () => {
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
+      window.removeEventListener('keydown', cancelDrag);
     };
-  }, [draggingNodeId, dragStartX, initialNodeX]);
+  }, [draggingNodeId, dragStartX, initialNodeX, timelineNodes, showPreview, finishDrag]);
 
   // Auto-Spacing Helper Function
   const applyAutoSpacing = (eventList: SimpleTimelineNode[], targetTrackId?: string): SimpleTimelineNode[] => {
@@ -493,10 +463,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     }
   };
 
-  const handleMouseUp = () => {
-    setIsPanning(false);
-    setDraggingNodeId(null);
-  };
+  const handleMouseUp = () => { setIsPanning(false); finishDrag(); };
 
   const handleWheel = (e: React.WheelEvent) => {
     if (!containerRef.current) return;
@@ -848,14 +815,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     setNewTrackOrderPosition(null);
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = useStableEvent(() => {
     setDeleteTarget({
       type: 'clear_all',
       title: t.timeline.allTimelineEvents,
       subtitle: t.timeline.totalClear,
       itemCount: nodes.length,
     });
-  };
+  });
 
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
@@ -891,7 +858,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     };
     window.addEventListener('worlddeck_clear_timeline', handleExternalClear);
     return () => window.removeEventListener('worlddeck_clear_timeline', handleExternalClear);
-  }, [nodes]);
+  }, [handleClearAll]);
 
   const linkedCardForReader = readerNode?.cardId ? cards.find((c) => c.id === readerNode.cardId) : null;
   const viewportHeight = containerBounds.height;
@@ -1218,6 +1185,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
                   {/* Node Point Dot Circle */}
                   <div
+                    data-timeline-node-id={node.id}
+                    data-broken-reference={!!node.cardId && !cards.some(card => card.id === node.cardId) || !tracks.some(track => track.id === node.trackId) || undefined}
+                    aria-label={node.title}
                     onMouseDown={(e) => handleStartDragNode(node, e)}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1776,7 +1746,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   </div>
                 ) : (
                   <div className="p-3 rounded-xl app-bg-main border app-border text-center app-text-muted text-xs">
-                    {t.timeline.noLinkedCard}
+                    {readerNode.cardId ? `Referensi terputus / Broken reference: ${readerNode.cardId}` : t.timeline.noLinkedCard}
                   </div>
                 )}
               </div>

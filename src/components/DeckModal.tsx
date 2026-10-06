@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { WorldDeck } from '../types';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 interface DeckModalProps {
   isOpen: boolean;
@@ -55,6 +55,8 @@ export const DeckModal: React.FC<DeckModalProps> = ({
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div
+        role="dialog"
+        aria-modal="true"
         className="w-full max-w-md app-bg-main border app-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >

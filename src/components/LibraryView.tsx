@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import type { WorldCard, WorldDeck, CardCategory } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 interface LibraryViewProps {
   cards: WorldCard[];
@@ -159,13 +159,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const activeDeck = decks.find((d) => d.id === activeDeckId) || null;
 
   // Filter cards based on search, category, and active deck navigation
-  const cardsToDisplay = cards.filter((card) => {
+  const cardsToDisplay = React.useMemo(() => cards.filter((card) => {
     if (activeDeckId) {
       return card.deckId === activeDeckId || (activeDeck?.cardIds || []).includes(card.id);
     }
     if (activeTab === 'all') return !card.deckId;
     return true;
-  });
+  }), [cards, activeDeckId, activeDeck, activeTab]);
 
   const filteredDecks = decks;
   const showDecksInGrid = !activeDeckId && (activeTab === 'all' || activeTab === 'decks');

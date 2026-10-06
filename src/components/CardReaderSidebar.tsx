@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import type { WorldCard, CardConnection, WorldDeck } from '../types';
+import type { WorldCard, CardConnection, WorldDeck, WorldProject } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import { parseMentions } from '../utils/helpers';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 interface CardReaderSidebarProps {
   isOpen: boolean;
@@ -15,6 +15,10 @@ interface CardReaderSidebarProps {
   onEditCard: (card: WorldCard) => void;
   onSelectCard: (cardId: string) => void;
   initialFullPage?: boolean;
+  world?: WorldProject;
+  onOpenMap?: (id: string, pinId: string) => void;
+  onOpenDocument?: (id: string) => void;
+  onOpenTimeline?: (id: string) => void;
 }
 
 export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
@@ -26,7 +30,7 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
   decks,
   onEditCard,
   onSelectCard,
-  initialFullPage = false,
+  initialFullPage = false, world, onOpenMap, onOpenDocument, onOpenTimeline,
 }) => {
   const { language, t, getCategoryLabel } = useLanguage();
   const [isExpanded, setIsExpanded] = useState<boolean>(initialFullPage);
@@ -362,6 +366,15 @@ export const CardReaderSidebar: React.FC<CardReaderSidebarProps> = ({
         )}
       </div>
 
+      {world && <details className="relative text-xs">
+        <summary className="cursor-pointer px-2 py-2">{language === 'en' ? 'Related places' : 'Tautan dunia'}</summary>
+        <div className="absolute right-0 top-full z-50 w-64 max-h-72 overflow-auto rounded-lg border app-border app-bg-main p-2 shadow-xl flex flex-col gap-2">
+          {(world.worldMaps || []).flatMap(m => m.pins.filter(p => p.cardId === activeCard.id).map(p => <button key={m.id + p.id} className="text-left p-2 app-bg-hover rounded" onClick={() => onOpenMap?.(m.id, p.id)}>Map · {m.name}</button>))}
+          {(world.timelineNodes || []).filter(n => n.cardId === activeCard.id).map(n => <button key={n.id} className="text-left p-2 app-bg-hover rounded" onClick={() => onOpenTimeline?.(n.id)}>Timeline · {n.title}</button>)}
+          {(world.documents || []).filter(d => d.associatedCardIds?.includes(activeCard.id) || d.content.includes(`data-card-id="${activeCard.id}"`) || parseMentions(d.content, allCards).some(s => s.cardId === activeCard.id)).map(d => <button key={d.id} className="text-left p-2 app-bg-hover rounded" onClick={() => onOpenDocument?.(d.id)}>{language === 'en' ? 'Document' : 'Dokumen'} · {d.title}</button>)}
+          <small className="app-text-muted">{language === 'en' ? 'Maps, events and documents using this card appear here.' : 'Peta, event, dan dokumen yang memakai kartu ini tampil di sini.'}</small>
+        </div>
+      </details>}
       <div className="flex items-center gap-2 shrink-0">
         <button
           type="button"

@@ -5,4 +5,5 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: './',
+  cacheDir: process.env.WORLD_DECK_VITE_CACHE || 'node_modules/.vite',
 })

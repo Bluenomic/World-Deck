@@ -1,7 +1,7 @@
 import React from 'react';
 import type { WorldCard, CardConnection } from '../types';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 interface RelationListViewProps {
   connections: CardConnection[];

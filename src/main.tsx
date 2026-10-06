@@ -1,6 +1,13 @@
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
+import '@fontsource/outfit/latin-400.css';
+import '@fontsource/outfit/latin-600.css';
+import '@fontsource/outfit/latin-700.css';
+import '@fontsource/plus-jakarta-sans/latin-400.css';
+import '@fontsource/plus-jakarta-sans/latin-600.css';
+import '@fontsource/plus-jakarta-sans/latin-700.css';
+import '@fontsource/fira-code/latin-400.css';
 import App from './App';
 import { LanguageProvider } from './i18n/LanguageContext';
 
@@ -27,7 +34,6 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   public handleReset = () => {
-    localStorage.clear();
     window.location.reload();
   };
 
@@ -47,7 +53,7 @@ class ErrorBoundary extends Component<Props, State> {
             onClick={this.handleReset}
             className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg"
           >
-            Muat Ulang & Reset Cache Data
+            Muat Ulang Aplikasi
           </button>
         </div>
       );

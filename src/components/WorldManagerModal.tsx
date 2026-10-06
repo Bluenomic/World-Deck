@@ -1,17 +1,17 @@
 import React, { useState, useRef } from 'react';
 import type { WorldProject } from '../types';
 import { generateId, downloadProjectJson } from '../utils/helpers';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 interface WorldManagerModalProps {
   worlds: WorldProject[];
   activeWorldId: string;
-  onSelectWorld: (worldId: string) => void;
-  onCreateWorld: (newWorld: WorldProject) => void;
-  onDeleteWorld: (worldId: string) => void;
-  onDuplicateWorld: (worldId: string) => void;
-  onUpdateWorldInfo: (worldId: string, name: string, description: string, author: string) => void;
+  onSelectWorld: (worldId: string) => Promise<void>;
+  onCreateWorld: (newWorld: WorldProject) => Promise<void>;
+  onDeleteWorld: (worldId: string) => Promise<void>;
+  onDuplicateWorld: (worldId: string) => Promise<void>;
+  onUpdateWorldInfo: (worldId: string, name: string, description: string, author: string) => Promise<void>;
   onClose: () => void;
   onImportWorld: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
@@ -54,11 +54,12 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
     setShowCreateForm(false);
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameInput.trim()) return;
 
     const newWorld: WorldProject = {
+      schemaVersion: 1,
       id: generateId('world'),
       name: nameInput.trim(),
       description: descInput.trim(),
@@ -70,14 +71,14 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
       connections: [],
     };
 
-    onCreateWorld(newWorld);
+    await onCreateWorld(newWorld);
     setShowCreateForm(false);
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingWorldId && nameInput.trim()) {
-      onUpdateWorldInfo(editingWorldId, nameInput.trim(), descInput.trim(), authorInput.trim());
+      await onUpdateWorldInfo(editingWorldId, nameInput.trim(), descInput.trim(), authorInput.trim());
       setEditingWorldId(null);
     }
   };
@@ -97,6 +98,8 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
       />
 
       <div
+        role="dialog"
+        aria-modal="true"
         className="bg-[#1e1e1e] border border-[#383838] w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white transition-all cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
@@ -328,8 +331,9 @@ export const WorldManagerModal: React.FC<WorldManagerModalProps> = ({
               return (
                 <div
                   key={w.id}
-                  onClick={() => {
-                    onSelectWorld(w.id);
+                  data-world-id={w.id}
+                  onClick={async () => {
+                    await onSelectWorld(w.id);
                     onClose();
                   }}
                   className={`p-4 rounded-xl border transition-all flex flex-col justify-between space-y-3 cursor-pointer group ${

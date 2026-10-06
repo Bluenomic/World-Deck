@@ -1,3 +1,4 @@
+import type { WorldProject } from '../types';
 import type { WorldCard } from '../types';
 
 export const generateId = (prefix: string = 'id'): string => {
@@ -110,7 +111,7 @@ export const parseMentions = (content: string, cards: WorldCard[]): TextSegment[
 /**
  * Save project to JSON file download
  */
-export const downloadProjectJson = (projectData: any) => {
+export const downloadProjectJson = (projectData: WorldProject) => {
   const jsonStr = JSON.stringify(projectData, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

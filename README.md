@@ -8,7 +8,7 @@ A native, canvas-based worldbuilding application designed for writers, game desi
 
 World Deck provides a visual workspace for crafting narrative universes. Built with React 19, Vite, TypeScript, Tailwind CSS, and Tauri v2 (Rust), it combines high-performance web graphics with transparent local desktop file system storage.
 
-All project data is saved directly to your chosen local directory as human-readable JSON files (`project_<id>.json`). No cloud lock-in, no proprietary databases.
+Project data is saved to your chosen directory as human-readable JSON files (`project_<id>.json`). PNG, JPEG, WebP and GIF images are stored in the adjacent `assets/` folder. Keep the folder and JSON files together when moving a workspace. JSON exports embed images for portable sharing. No cloud lock-in or proprietary databases.
 
 ---
 
@@ -38,6 +38,27 @@ All project data is saved directly to your chosen local directory as human-reada
 - Workspace Folder Isolation: Complete data separation per user-selected directory.
 - Real-time auto-saving to `project_<id>.json` files with strict race condition prevention.
 - Explicit Workspace Project Manager for creating and switching projects within local folders.
+
+### Interactive Atlas
+- Single-click a pin to select it; double-click to open its linked card, matching Canvas interaction.
+- Drag pins to move them. One completed drag creates one undo operation; Escape cancels an active drag.
+- Right-click for pin actions, colors, card editing, and map settings. There is no permanent inspector or search/status bar.
+- Add a new location card or place existing cards from the gallery. Cancelling a new card leaves no empty card behind.
+- Pan with dragging or scrolling; Ctrl/Command + scroll zooms around the pointer. `F` fits the image to the available viewport.
+- Keyboard-focus a pin and use arrow keys to move it by 0.1%; Shift + arrow moves it by 1%. Coordinates can also be edited in Pin settings.
+- Optional Map settings contain category/deck/tag filters, label visibility, layers, pin icons, and map management.
+- Draw routes with at least two points and regions with at least three. Finish creates the object; Escape cancels. Their names, colors, layers, and controlling factions are editable in settings.
+- Parent maps and pin links connect world, continent, city, and building maps. Cyclic parent relationships are rejected.
+- Choose a Timeline event to record a pin position from that event onwards on the same track. Base mode edits the default position. Region/route visibility uses an inclusive start and exclusive end event; events are ordered by their Timeline x-position, not parsed date labels.
+- Card readers expose links back to maps, Timeline events, and documents that use the card.
+
+### Reliability and Offline Use
+- Undo/redo includes maps, documents, decks, cards and Timeline data, with up to 50 undo operations.
+- Writes are queued in order. Failed saves show a retry notification; successful saves do not add UI chrome.
+- Native saves write a temporary file and atomically replace the primary without deleting it first. A `.json.bak` copy retains the last valid version.
+- If a primary project is missing or unreadable, workspace loading attempts its backup. Assets are retained for backup and undo recovery; unused images are not automatically removed.
+- Tailwind CSS and fonts are bundled locally. Installed desktop builds do not need a CDN to render the interface. User-provided remote image URLs still need their origin to be available.
+- Category templates in the card editor add missing suggested attributes and a starting outline without overwriting written content.
 
 ---
 
@@ -87,7 +108,7 @@ World-Deck/
 ## Development Setup
 
 ### Prerequisites
-- Node.js (v18 or higher)
+- Node.js (v22.12 or higher)
 - Rust and Cargo (for Tauri desktop builds)
 
 ### Installation
@@ -137,3 +158,16 @@ Output installers and binaries are generated at:
 ## License
 
 This project is open source and available under the MIT License.
+
+## Validation
+
+```bash
+npm run build
+npm run lint
+npm test
+cargo test --manifest-path src-tauri/Cargo.toml --lib
+```
+
+Browser tests use installed Microsoft Edge and an isolated in-memory Tauri bridge; they do not open or write personal workspace files. Rust storage tests use temporary directories and verify image/metadata round trips, backup recovery, and path validation.
+
+Quality contracts, review stages, CI validation and desktop smoke instructions: [Quality](docs/QUALITY.md). Production measurements and repeatable fixture: [Canvas benchmark](docs/BENCHMARK.md).

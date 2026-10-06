@@ -1,1401 +1,1884 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import type { WorldMap, MapPin, WorldCard, WorldDeck } from '../types';
-import * as Icons from 'lucide-react';
-import { useLanguage } from '../i18n/LanguageContext';
-import { ConfirmModal } from './ConfirmModal';
-import type { ConfirmModalConfig } from './ConfirmModal';
-import { AddCardFromGalleryModal } from './AddCardFromGalleryModal';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  Map as MapIcon,
+  Plus,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Layers,
+  X,
+  MapPin as PinIcon,
+  Route,
+  Pentagon,
+  Undo2,
+  Redo2,
+} from "lucide-react";
+import type {
+  MapPin,
+  MapShape,
+  TimelineNode,
+  WorldCard,
+  WorldDeck,
+  WorldMap,
+} from "../types";
+import { useLanguage } from "../i18n/useLanguage";
+import { generateId } from "../utils/helpers";
+import {
+  canParentMap,
+  clampPercent,
+  fitMap,
+  pinAtEvent,
+  shapeAtEvent,
+} from "../utils/mapGeometry";
+import { AddCardFromGalleryModal } from "./AddCardFromGalleryModal";
+import { ConfirmModal, type ConfirmModalConfig } from "./ConfirmModal";
+import "./MapView.css";
+import { useDialogFocus } from "../utils/useDialogFocus";
 
 interface MapViewProps {
   worldMaps: WorldMap[];
   cards: WorldCard[];
   decks?: WorldDeck[];
+  timelineNodes?: TimelineNode[];
+  projectId?: string;
+  focus?: { mapId: string; pinId?: string; token: number };
   onSaveMap: (map: WorldMap) => void;
-  onDeleteMap: (mapId: string) => void;
-  onOpenCard: (cardId: string) => void;
+  onDeleteMap: (id: string) => void;
+  onOpenCard: (id: string) => void;
   onEditCard?: (card: WorldCard) => void;
   onCreatePinCard?: (mapId: string, x: number, y: number) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
+}
+type Point = { x: number; y: number };
+type Camera = Point & { zoom: number };
+type Mode = "pan" | "new" | "existing" | "route" | "region";
+const COLORS = [
+  "#0d99ff",
+  "#10b981",
+  "#f59e0b",
+  "#f43f5e",
+  "#a855f7",
+  "#06b6d4",
+];
+const ICONS = ["●", "◆", "★", "⚑", "⌂"];
+function savedCamera(key: string): Camera | null {
+  try {
+    const c = JSON.parse(localStorage.getItem(key) || "null");
+    return c &&
+      [c.x, c.y, c.zoom].every(Number.isFinite) &&
+      c.zoom > 0 &&
+      c.zoom <= 5
+      ? c
+      : null;
+  } catch {
+    return null;
+  }
 }
 
-const PIN_COLORS = [
-  { label: 'Blue', value: '#0d99ff' },
-  { label: 'Emerald', value: '#10b981' },
-  { label: 'Amber', value: '#f59e0b' },
-  { label: 'Rose', value: '#f43f5e' },
-  { label: 'Purple', value: '#a855f7' },
-  { label: 'Cyan', value: '#06b6d4' },
-];
-
-export const MapView: React.FC<MapViewProps> = ({
+export function MapView({
   worldMaps,
   cards,
   decks = [],
+  timelineNodes = [],
+  projectId = "world",
+  focus,
   onSaveMap,
   onDeleteMap,
   onOpenCard,
   onEditCard,
   onCreatePinCard,
-}) => {
-  const { language, t } = useLanguage();
-  
-  const [confirmModalConfig, setConfirmModalConfig] = useState<ConfirmModalConfig | null>(null);
-
-  const [selectedMapId, setSelectedMapId] = useState<string | null>(() => 
-    worldMaps.length > 0 ? worldMaps[0].id : null
-  );
-
-  // Fallback to first map if selectedMapId is invalid
-  useEffect(() => {
-    if (worldMaps.length > 0) {
-      if (!selectedMapId || !worldMaps.some((m) => m.id === selectedMapId)) {
-        setSelectedMapId(worldMaps[0].id);
-      }
-    } else {
-      setSelectedMapId(null);
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+}: MapViewProps) {
+  const { language, t, getCategoryLabel } = useLanguage();
+  const text = (id: string, en: string) => (language === "en" ? en : id);
+  const [mapId, setMapId] = useState(() => {
+    try {
+      return (
+        localStorage.getItem(`wd-map-selected:${projectId}`) ||
+        worldMaps[0]?.id ||
+        ""
+      );
+    } catch {
+      return worldMaps[0]?.id || "";
     }
-  }, [worldMaps, selectedMapId]);
-
-  const currentMap = useMemo(
-    () => worldMaps.find((m) => m.id === selectedMapId) || null,
-    [worldMaps, selectedMapId]
-  );
-
-  // Map Controls State
-  const [isAddPinMode, setIsAddPinMode] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
-
-  // Pan & Zoom state
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const [hasDragged, setHasDragged] = useState(false);
-  
-  // Dragging pin state
-  const [draggingPinId, setDraggingPinId] = useState<string | null>(null);
-
-  // Modal State for New/Edit Map
-  const [showMapModal, setShowMapModal] = useState(false);
-  const [mapFormMode, setMapFormMode] = useState<'create' | 'edit'>('create');
-  const [mapName, setMapName] = useState('');
-  const [mapDesc, setMapDesc] = useState('');
-  const [mapImageUrl, setMapImageUrl] = useState('');
-  // Context Menu State
-  const [contextMenu, setContextMenu] = useState<{
-    visible: boolean;
-    x: number;
-    y: number;
-    mapPercentX: number | null;
-    mapPercentY: number | null;
-    pinId: string | null;
-    isNearRight: boolean;
-    isNearBottom: boolean;
-  }>({
-    visible: false,
-    x: 0,
-    y: 0,
-    mapPercentX: null,
-    mapPercentY: null,
-    pinId: null,
-    isNearRight: false,
-    isNearBottom: false,
   });
-
-  // Target position for AddCardFromGalleryModal
-  const [galleryTargetPos, setGalleryTargetPos] = useState<{
+  const map = worldMaps.find((m) => m.id === mapId) || worldMaps[0];
+  const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, zoom: 1 });
+  const cameraRef = useRef(camera);
+  const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
+  const [imageState, setImageState] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
+  const [mode, setMode] = useState<Mode>("pan");
+  const [selectedPin, setSelectedPin] = useState("");
+  const [selectedShape, setSelectedShape] = useState("");
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("");
+  const [deckId, setDeckId] = useState("");
+  const [tag, setTag] = useState("");
+  const [labels, setLabels] = useState<"all" | "selected" | "hover">(
+    "selected",
+  );
+  const [panel, setPanel] = useState(false);
+  const [menu, setMenu] = useState<{
     x: number;
     y: number;
+    pinId?: string;
+    point: Point | null;
   } | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-
-  // Mutable refs for zoom & pan to prevent stale closure lag during rapid wheel events
-  const zoomRef = useRef<number>(zoom);
-  const panRef = useRef<{ x: number; y: number }>(pan);
-  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
+  const [hiddenLayers, setHiddenLayers] = useState<string[]>([]);
+  const [activeLayer, setActiveLayer] = useState("");
+  const [eventId, setEventId] = useState("");
+  const [draftPoints, setDraftPoints] = useState<Point[]>([]);
+  const [draftPin, setDraftPin] = useState<(Point & { id: string }) | null>(
+    null,
+  );
+  const draftRef = useRef<typeof draftPin>(null);
+  const [galleryPosition, setGalleryPosition] = useState<Point | null>(null);
+  const [form, setForm] = useState<{
+    id?: string;
+    name: string;
+    description: string;
+    imageUrl: string;
+    parentMapId: string;
+  } | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [confirm, setConfirm] = useState<ConfirmModalConfig | null>(null);
+  const [layerName, setLayerName] = useState("");
+  const viewport = useRef<HTMLDivElement>(null);
+  const fileVersion = useRef(0);
+  const drag = useRef<{
+    pointerId: number;
+    start: Point;
+    camera: Camera;
+    pin?: MapPin;
+    moved: boolean;
+  } | null>(null);
+  const cardById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
+  const events = useMemo(
+    () => [...timelineNodes].sort((a, b) => a.x - b.x),
+    [timelineNodes],
+  );
+  const effectiveMapId = map?.id;
+  const consumedFocus = useRef<number | null>(null);
+  useDialogFocus(panel, ".map-settings");
+  useDialogFocus(!!form, ".map-modal");
+  const cameraKey = `wd-map-camera:${projectId}:${map?.id}`;
+  const changeCamera = useCallback((value: Camera) => {
+    cameraRef.current = value;
+    setCamera(value);
+  }, []);
+  const fit = useCallback(() => {
+    if (viewport.current)
+      changeCamera({
+        x: 0,
+        y: 0,
+        zoom: fitMap(
+          imageSize.width,
+          imageSize.height,
+          viewport.current.clientWidth,
+          viewport.current.clientHeight,
+        ),
+      });
+  }, [imageSize, changeCamera]);
+  const save = (changes: Partial<WorldMap>) => {
+    if (map) onSaveMap({ ...map, ...changes, updatedAt: Date.now() });
+  };
+  const patchPin = (id: string, changes: Partial<MapPin>) =>
+    save({
+      pins: map.pins.map((p) => (p.id === id ? { ...p, ...changes } : p)),
+    });
+  const patchShape = (id: string, changes: Partial<MapShape>) =>
+    save({
+      shapes: (map.shapes || []).map((s) =>
+        s.id === id ? { ...s, ...changes } : s,
+      ),
+    });
+  const commitPosition = (id: string, point: Point) => {
+    const pin = map?.pins.find((p) => p.id === id);
+    if (!pin) return;
+    if (eventId)
+      patchPin(id, {
+        positions: [
+          ...(pin.positions || []).filter((p) => p.eventId !== eventId),
+          { eventId, ...point },
+        ],
+      });
+    else patchPin(id, point);
+  };
+  useLayoutEffect(() => {
+    setMode("pan");
+    setSelectedPin("");
+    setSelectedShape("");
+    setQuery("");
+    setHiddenLayers([]);
+    setActiveLayer("");
+    setDraftPoints([]);
+    setDraftPin(null);
+    draftRef.current = null;
+    drag.current = null;
+    setImageState("loading");
+    setGalleryPosition(null);
+    setError("");
+    setMenu(null);
+    setPanel(false);
+    try {
+      if (effectiveMapId)
+        localStorage.setItem(`wd-map-selected:${projectId}`, effectiveMapId);
+    } catch {
+      /* Optional preferences. */
+    }
+  }, [effectiveMapId, map?.imageUrl, projectId]);
   useEffect(() => {
-    zoomRef.current = zoom;
-  }, [zoom]);
-
+    if (imageState !== "ready") return;
+    const timeout = window.setTimeout(() => {
+      try {
+        localStorage.setItem(cameraKey, JSON.stringify(camera));
+      } catch {
+        /* Optional cache. */
+      }
+    }, 150);
+    return () => window.clearTimeout(timeout);
+  }, [camera, cameraKey, imageState]);
   useEffect(() => {
-    panRef.current = pan;
-  }, [pan]);
-
-  // Ref for active smooth zoom animation loop
-  const animFrameRef = useRef<number | null>(null);
-  const wheelRafRef = useRef<number | null>(null);
-
-  // Reset zoom & pan when map changes
+    if (!focus) return;
+    setMapId(focus.mapId);
+    setSelectedPin(focus.pinId || "");
+    setQuery("");
+    setCategory("");
+    setTag("");
+    setDeckId("");
+    setHiddenLayers([]);
+  }, [focus]);
+  const centerPin = useCallback(
+    (pin: MapPin) => {
+      const zoom = Math.max(
+        cameraRef.current.zoom,
+        Math.min(1, 700 / imageSize.width),
+      );
+      changeCamera({
+        zoom,
+        x: ((50 - pin.x) / 100) * imageSize.width * zoom,
+        y: ((50 - pin.y) / 100) * imageSize.height * zoom,
+      });
+    },
+    [imageSize, changeCamera],
+  );
   useEffect(() => {
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-      animFrameRef.current = null;
+    if (
+      imageState === "ready" &&
+      focus?.mapId === map?.id &&
+      focus.pinId &&
+      consumedFocus.current !== focus.token
+    ) {
+      const pin = map.pins.find((p) => p.id === focus.pinId);
+      if (pin) {
+        consumedFocus.current = focus.token;
+        setSelectedPin(pin.id);
+        centerPin(pinAtEvent(pin, eventId, events));
+      }
     }
-    if (wheelRafRef.current) {
-      cancelAnimationFrame(wheelRafRef.current);
-      wheelRafRef.current = null;
-    }
-    zoomRef.current = 1;
-    panRef.current = { x: 0, y: 0 };
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-    setSelectedPinId(null);
-    setIsAddPinMode(false);
-    setHasDragged(false);
-  }, [selectedMapId]);
-
-  // Smooth animate to target zoom and target pan (ease-out cubic / exponential smoothing like Google Maps)
-  const animateTo = useCallback((targetZoom: number, targetPan: { x: number; y: number }, durationMs: number = 220) => {
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-      animFrameRef.current = null;
-    }
-    if (wheelRafRef.current) {
-      cancelAnimationFrame(wheelRafRef.current);
-      wheelRafRef.current = null;
-    }
-
-    const startZoom = zoomRef.current;
-    const startPanX = panRef.current.x;
-    const startPanY = panRef.current.y;
-    const startTime = performance.now();
-
-    // Ease-out cubic function: fast onset, buttery-soft deceleration landing
-    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-
-    const step = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(1, Math.max(0, elapsed / durationMs));
-      const ease = easeOutCubic(progress);
-
-      const currentZ = startZoom + (targetZoom - startZoom) * ease;
-      const currentPx = startPanX + (targetPan.x - startPanX) * ease;
-      const currentPy = startPanY + (targetPan.y - startPanY) * ease;
-
-      zoomRef.current = currentZ;
-      panRef.current = { x: currentPx, y: currentPy };
-      setZoom(currentZ);
-      setPan({ x: currentPx, y: currentPy });
-
-      if (progress < 1) {
-        animFrameRef.current = requestAnimationFrame(step);
-      } else {
-        animFrameRef.current = null;
+  }, [focus, imageState, map, eventId, events, centerPin]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMode("pan");
+        setDraftPoints([]);
+        setGalleryPosition(null);
+        setForm(null);
+        fileVersion.current++;
+        setImageBusy(false);
+        setMenu(null);
+        setPanel(false);
+        setDraftPin(null);
+        draftRef.current = null;
+        drag.current = null;
       }
     };
-
-    animFrameRef.current = requestAnimationFrame(step);
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
   }, []);
-
-  // Precise Cursor-Centric Focal Zoom
-  const zoomAtPoint = useCallback((targetZoom: number, clientX: number, clientY: number, smooth: boolean = false) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    const currentZoom = zoomRef.current;
-    const currentPan = panRef.current;
-
-    const nextZoom = Math.max(0.2, Math.min(5.0, targetZoom));
-    if (Math.abs(nextZoom - currentZoom) < 0.0001) return;
-
-    // Calculate world coordinate (relative to container center) under mouse cursor
-    const worldX = (clientX - centerX - currentPan.x) / currentZoom;
-    const worldY = (clientY - centerY - currentPan.y) / currentZoom;
-
-    // Calculate new pan to lock world point to exact mouse screen position
-    const newPanX = (clientX - centerX) - worldX * nextZoom;
-    const newPanY = (clientY - centerY) - worldY * nextZoom;
-
-    if (smooth) {
-      animateTo(nextZoom, { x: newPanX, y: newPanY }, 240);
-    } else {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-      zoomRef.current = nextZoom;
-      panRef.current = { x: newPanX, y: newPanY };
-      setZoom(nextZoom);
-      setPan({ x: newPanX, y: newPanY });
-    }
-  }, [animateTo]);
-
-  // Smooth zoom handlers for buttons (focus on viewport center)
-  const handleZoom = (delta: number) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    zoomAtPoint(zoomRef.current + delta, centerX, centerY, true);
-  };
-
-  // Wheel zoom (Ctrl + Wheel) & Smooth 2D Scroll navigation (Horizontal & Vertical with inertia damping)
+  // Follow the actual viewport, including the first uploaded map.
   useEffect(() => {
-    const el = containerRef.current;
+    const el = viewport.current;
     if (!el) return;
-
-    let targetZoomLevel = zoomRef.current;
-    let targetPanX = panRef.current.x;
-    let targetPanY = panRef.current.y;
-    let lastClientX = 0;
-    let lastClientY = 0;
-    let isZoomingMode = false;
-
-    const updateSmoothWheel = () => {
-      if (isZoomingMode) {
-        const current = zoomRef.current;
-        const diff = targetZoomLevel - current;
-
-        if (Math.abs(diff) > 0.001) {
-          // Interpolate toward target zoom (smooth damping factor 0.22 per frame)
-          const nextStepZoom = current + diff * 0.22;
-          zoomAtPoint(nextStepZoom, lastClientX, lastClientY, false);
-          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
-        } else {
-          zoomAtPoint(targetZoomLevel, lastClientX, lastClientY, false);
-          wheelRafRef.current = null;
-        }
-      } else {
-        // Smooth scroll damping (vertical & horizontal pan)
-        const currentPanX = panRef.current.x;
-        const currentPanY = panRef.current.y;
-        const diffX = targetPanX - currentPanX;
-        const diffY = targetPanY - currentPanY;
-
-        if (Math.abs(diffX) > 0.4 || Math.abs(diffY) > 0.4) {
-          const nextPx = currentPanX + diffX * 0.22;
-          const nextPy = currentPanY + diffY * 0.22;
-          panRef.current = { x: nextPx, y: nextPy };
-          setPan({ x: nextPx, y: nextPy });
-          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
-        } else {
-          panRef.current = { x: targetPanX, y: targetPanY };
-          setPan({ x: targetPanX, y: targetPanY });
-          wheelRafRef.current = null;
-        }
-      }
-    };
-
-    const onNativeWheel = (e: WheelEvent) => {
+    const wheel = (e: WheelEvent) => {
+      if ((e.target as HTMLElement).closest("button,input,select")) return;
       e.preventDefault();
-
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-
+      if (drag.current) return;
+      const c = cameraRef.current;
       if (e.ctrlKey || e.metaKey) {
-        // Smooth Zoom mode (Ctrl + Wheel)
-        if (!isZoomingMode && wheelRafRef.current) {
-          cancelAnimationFrame(wheelRafRef.current);
-          wheelRafRef.current = null;
-        }
-        isZoomingMode = true;
-        lastClientX = e.clientX;
-        lastClientY = e.clientY;
-
-        if (wheelRafRef.current === null) {
-          targetZoomLevel = zoomRef.current;
-        }
-
-        // Proportional exponential zoom per wheel notch (smooth Google Maps feeling)
-        const delta = Math.max(-100, Math.min(100, e.deltaY));
-        const factor = Math.exp(-delta * 0.0016);
-        targetZoomLevel = Math.max(0.2, Math.min(5.0, targetZoomLevel * factor));
-
-        if (!wheelRafRef.current) {
-          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
-        }
-      } else if (e.shiftKey) {
-        // Shift + Wheel = Smooth horizontal pan
-        if (isZoomingMode && wheelRafRef.current) {
-          cancelAnimationFrame(wheelRafRef.current);
-          wheelRafRef.current = null;
-        }
-        isZoomingMode = false;
-
-        if (wheelRafRef.current === null) {
-          targetPanX = panRef.current.x;
-          targetPanY = panRef.current.y;
-        }
-
-        const scrollDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-        const clampedDelta = Math.max(-200, Math.min(200, scrollDelta));
-        targetPanX -= clampedDelta * 0.9;
-
-        if (!wheelRafRef.current) {
-          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
-        }
-      } else {
-        // Standard Wheel = Smooth 2D pan (vertical deltaY & horizontal deltaX)
-        if (isZoomingMode && wheelRafRef.current) {
-          cancelAnimationFrame(wheelRafRef.current);
-          wheelRafRef.current = null;
-        }
-        isZoomingMode = false;
-
-        if (wheelRafRef.current === null) {
-          targetPanX = panRef.current.x;
-          targetPanY = panRef.current.y;
-        }
-
-        const clampedDeltaX = Math.max(-200, Math.min(200, e.deltaX));
-        const clampedDeltaY = Math.max(-200, Math.min(200, e.deltaY));
-
-        targetPanX -= clampedDeltaX * 0.9;
-        targetPanY -= clampedDeltaY * 0.9;
-
-        if (!wheelRafRef.current) {
-          wheelRafRef.current = requestAnimationFrame(updateSmoothWheel);
-        }
-      }
-    };
-
-    el.addEventListener('wheel', onNativeWheel, { passive: false });
-    return () => {
-      el.removeEventListener('wheel', onNativeWheel);
-      if (wheelRafRef.current) {
-        cancelAnimationFrame(wheelRafRef.current);
-        wheelRafRef.current = null;
-      }
-    };
-  }, [zoomAtPoint]);
-
-  // Close context menu on global click or wheel/scroll
-  useEffect(() => {
-    if (!contextMenu.visible) return;
-
-    const handleClose = () => {
-      setContextMenu((prev) => ({ ...prev, visible: false }));
-    };
-
-    window.addEventListener('click', handleClose);
-    window.addEventListener('wheel', handleClose, { passive: true });
-    window.addEventListener('resize', handleClose);
-
-    return () => {
-      window.removeEventListener('click', handleClose);
-      window.removeEventListener('wheel', handleClose);
-      window.removeEventListener('resize', handleClose);
-    };
-  }, [contextMenu.visible]);
-
-  // Global mouseup listener to release pan/drag anywhere
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      setIsPanning(false);
-      setDraggingPinId(null);
-      dragOffsetRef.current = { x: 0, y: 0 };
-    };
-    window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-  }, []);
-
-  // Open create map modal
-  const handleOpenCreateModal = () => {
-    setMapFormMode('create');
-    setMapName('');
-    setMapDesc('');
-    setMapImageUrl('');
-    setShowMapModal(true);
-  };
-
-  // Open edit map modal
-  const handleOpenEditModal = () => {
-    if (!currentMap) return;
-    setMapFormMode('edit');
-    setMapName(currentMap.name);
-    setMapDesc(currentMap.description || '');
-    setMapImageUrl(currentMap.imageUrl);
-    setShowMapModal(true);
-  };
-
-  // File upload handler
-  const handleImageFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setMapImageUrl(event.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Save map (Create or Edit)
-  const handleSaveMapSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mapImageUrl) return;
-
-    const now = Date.now();
-    if (mapFormMode === 'create') {
-      const newMap: WorldMap = {
-        id: `map_${now}_${Math.random().toString(36).substr(2, 6)}`,
-        name: mapName.trim() || t.map.unnamedMap,
-        description: mapDesc.trim(),
-        imageUrl: mapImageUrl,
-        pins: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      onSaveMap(newMap);
-      setSelectedMapId(newMap.id);
-    } else if (currentMap) {
-      const updatedMap: WorldMap = {
-        ...currentMap,
-        name: mapName.trim() || t.map.unnamedMap,
-        description: mapDesc.trim(),
-        imageUrl: mapImageUrl,
-        updatedAt: now,
-      };
-      onSaveMap(updatedMap);
-    }
-    setShowMapModal(false);
-  };
-
-  // Delete Map
-  const handleDeleteCurrentMap = () => {
-    if (!currentMap) return;
-    setConfirmModalConfig({
-      isOpen: true,
-      title: t.map.deleteMap,
-      description: `${t.map.deleteMapConfirm} ("${currentMap.name}")`,
-      confirmLabel: t.common.delete || (language === 'en' ? 'Delete' : 'Hapus'),
-      cancelLabel: t.common.cancel || (language === 'en' ? 'Cancel' : 'Batal'),
-      variant: 'danger',
-      onConfirm: () => {
-        onDeleteMap(currentMap.id);
-        setConfirmModalConfig(null);
-      },
-      onCancel: () => setConfirmModalConfig(null),
-    });
-  };
-
-  // Handle click on Map Image to add pin (triggers card creation modal)
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (hasDragged) {
-      setHasDragged(false);
-      return;
-    }
-
-    if (!currentMap || !imageRef.current) return;
-    
-    // Ignore click if clicking directly on a pin or controls
-    const target = e.target as HTMLElement;
-    if (target.closest('.map-pin-element') || target.closest('button')) return;
-
-    if (!isAddPinMode) return;
-
-    const rect = imageRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    const percentX = Math.min(100, Math.max(0, (clickX / rect.width) * 100));
-    const percentY = Math.min(100, Math.max(0, (clickY / rect.height) * 100));
-    const posX = Math.round(percentX * 10) / 10;
-    const posY = Math.round(percentY * 10) / 10;
-
-    setIsAddPinMode(false);
-
-    if (onCreatePinCard) {
-      onCreatePinCard(currentMap.id, posX, posY);
-    }
-  };
-
-  // Container Mouse Down for Google Maps style pan-and-drag
-  const handleContainerMouseDown = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('button, input, select, textarea, a, .map-pin-element')) return;
-
-    if (isAddPinMode) return;
-
-    if (e.button === 0 || e.button === 1) {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-      if (wheelRafRef.current) {
-        cancelAnimationFrame(wheelRafRef.current);
-        wheelRafRef.current = null;
-      }
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-      setHasDragged(false);
-    }
-  };
-
-  // Delete Pin
-  const handleDeletePin = (pinId: string) => {
-    if (!currentMap) return;
-    const targetPin = currentMap.pins.find((p) => p.id === pinId);
-    const pinName = targetPin?.title || (language === 'en' ? 'this pin' : 'pin ini');
-
-    setConfirmModalConfig({
-      isOpen: true,
-      title: t.map.deletePin,
-      description: `${t.map.deletePinConfirm} ("${pinName}")`,
-      confirmLabel: t.common.delete || (language === 'en' ? 'Delete' : 'Hapus'),
-      cancelLabel: t.common.cancel || (language === 'en' ? 'Cancel' : 'Batal'),
-      variant: 'danger',
-      onConfirm: () => {
-        const newPins = currentMap.pins.filter((p) => p.id !== pinId);
-        onSaveMap({
-          ...currentMap,
-          pins: newPins,
-          updatedAt: Date.now(),
-        });
-        if (selectedPinId === pinId) setSelectedPinId(null);
-        setConfirmModalConfig(null);
-      },
-      onCancel: () => setConfirmModalConfig(null),
-    });
-  };
-
-  // Drag pin handlers (Direct click-and-drag to move, double-click to open card)
-  const handlePinMouseDown = (e: React.MouseEvent, pinId: string) => {
-    // Only handle primary (left) button
-    if (e.button !== 0) return;
-    e.stopPropagation();
-    if (isAddPinMode) return;
-
-    setSelectedPinId(pinId);
-
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-      animFrameRef.current = null;
-    }
-    if (wheelRafRef.current) {
-      cancelAnimationFrame(wheelRafRef.current);
-      wheelRafRef.current = null;
-    }
-
-    if (imageRef.current) {
-      const rect = imageRef.current.getBoundingClientRect();
-      const cursorPercentX = ((e.clientX - rect.left) / rect.width) * 100;
-      const cursorPercentY = ((e.clientY - rect.top) / rect.height) * 100;
-      const targetPin = currentMap?.pins.find((p) => p.id === pinId);
-      if (targetPin) {
-        dragOffsetRef.current = {
-          x: cursorPercentX - targetPin.x,
-          y: cursorPercentY - targetPin.y,
+        const rect = el.getBoundingClientRect();
+        const point = {
+          x: e.clientX - rect.left - rect.width / 2,
+          y: e.clientY - rect.top - rect.height / 2,
         };
-      }
-    }
-    setDraggingPinId(pinId);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning) {
-      const newPanX = e.clientX - panStart.x;
-      const newPanY = e.clientY - panStart.y;
-      if (Math.abs(newPanX - pan.x) > 3 || Math.abs(newPanY - pan.y) > 3) {
-        setHasDragged(true);
-      }
-      panRef.current = { x: newPanX, y: newPanY };
-      setPan({ x: newPanX, y: newPanY });
-      return;
-    }
-
-    if (draggingPinId && currentMap && imageRef.current) {
-      const rect = imageRef.current.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-
-      // Compensate for cursor offset relative to pin coordinate so the pin does not jump abruptly
-      const rawPercentX = ((clickX / rect.width) * 100) - dragOffsetRef.current.x;
-      const rawPercentY = ((clickY / rect.height) * 100) - dragOffsetRef.current.y;
-
-      const percentX = Math.min(100, Math.max(0, rawPercentX));
-      const percentY = Math.min(100, Math.max(0, rawPercentY));
-
-      const updatedPins = currentMap.pins.map((p) => {
-        if (p.id === draggingPinId) {
-          return {
-            ...p,
-            x: Math.round(percentX * 10) / 10,
-            y: Math.round(percentY * 10) / 10,
-          };
-        }
-        return p;
-      });
-
-      onSaveMap({
-        ...currentMap,
-        pins: updatedPins,
-        updatedAt: Date.now(),
-      });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsPanning(false);
-    setDraggingPinId(null);
-    dragOffsetRef.current = { x: 0, y: 0 };
-  };
-
-  // Context Menu Handler
-  const handleContextMenu = (e: React.MouseEvent) => {
-    // If clicking on an input/textarea or button, do not intercept
-    const target = e.target as HTMLElement;
-    if (target.closest('input, textarea, button, select')) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Check if right-clicking on a pin
-    const pinElem = target.closest('.map-pin-element');
-    const pinId = pinElem?.getAttribute('data-pin-id') || null;
-
-    let mapPercentX: number | null = null;
-    let mapPercentY: number | null = null;
-
-    if (imageRef.current) {
-      const rect = imageRef.current.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-      // Clamp between 0 and 100
-      const rawX = (clickX / rect.width) * 100;
-      const rawY = (clickY / rect.height) * 100;
-      if (rawX >= -5 && rawX <= 105 && rawY >= -5 && rawY <= 105) {
-        mapPercentX = Math.round(Math.min(100, Math.max(0, rawX)) * 10) / 10;
-        mapPercentY = Math.round(Math.min(100, Math.max(0, rawY)) * 10) / 10;
-      }
-    }
-
-    if (pinId) {
-      setSelectedPinId(pinId);
-    }
-
-    const isNearRight = e.clientX > window.innerWidth - 240;
-    const isNearBottom = e.clientY > window.innerHeight - 240;
-
-    setContextMenu({
-      visible: true,
-      x: e.clientX,
-      y: e.clientY,
-      mapPercentX,
-      mapPercentY,
-      pinId,
-      isNearRight,
-      isNearBottom,
+        const zoom = Math.max(
+          0.01,
+          Math.min(5, c.zoom * Math.exp(-e.deltaY * 0.002)),
+        );
+        changeCamera({
+          zoom,
+          x: point.x - ((point.x - c.x) * zoom) / c.zoom,
+          y: point.y - ((point.y - c.y) * zoom) / c.zoom,
+        });
+      } else
+        changeCamera({
+          ...c,
+          x: c.x - (e.shiftKey ? e.deltaY : e.deltaX),
+          y: c.y - (e.shiftKey ? 0 : e.deltaY),
+        });
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  }, [map?.id, changeCamera]);
+  function pointAt(clientX: number, clientY: number): Point | null {
+    const rect = viewport.current?.getBoundingClientRect();
+    if (!rect || imageState !== "ready") return null;
+    const c = cameraRef.current;
+    return {
+      x:
+        ((clientX - rect.left - rect.width / 2 - c.x) /
+          c.zoom /
+          imageSize.width +
+          0.5) *
+        100,
+      y:
+        ((clientY - rect.top - rect.height / 2 - c.y) /
+          c.zoom /
+          imageSize.height +
+          0.5) *
+        100,
+    };
+  }
+  const pins = useMemo(
+    () =>
+      (map?.pins || [])
+        .filter((p) => !hiddenLayers.includes(p.layerId || ""))
+        .map((p) => pinAtEvent(p, eventId, events))
+        .filter((p) => {
+          const card = cardById.get(p.cardId || "");
+          const deck = decks.find((d) => d.id === deckId);
+          return (
+            (!category || card?.category === category) &&
+            (!tag || card?.tags.includes(tag)) &&
+            (!deckId ||
+              card?.deckId === deckId ||
+              !!deck?.cardIds.includes(p.cardId || "")) &&
+            [
+              card?.title || p.title,
+              card?.summary || p.description,
+              ...(card?.tags || []),
+            ]
+              .join(" ")
+              .toLowerCase()
+              .includes(query.trim().toLowerCase())
+          );
+        }),
+    [
+      map,
+      cardById,
+      hiddenLayers,
+      eventId,
+      events,
+      decks,
+      deckId,
+      category,
+      tag,
+      query,
+    ],
+  );
+  const pin = pins.find((p) => p.id === selectedPin);
+  const linkedCard = cardById.get(pin?.cardId || "");
+  const shape = map?.shapes?.find((s) => s.id === selectedShape);
+  const visibleShapes = (map?.shapes || []).filter(
+    (s) =>
+      !hiddenLayers.includes(s.layerId || "") &&
+      shapeAtEvent(s, eventId, events),
+  );
+  const askDelete = (name: string, action: () => void) =>
+    setConfirm({
+      isOpen: true,
+      title: text("Hapus", "Delete"),
+      description: text(
+        `Hapus “${name}”? Kamu bisa membatalkannya dengan Undo.`,
+        `Delete “${name}”? You can undo this change.`,
+      ),
+      variant: "danger",
+      onConfirm: () => {
+        action();
+        setConfirm(null);
+      },
     });
+  const changeMode = (next: Mode) => {
+    setMode(next);
+    setDraftPoints([]);
+    setSelectedShape("");
   };
-
-  // Center viewport on context menu coordinate
-  const handleCenterOnPos = (screenX: number, screenY: number) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    // Shift pan so (screenX, screenY) moves to (centerX, centerY)
-    const deltaX = centerX - screenX;
-    const deltaY = centerY - screenY;
-
-    const newPanX = panRef.current.x + deltaX;
-    const newPanY = panRef.current.y + deltaY;
-
-    animateTo(zoomRef.current, { x: newPanX, y: newPanY }, 250);
+  const finishShape = () => {
+    if (!map || draftPoints.length < (mode === "region" ? 3 : 2)) return;
+    const next: MapShape = {
+      id: generateId("shape"),
+      name:
+        mode === "region"
+          ? text("Wilayah baru", "New region")
+          : text("Rute baru", "New route"),
+      kind: mode === "region" ? "region" : "route",
+      points: draftPoints,
+      color: COLORS[0],
+      layerId: activeLayer || undefined,
+      fromEventId: eventId || undefined,
+    };
+    save({ shapes: [...(map.shapes || []), next] });
+    setSelectedPin("");
+    setPanel(true);
+    changeMode("pan");
+    setSelectedShape(next.id);
   };
-
-  // Focus and center on a pin smoothly
-  const handleFocusOnPin = (pin: MapPin) => {
-    if (!imageRef.current) return;
-
-    // We want pin position to align with center
-    // Pin coordinate on unscaled map image
-    const naturalWidth = imageRef.current.offsetWidth;
-    const naturalHeight = imageRef.current.offsetHeight;
-    const pinImageX = (pin.x / 100) * naturalWidth;
-    const pinImageY = (pin.y / 100) * naturalHeight;
-
-    // When centered, image center is at (0, 0) relative to pan
-    const targetZoom = Math.max(zoomRef.current, 1.4);
-    const newPanX = (naturalWidth / 2 - pinImageX) * targetZoom;
-    const newPanY = (naturalHeight / 2 - pinImageY) * targetZoom;
-
-    setSelectedPinId(pin.id);
-    animateTo(targetZoom, { x: newPanX, y: newPanY }, 300);
+  const layerSelect = (
+    value: string | undefined,
+    change: (id: string) => void,
+  ) => (
+    <select
+      aria-label={text("Layer", "Layer")}
+      value={value || ""}
+      onChange={(e) => change(e.target.value)}
+    >
+      <option value="">{text("Dasar", "Base")}</option>
+      {map?.layers?.map((l) => (
+        <option key={l.id} value={l.id}>
+          {l.name}
+        </option>
+      ))}
+    </select>
+  );
+  const eventSelect = (
+    value: string | undefined,
+    change: (id: string) => void,
+    empty: string,
+  ) => (
+    <select
+      aria-label={empty}
+      value={value || ""}
+      onChange={(e) => change(e.target.value)}
+    >
+      <option value="">{empty}</option>
+      {events.map((e) => (
+        <option key={e.id} value={e.id}>
+          {e.dateLabel ? `${e.dateLabel} · ` : ""}
+          {e.title}
+        </option>
+      ))}
+    </select>
+  );
+  const closeForm = () => {
+    setForm(null);
+    fileVersion.current++;
+    setImageBusy(false);
   };
-
-  // Quick change pin color
-  const handleQuickChangePinColor = (pinId: string, color: string) => {
-    if (!currentMap) return;
-    const newPins = currentMap.pins.map((p) => (p.id === pinId ? { ...p, color } : p));
-    onSaveMap({
-      ...currentMap,
-      pins: newPins,
-      updatedAt: Date.now(),
-    });
-  };
-
-  // Filter out any orphan pins where the linked card has been deleted
-  const validPins = useMemo(() => {
-    if (!currentMap) return [];
-    return currentMap.pins.filter((pin) => {
-      if (pin.cardId) {
-        return cards.some((c) => c.id === pin.cardId);
-      }
-      return true;
-    });
-  }, [currentMap, cards]);
-
-  // Auto-sync & persist pin cleanup if any linked card was deleted
-  useEffect(() => {
-    if (!currentMap) return;
-    const hasOrphans = currentMap.pins.some((pin) => pin.cardId && !cards.some((c) => c.id === pin.cardId));
-    if (hasOrphans) {
-      const cleanedPins = currentMap.pins.filter((pin) => !pin.cardId || cards.some((c) => c.id === pin.cardId));
-      onSaveMap({
-        ...currentMap,
-        pins: cleanedPins,
-        updatedAt: Date.now(),
-      });
-    }
-  }, [currentMap, cards, onSaveMap]);
-
-  // Filtered pins based on search query
-  const filteredPins = useMemo(() => {
-    if (!validPins.length) return [];
-    if (!searchQuery.trim()) return validPins;
-
-    const q = searchQuery.toLowerCase();
-    return validPins.filter((pin) => {
-      const titleMatch = pin.title.toLowerCase().includes(q);
-      const descMatch = (pin.description || '').toLowerCase().includes(q);
-      const linkedCard = cards.find((c) => c.id === pin.cardId);
-      const cardMatch = linkedCard
-        ? linkedCard.title.toLowerCase().includes(q) ||
-          linkedCard.tags.some((t) => t.toLowerCase().includes(q))
-        : false;
-      return titleMatch || descMatch || cardMatch;
-    });
-  }, [validPins, searchQuery, cards]);
-
-  // Dynamic pin scaling: pins counter-scale with zoom so they remain readable without becoming excessively tiny or overwhelmingly huge
-  const pinScale = useMemo(() => {
-    // Keep pins at an optimal screen size (~1.0x - 1.35x):
-    // When zooming in, visual scale gently expands to ~1.3x so pins & text labels are bold, crisp, and easily readable.
-    // Screen size = pinScale * zoom.
-    // targetVisualScale = clamp(1.0, 1.45, 0.95 + 0.15 * zoom)
-    const targetVisualScale = Math.max(1.0, Math.min(1.45, 0.95 + 0.15 * zoom));
-    return targetVisualScale / zoom;
-  }, [zoom]);
-
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#181818] overflow-hidden select-none">
-      {/* TOOLBAR TOP HEADER */}
-      <div className="h-12 bg-[#222222] border-b border-[#383838] px-4 flex items-center justify-between gap-3 shrink-0 z-20 shadow-md">
-        {/* Left: Map Switcher & Map Management */}
-        <div className="flex items-center gap-2">
-          <Icons.Map size={18} className="text-[#0d99ff]" />
-          <span className="font-bold text-sm text-white">{t.map.title}</span>
-
-          {worldMaps.length > 0 && (
-            <div className="relative flex items-center ml-2">
-              <select
-                value={selectedMapId || ''}
-                onChange={(e) => setSelectedMapId(e.target.value)}
-                className="bg-[#1e1e1e] hover:bg-[#2c2c2c] border border-[#383838] hover:border-[#0d99ff] text-xs font-semibold text-white px-3 py-1.5 pr-8 rounded-lg outline-none cursor-pointer transition-all appearance-none"
-              >
-                {worldMaps.map((map) => {
-                  const count = map.pins.filter((p) => !p.cardId || cards.some((c) => c.id === p.cardId)).length;
-                  return (
-                    <option key={map.id} value={map.id}>
-                      {map.name} ({count} {t.map.pinsCount})
-                    </option>
-                  );
-                })}
-              </select>
-              <Icons.ChevronDown size={14} className="absolute right-2.5 text-slate-400 pointer-events-none" />
-            </div>
+    <section className="map-workspace" aria-label={t.map.title}>
+      <header className="map-toolbar">
+        <div className="map-toolbar-group">
+          <MapIcon size={20} />
+          <strong>{t.map.title}</strong>
+          {map && (
+            <select
+              aria-label={text("Pilih peta", "Choose map")}
+              value={map.id}
+              onChange={(e) => setMapId(e.target.value)}
+            >
+              {worldMaps.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
           )}
-
           <button
-            type="button"
-            onClick={handleOpenCreateModal}
-            className="px-3 py-1.5 rounded-lg bg-[#0d99ff] hover:bg-[#0088eb] text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            onClick={() => {
+              setError("");
+              setForm({
+                name: "",
+                description: "",
+                imageUrl: "",
+                parentMapId: "",
+              });
+            }}
           >
-            <Icons.Plus size={14} />
-            <span>{t.map.uploadMap}</span>
+            <Plus size={16} />
+            {t.map.uploadMap}
           </button>
-
-          {currentMap && (
-            <div className="flex items-center gap-1 border-l border-[#383838] pl-2 ml-1">
-              <button
-                type="button"
-                onClick={handleOpenEditModal}
-                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-[#383838] transition-all cursor-pointer"
-                title={t.map.editMap}
-              >
-                <Icons.Edit3 size={14} />
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteCurrentMap}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-[#383838] transition-all cursor-pointer"
-                title={t.map.deleteMap}
-              >
-                <Icons.Trash2 size={14} />
-              </button>
-            </div>
-          )}
         </div>
-
-        {/* Center: Add Pin Mode Toggle & Search */}
-        {currentMap && (
-          <div className="flex items-center gap-2">
+        {map && (
+          <div className="map-toolbar-group">
             <button
-              type="button"
-              onClick={() => setIsAddPinMode((prev) => !prev)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
-                isAddPinMode
-                  ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md animate-pulse'
-                  : 'bg-[#1e1e1e] hover:bg-[#2c2c2c] text-white border-[#383838] hover:border-[#0d99ff]'
-              }`}
+              className={mode === "new" ? "active" : ""}
+              onClick={() => changeMode(mode === "new" ? "pan" : "new")}
             >
-              <Icons.MapPin size={14} className={isAddPinMode ? 'text-slate-950' : 'text-[#0d99ff]'} />
-              <span>{isAddPinMode ? t.map.addPinModeActive : t.map.addPin}</span>
-            </button>
-
-            <div className="relative w-48 sm:w-64">
-              <Icons.Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t.map.searchPinsPlaceholder}
-                className="w-full bg-[#1e1e1e] border border-[#383838] focus:border-[#0d99ff] rounded-lg pl-8 pr-3 py-1 text-xs text-white placeholder-slate-400 outline-none transition-colors"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                >
-                  <Icons.X size={12} />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Right: Zoom Controls */}
-        {currentMap && (
-          <div className="flex items-center gap-1 bg-[#1e1e1e] p-1 rounded-lg border border-[#383838]">
-            <button
-              type="button"
-              onClick={() => handleZoom(-0.25)}
-              className="p-1 rounded text-slate-300 hover:text-white hover:bg-[#383838] transition-colors"
-              title={t.map.zoomOut}
-            >
-              <Icons.ZoomOut size={14} />
-            </button>
-            <span className="text-[11px] font-mono text-slate-300 w-10 text-center font-bold">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button
-              type="button"
-              onClick={() => handleZoom(0.25)}
-              className="p-1 rounded text-slate-300 hover:text-white hover:bg-[#383838] transition-colors"
-              title={t.map.zoomIn}
-            >
-              <Icons.ZoomIn size={14} />
+              <PinIcon size={16} />
+              {text("Kartu baru", "New card")}
             </button>
             <button
-              type="button"
-              onClick={() => {
-                animateTo(1, { x: 0, y: 0 }, 250);
-              }}
-              className="p-1 rounded text-slate-300 hover:text-white hover:bg-[#383838] transition-colors"
-              title={t.map.resetZoom}
+              className={mode === "existing" ? "active" : ""}
+              onClick={() =>
+                changeMode(mode === "existing" ? "pan" : "existing")
+              }
             >
-              <Icons.Maximize2 size={13} />
+              {text("Kartu yang ada", "Existing card")}
+            </button>
+            <button
+              title={text("Gambar rute", "Draw route")}
+              aria-label={text("Gambar rute", "Draw route")}
+              className={mode === "route" ? "active" : ""}
+              onClick={() => changeMode(mode === "route" ? "pan" : "route")}
+            >
+              <Route size={17} />
+            </button>
+            <button
+              title={text("Gambar wilayah", "Draw region")}
+              aria-label={text("Gambar wilayah", "Draw region")}
+              className={mode === "region" ? "active" : ""}
+              onClick={() => changeMode(mode === "region" ? "pan" : "region")}
+            >
+              <Pentagon size={17} />
+            </button>
+            <button disabled={!canUndo} onClick={onUndo} aria-label="Undo">
+              <Undo2 size={17} />
+            </button>
+            <button disabled={!canRedo} onClick={onRedo} aria-label="Redo">
+              <Redo2 size={17} />
+            </button>
+            <button aria-expanded={panel} onClick={() => setPanel(!panel)}>
+              <Layers size={17} />
+              {text("Pengaturan peta", "Map settings")}
             </button>
           </div>
         )}
-      </div>
-
-      {/* MAIN VIEW AREA */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* EMPTY STATE IF NO MAPS */}
-        {!currentMap ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#181818]">
-            <div className="w-20 h-20 rounded-3xl bg-[#222222] border border-[#383838] flex items-center justify-center mb-4 text-[#0d99ff] shadow-xl">
-              <Icons.Map size={40} />
-            </div>
-            <h2 className="text-xl font-bold text-white mb-2">{t.map.noMaps}</h2>
-            <p className="text-sm text-slate-400 max-w-md mb-6 leading-relaxed">
-              {t.map.noMapsDesc}
-            </p>
-            <button
-              type="button"
-              onClick={handleOpenCreateModal}
-              className="px-5 py-2.5 rounded-xl bg-[#0d99ff] hover:bg-[#0088eb] text-white text-sm font-bold flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-[#0d99ff]/20"
-            >
-              <Icons.Plus size={18} />
-              <span>{t.map.uploadMap}</span>
-            </button>
-          </div>
-        ) : (
-          /* INTERACTIVE MAP CANVAS */
-          <div
-            ref={containerRef}
-            onMouseDown={handleContainerMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onContextMenu={handleContextMenu}
-            className={`flex-1 relative overflow-hidden bg-[#121212] flex items-center justify-center ${
-              isAddPinMode ? 'cursor-crosshair' : isPanning ? 'cursor-grabbing' : 'cursor-grab'
-            }`}
+      </header>
+      {!map ? (
+        <div className="map-empty">
+          <MapIcon size={48} />
+          <h2>{t.map.noMaps}</h2>
+          <p>{t.map.noMapsDesc}</p>
+          <button
+            className="primary"
+            onClick={() =>
+              setForm({
+                name: "",
+                description: "",
+                imageUrl: "",
+                parentMapId: "",
+              })
+            }
           >
-            {/* Banner hint when Add Pin Mode is active */}
-            {isAddPinMode && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-amber-500 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs shadow-2xl flex items-center gap-2 animate-bounce">
-                <Icons.MapPin size={16} />
-                <span>{t.map.addPinModeActive}</span>
-                <button
-                  type="button"
-                  onClick={() => setIsAddPinMode(false)}
-                  className="ml-2 text-slate-900 hover:text-black font-extrabold text-sm"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-
-            {/* Map Container with Zoom & Pan */}
-            <div
-              style={{
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              }}
-              className="relative max-w-full max-h-full inline-block select-none"
+            {t.map.uploadMap}
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="map-breadcrumb">
+            <button
+              disabled={!map.parentMapId}
+              onClick={() => setMapId(map.parentMapId!)}
             >
-              <div className="relative inline-block" onClick={handleMapClick}>
+              ↑ {text("Peta induk", "Parent map")}
+            </button>
+            <span>{map.name}</span>
+            {worldMaps
+              .filter((m) => m.parentMapId === map.id)
+              .map((m) => (
+                <button key={m.id} onClick={() => setMapId(m.id)}>
+                  ↳ {m.name}
+                </button>
+              ))}
+            <span className="map-spacer" />
+            {eventSelect(
+              eventId,
+              setEventId,
+              text(
+                "Posisi dasar · semua periode",
+                "Base positions · all periods",
+              ),
+            )}
+          </div>
+          <div className="map-body">
+            <div
+              onContextMenu={(e) => {
+                e.preventDefault();
+                const target = (e.target as HTMLElement).closest(
+                  "[data-pin-id]",
+                );
+                const id = target?.getAttribute("data-pin-id") || undefined;
+                if (id) setSelectedPin(id);
+                setMenu({
+                  x: Math.min(e.clientX, window.innerWidth - 240),
+                  y: Math.min(e.clientY, window.innerHeight - 300),
+                  pinId: id,
+                  point: pointAt(e.clientX, e.clientY),
+                });
+              }}
+              ref={viewport}
+              className={`map-viewport mode-${mode}`}
+              tabIndex={0}
+              aria-label={text(
+                "Area peta. Ctrl dan scroll untuk zoom.",
+                "Map viewport. Ctrl and scroll to zoom.",
+              )}
+              onPointerDown={(e) => {
+                if (
+                  e.button !== 0 ||
+                  (e.target as HTMLElement).closest(
+                    "button,input,select,.map-overlay-controls",
+                  )
+                )
+                  return;
+                viewport.current?.setPointerCapture(e.pointerId);
+                drag.current = {
+                  pointerId: e.pointerId,
+                  start: { x: e.clientX, y: e.clientY },
+                  camera: cameraRef.current,
+                  moved: false,
+                };
+              }}
+              onPointerMove={(e) => {
+                const d = drag.current;
+                if (!d || d.pointerId !== e.pointerId) return;
+                const dx = e.clientX - d.start.x,
+                  dy = e.clientY - d.start.y;
+                if (Math.hypot(dx, dy) < 4 && !d.moved) return;
+                d.moved = true;
+                if (d.pin) {
+                  const value = {
+                    id: d.pin.id,
+                    x: clampPercent(
+                      d.pin.x + (dx / d.camera.zoom / imageSize.width) * 100,
+                    ),
+                    y: clampPercent(
+                      d.pin.y + (dy / d.camera.zoom / imageSize.height) * 100,
+                    ),
+                  };
+                  draftRef.current = value;
+                  setDraftPin(value);
+                } else if (mode === "pan")
+                  changeCamera({
+                    ...d.camera,
+                    x: d.camera.x + dx,
+                    y: d.camera.y + dy,
+                  });
+              }}
+              onPointerUp={(e) => {
+                const d = drag.current;
+                drag.current = null;
+                if (viewport.current?.hasPointerCapture(e.pointerId))
+                  viewport.current.releasePointerCapture(e.pointerId);
+                if (d?.pin) {
+                  const value = draftRef.current;
+                  if (d.moved && value)
+                    commitPosition(value.id, { x: value.x, y: value.y });
+                  draftRef.current = null;
+                  setDraftPin(null);
+                  return;
+                }
+                if (!d || d.moved) return;
+                const point = pointAt(e.clientX, e.clientY);
+                if (
+                  !point ||
+                  point.x < 0 ||
+                  point.x > 100 ||
+                  point.y < 0 ||
+                  point.y > 100
+                )
+                  return;
+                if (mode === "new") {
+                  onCreatePinCard?.(map.id, point.x, point.y);
+                  setMode("pan");
+                } else if (mode === "existing") {
+                  setGalleryPosition(point);
+                  setMode("pan");
+                } else if (mode === "route" || mode === "region")
+                  setDraftPoints((p) => [...p, point]);
+                else {
+                  setSelectedPin("");
+                  setSelectedShape("");
+                }
+              }}
+              onPointerCancel={() => {
+                drag.current = null;
+                draftRef.current = null;
+                setDraftPin(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                const delta: Record<string, Point> = {
+                  ArrowLeft: { x: 40, y: 0 },
+                  ArrowRight: { x: -40, y: 0 },
+                  ArrowUp: { x: 0, y: 40 },
+                  ArrowDown: { x: 0, y: -40 },
+                };
+                if (delta[e.key]) {
+                  e.preventDefault();
+                  const c = cameraRef.current;
+                  changeCamera({
+                    ...c,
+                    x: c.x + delta[e.key].x,
+                    y: c.y + delta[e.key].y,
+                  });
+                }
+                if (e.key.toLowerCase() === "f") fit();
+              }}
+            >
+              <div
+                className="map-surface"
+                style={{
+                  width: imageSize.width,
+                  height: imageSize.height,
+                  transform: `translate(-50%, -50%) translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
+                }}
+              >
                 <img
-                  ref={imageRef}
-                  src={currentMap.imageUrl}
-                  alt={currentMap.name}
-                  className="max-w-none max-h-[85vh] object-contain rounded-xl shadow-2xl border border-[#383838] pointer-events-auto"
+                  key={map.id + map.imageUrl}
+                  src={map.imageUrl}
+                  alt={map.name}
                   draggable={false}
+                  onError={() => setImageState("error")}
+                  onLoad={(e) => {
+                    const img = e.currentTarget;
+                    const size = {
+                      width: img.naturalWidth,
+                      height: img.naturalHeight,
+                    };
+                    setImageSize(size);
+                    setImageState("ready");
+                    const rect = viewport.current?.getBoundingClientRect();
+                    changeCamera(
+                      savedCamera(cameraKey) || {
+                        x: 0,
+                        y: 0,
+                        zoom: fitMap(
+                          size.width,
+                          size.height,
+                          rect?.width || 800,
+                          rect?.height || 600,
+                        ),
+                      },
+                    );
+                  }}
                 />
-
-                {/* RENDER PINS ON MAP */}
-                {filteredPins.map((pin) => {
-                  const isSelected = selectedPinId === pin.id;
-                  const pinColor = pin.color || '#0d99ff';
-                  const baseScale = pinScale * (isSelected ? 1.25 : 1);
-                  const isDragging = draggingPinId === pin.id;
-                  const linkedCard = pin.cardId ? cards.find((c) => c.id === pin.cardId) : undefined;
-                  const displayTitle = linkedCard ? linkedCard.title : pin.title;
-
+                <svg
+                  className="map-shapes"
+                  viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
+                  aria-label={text("Wilayah dan rute", "Regions and routes")}
+                >
+                  {visibleShapes.map((s) => {
+                    const points = s.points
+                      .map(
+                        (p) =>
+                          `${(p.x / 100) * imageSize.width},${(p.y / 100) * imageSize.height}`,
+                      )
+                      .join(" ");
+                    const props = {
+                      points,
+                      stroke: s.color,
+                      strokeWidth: selectedShape === s.id ? 4 : 2,
+                      vectorEffect: "non-scaling-stroke" as const,
+                      onPointerDown: (e: React.PointerEvent) => {
+                        if (mode === "pan") {
+                          e.stopPropagation();
+                          setSelectedShape(s.id);
+                          setSelectedPin("");
+                        }
+                      },
+                      style: {
+                        pointerEvents:
+                          mode === "pan"
+                            ? ("auto" as const)
+                            : ("none" as const),
+                        cursor: "pointer",
+                      },
+                    };
+                    return s.kind === "region" ? (
+                      <polygon
+                        key={s.id}
+                        {...props}
+                        fill={s.color}
+                        fillOpacity={0.2}
+                      >
+                        <title>{s.name}</title>
+                      </polygon>
+                    ) : (
+                      <polyline key={s.id} {...props} fill="none">
+                        <title>{s.name}</title>
+                      </polyline>
+                    );
+                  })}
+                  {draftPoints.length > 0 && (
+                    <polyline
+                      points={draftPoints
+                        .map(
+                          (p) =>
+                            `${(p.x / 100) * imageSize.width},${(p.y / 100) * imageSize.height}`,
+                        )
+                        .join(" ")}
+                      stroke="#f59e0b"
+                      strokeWidth={3}
+                      vectorEffect="non-scaling-stroke"
+                      fill={mode === "region" ? "#f59e0b33" : "none"}
+                    />
+                  )}
+                </svg>
+                {pins.map((p) => {
+                  const pos = draftPin?.id === p.id ? draftPin : p;
+                  const title = cardById.get(p.cardId || "")?.title || p.title;
                   return (
-                    <div
-                      key={pin.id}
-                      data-pin-id={pin.id}
+                    <button
+                      key={p.id}
+                      data-pin-id={p.id}
+                      data-broken-reference={((p.cardId && !cardById.has(p.cardId)) || (p.targetMapId && !worldMaps.some(m => m.id === p.targetMapId)) || (p.layerId && !(map?.layers || []).some(l => l.id === p.layerId))) || undefined}
+                      aria-label={title}
+                      title={p.cardId && !cardById.has(p.cardId) ? `${title} — ${text("Referensi terputus", "Broken reference")}: ${p.cardId}` : title}
+                      className={`atlas-pin ${selectedPin === p.id ? "selected" : ""} labels-${labels}`}
                       style={{
-                        left: `${pin.x}%`,
-                        top: `${pin.y}%`,
-                        transform: `translate(-50%, -100%) scale(${baseScale})`,
-                        transformOrigin: 'bottom center',
+                        left: `${pos.x}%`,
+                        top: `${pos.y}%`,
+                        transform: `translate(-50%, -100%) scale(${1 / camera.zoom})`,
+                        color: p.color || COLORS[0],
                       }}
-                      onMouseDown={(e) => handlePinMouseDown(e, pin.id)}
-                      onClick={(e) => {
+                      onPointerDown={(e) => {
+                        if (e.button !== 0 || mode !== "pan") return;
                         e.stopPropagation();
-                        setSelectedPinId(pin.id);
+                        e.currentTarget.setPointerCapture(e.pointerId);
+                        setSelectedPin(p.id);
+                        setSelectedShape("");
+                        drag.current = {
+                          pointerId: e.pointerId,
+                          start: { x: e.clientX, y: e.clientY },
+                          camera: cameraRef.current,
+                          pin: p,
+                          moved: false,
+                        };
                       }}
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        if (pin.cardId) {
-                          onOpenCard(pin.cardId);
+                      onClick={() => {
+                        setSelectedPin(p.id);
+                        setSelectedShape("");
+                      }}
+                      onDoubleClick={() => {
+                        if (p.cardId) onOpenCard(p.cardId);
+                      }}
+                      onKeyDown={(e) => {
+                        const step = e.shiftKey ? 1 : 0.1;
+                        const delta: Record<string, Point> = {
+                          ArrowLeft: { x: -step, y: 0 },
+                          ArrowRight: { x: step, y: 0 },
+                          ArrowUp: { x: 0, y: -step },
+                          ArrowDown: { x: 0, y: step },
+                        };
+                        if (delta[e.key]) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          commitPosition(p.id, {
+                            x: clampPercent(p.x + delta[e.key].x),
+                            y: clampPercent(p.y + delta[e.key].y),
+                          });
                         }
                       }}
-                      title={t.map.dragPinHint}
-                      className={`map-pin-element absolute z-10 will-change-transform group select-none ${
-                        isDragging ? 'cursor-grabbing z-40' : 'cursor-pointer'
-                      } ${isSelected ? 'z-30' : 'hover:brightness-110'}`}
                     >
-                      {/* Pin Marker (Seamless Teardrop Pin) */}
-                      <div className="relative flex flex-col items-center">
-                        <div className="relative filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.45)] group-hover:scale-105 transition-transform">
-                          <svg
-                            width="28"
-                            height="36"
-                            viewBox="0 0 32 40"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="block"
-                          >
-                            {/* Seamless Pin Body */}
-                            <path
-                              d="M16 39C16 39 30 25.4 30 16C30 8.268 23.732 2 16 2C8.268 2 2 8.268 2 16C2 25.4 16 39 16 39Z"
-                              fill={pinColor}
-                              stroke="white"
-                              strokeWidth="2.5"
-                              strokeLinejoin="round"
-                            />
-                            {/* Clean Center Dot Accent */}
-                            <circle cx="16" cy="16" r="5" fill="white" />
-                          </svg>
-                        </div>
-
-                        {/* Title Label below pin */}
-                        <div className="mt-1 bg-slate-950/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-xs border border-white/20 whitespace-nowrap max-w-[130px] truncate shadow-md">
-                          {displayTitle}
-                        </div>
-                      </div>
-                    </div>
+                      <span className="atlas-marker">
+                        <span>{p.icon || "●"}</span>
+                      </span>
+                      <span className="atlas-label">{title}</span>
+                    </button>
                   );
                 })}
               </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* CONTEXT MENU */}
-      {contextMenu.visible && (
-        <div
-          style={{
-            top: `${contextMenu.y}px`,
-            left: `${contextMenu.x}px`,
-          }}
-          className={`fixed z-50 min-w-[210px] bg-[#1e1e1e]/95 backdrop-blur-md border border-[#383838] rounded-xl shadow-2xl py-1 text-xs text-slate-200 select-none animate-in fade-in zoom-in-95 duration-100 ${
-            contextMenu.isNearRight ? '-translate-x-full' : ''
-          } ${contextMenu.isNearBottom ? '-translate-y-full' : ''}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Skenario 1: Klik Kanan pada Pin */}
-          {contextMenu.pinId ? (() => {
-            const pin = currentMap?.pins.find((p) => p.id === contextMenu.pinId);
-            if (!pin) return null;
-            const linkedCard = cards.find((c) => c.id === pin.cardId);
-
-            return (
-              <div className="space-y-0.5">
-                <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#383838] flex items-center gap-1.5">
-                  <div
-                    style={{ backgroundColor: pin.color || '#0d99ff' }}
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                  />
-                  <span className="truncate">{linkedCard ? linkedCard.title : pin.title}</span>
+              {imageState !== "ready" && (
+                <div className="map-message" role="status">
+                  {imageState === "error"
+                    ? text(
+                        "Gambar tidak dapat dibuka. Pilih Edit peta untuk menggantinya.",
+                        "Image could not be opened. Edit the map to replace it.",
+                      )
+                    : text("Memuat gambar…", "Loading image…")}
                 </div>
-
-                {/* Buka Kartu Terkait */}
-                {linkedCard && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onOpenCard(linkedCard.id);
-                        setContextMenu((prev) => ({ ...prev, visible: false }));
-                      }}
-                      className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-white font-semibold cursor-pointer"
-                    >
-                      <Icons.BookOpen size={14} className="text-[#0d99ff]" />
-                      <span className="truncate">{t.map.viewCard}: {linkedCard.title}</span>
-                    </button>
-
-                    {onEditCard && (
+              )}
+              {mode !== "pan" && (
+                <div className="map-mode-hint map-overlay-controls">
+                  <span>
+                    {mode === "route" || mode === "region"
+                      ? text(
+                          "Klik titik-titik peta, lalu Selesai.",
+                          "Click map points, then Finish.",
+                        )
+                      : text(
+                          "Klik peta untuk menempatkan pin.",
+                          "Click the map to place a pin.",
+                        )}
+                  </span>
+                  {(mode === "route" || mode === "region") && (
+                    <>
                       <button
-                        type="button"
-                        onClick={() => {
-                          onEditCard(linkedCard);
-                          setContextMenu((prev) => ({ ...prev, visible: false }));
-                        }}
-                        className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-200 cursor-pointer"
+                        disabled={!draftPoints.length}
+                        onClick={() => setDraftPoints((p) => p.slice(0, -1))}
                       >
-                        <Icons.Edit3 size={14} className="text-amber-400" />
-                        <span>Edit Kartu</span>
+                        {text("Hapus titik", "Remove point")}
                       </button>
-                    )}
-                  </>
+                      <button
+                        disabled={
+                          draftPoints.length < (mode === "region" ? 3 : 2)
+                        }
+                        onClick={finishShape}
+                      >
+                        {text("Selesai", "Finish")}
+                      </button>
+                    </>
+                  )}
+                  <button onClick={() => changeMode("pan")}>
+                    {text("Batal", "Cancel")} · Esc
+                  </button>
+                </div>
+              )}
+              <div className="map-zoom map-overlay-controls">
+                <button
+                  aria-label={t.map.zoomOut}
+                  onClick={() => {
+                    const z = Math.max(0.01, camera.zoom / 1.25);
+                    changeCamera({
+                      zoom: z,
+                      x: (camera.x * z) / camera.zoom,
+                      y: (camera.y * z) / camera.zoom,
+                    });
+                  }}
+                >
+                  <ZoomOut size={18} />
+                </button>
+                <span>{Math.round(camera.zoom * 100)}%</span>
+                <button
+                  aria-label={t.map.zoomIn}
+                  onClick={() => {
+                    const z = Math.min(5, camera.zoom * 1.25);
+                    changeCamera({
+                      zoom: z,
+                      x: (camera.x * z) / camera.zoom,
+                      y: (camera.y * z) / camera.zoom,
+                    });
+                  }}
+                >
+                  <ZoomIn size={18} />
+                </button>
+                <button
+                  aria-label={text("Muat seluruh peta", "Fit to screen")}
+                  title={text("Muat seluruh peta (F)", "Fit to screen (F)")}
+                  onClick={fit}
+                >
+                  <Maximize2 size={18} />
+                </button>
+              </div>
+              <div className="map-navigation-hint">
+                {text(
+                  "Geser untuk navigasi · Ctrl + scroll untuk zoom · F untuk muat peta",
+                  "Drag to pan · Ctrl + scroll to zoom · F to fit",
                 )}
-
-                {/* Quick Color Palette */}
-                <div className="px-3 py-1.5 flex items-center gap-1.5">
-                  {PIN_COLORS.map((c) => (
+              </div>
+            </div>
+            {panel && (
+              <div
+                className="map-modal-backdrop"
+                onClick={() => setPanel(false)}
+              >
+                <aside
+                  role="dialog"
+                  aria-modal="true"
+                  className="map-settings"
+                  aria-label={text("Pengaturan peta", "Map settings")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="map-panel-heading">
+                    <strong>{text("Pengaturan peta", "Map settings")}</strong>
                     <button
-                      key={c.value}
-                      type="button"
-                      onClick={() => {
-                        handleQuickChangePinColor(pin.id, c.value);
-                        setContextMenu((prev) => ({ ...prev, visible: false }));
+                      aria-label={t.common.close}
+                      onClick={() => setPanel(false)}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <div className="map-filter-grid">
+                    <select
+                      aria-label={text("Kategori", "Category")}
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                    >
+                      <option value="">
+                        {text("Semua kategori", "All categories")}
+                      </option>
+                      {(
+                        [
+                          "character",
+                          "faction",
+                          "location",
+                          "lore",
+                          "timeline",
+                          "item",
+                          "realm",
+                        ] as const
+                      ).map((c) => (
+                        <option key={c} value={c}>
+                          {getCategoryLabel(c)}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Deck"
+                      value={deckId}
+                      onChange={(e) => setDeckId(e.target.value)}
+                    >
+                      <option value="">
+                        {text("Semua deck", "All decks")}
+                      </option>
+                      {decks.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Tag"
+                      value={tag}
+                      onChange={(e) => setTag(e.target.value)}
+                    >
+                      <option value="">{text("Semua tag", "All tags")}</option>
+                      {[...new Set(cards.flatMap((c) => c.tags))]
+                        .sort()
+                        .map((tag) => (
+                          <option key={tag}>{tag}</option>
+                        ))}
+                    </select>
+                    <select
+                      aria-label={text("Label pin", "Pin labels")}
+                      value={labels}
+                      onChange={(e) =>
+                        setLabels(e.target.value as typeof labels)
+                      }
+                    >
+                      <option value="selected">
+                        {text("Label terpilih", "Selected labels")}
+                      </option>
+                      <option value="hover">
+                        {text("Label saat hover", "Labels on hover")}
+                      </option>
+                      <option value="all">
+                        {text("Semua label", "All labels")}
+                      </option>
+                    </select>
+                  </div>
+                  <details open>
+                    <summary>
+                      {pins.length} {text("pin ditemukan", "pins found")}
+                    </summary>
+                    <div className="map-results">
+                      {!pins.length && (
+                        <p>
+                          {text(
+                            "Tidak ada pin yang cocok. Ubah filter atau tambahkan pin.",
+                            "No matching pins. Change filters or add a pin.",
+                          )}
+                        </p>
+                      )}
+                      {pins.map((p) => (
+                        <button
+                          className={selectedPin === p.id ? "active" : ""}
+                          key={p.id}
+                          onClick={() => {
+                            setSelectedPin(p.id);
+                            setSelectedShape("");
+                            centerPin(p);
+                          }}
+                        >
+                          <span style={{ color: p.color }}>
+                            {p.icon || "●"}
+                          </span>
+                          <span>
+                            {cardById.get(p.cardId || "")?.title || p.title}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </details>
+                  {pin && (
+                    <section className="map-inspector">
+                      <h3>{linkedCard?.title || pin.title}</h3>
+                      {pin.cardId && !linkedCard && <p data-broken-reference>{text("Referensi terputus", "Broken reference")}: {pin.cardId}</p>}
+                      <p>
+                        {linkedCard?.summary ||
+                          pin.description ||
+                          text("Belum ada ringkasan.", "No summary yet.")}
+                      </p>
+                      <div className="map-actions">
+                        {pin.cardId && linkedCard && (
+                          <button
+                            className="primary"
+                            onClick={() => onOpenCard(pin.cardId!)}
+                          >
+                            {text("Buka kartu", "Open card")}
+                          </button>
+                        )}
+                        {linkedCard && onEditCard && (
+                          <button onClick={() => onEditCard(linkedCard)}>
+                            {text("Edit kartu", "Edit card")}
+                          </button>
+                        )}
+                        <button onClick={() => centerPin(pin)}>
+                          {text("Fokus", "Focus")}
+                        </button>
+                      </div>
+                      <label>
+                        {text("Layer pin", "Pin layer")}
+                        {layerSelect(pin.layerId, (layerId) =>
+                          patchPin(pin.id, { layerId: layerId || undefined }),
+                        )}
+                      </label>
+                      <div className="map-actions">
+                        <label>
+                          {text("Ikon", "Icon")}
+                          <select
+                            value={pin.icon || "●"}
+                            onChange={(e) =>
+                              patchPin(pin.id, { icon: e.target.value })
+                            }
+                          >
+                            {ICONS.map((i) => (
+                              <option key={i}>{i}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          {text("Warna", "Color")}
+                          <input
+                            type="color"
+                            value={pin.color || COLORS[0]}
+                            onChange={(e) =>
+                              patchPin(pin.id, { color: e.target.value })
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="map-filter-grid">
+                        {(["x", "y"] as const).map((axis) => (
+                          <label
+                            key={`${pin.id}:${eventId}:${axis}:${pin[axis]}`}
+                          >
+                            {axis.toUpperCase()} %
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.1}
+                              defaultValue={Number(pin[axis].toFixed(2))}
+                              onBlur={(e) => {
+                                if (
+                                  e.target.value !== "" &&
+                                  Number.isFinite(e.target.valueAsNumber)
+                                )
+                                  commitPosition(pin.id, {
+                                    x: pin.x,
+                                    y: pin.y,
+                                    [axis]: clampPercent(
+                                      e.target.valueAsNumber,
+                                    ),
+                                  });
+                              }}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <small>
+                        {eventId
+                          ? text(
+                              "Posisi berlaku mulai event ini pada track yang sama.",
+                              "Position applies from this event on the same track.",
+                            )
+                          : text(
+                              "Pilih event untuk merekam perpindahan.",
+                              "Choose an event to record movement.",
+                            )}
+                      </small>
+                      {eventId &&
+                        pin.positions?.some((p) => p.eventId === eventId) && (
+                          <button
+                            onClick={() =>
+                              patchPin(pin.id, {
+                                positions: pin.positions?.filter(
+                                  (p) => p.eventId !== eventId,
+                                ),
+                              })
+                            }
+                          >
+                            {text(
+                              "Hapus posisi event ini",
+                              "Remove this event position",
+                            )}
+                          </button>
+                        )}
+                      <label>
+                        {text("Tautan ke peta", "Link to map")}
+                        <select
+                          value={pin.targetMapId || ""}
+                          onChange={(e) =>
+                            patchPin(pin.id, {
+                              targetMapId: e.target.value || undefined,
+                            })
+                          }
+                        >
+                          <option value="">—</option>
+                          {worldMaps
+                            .filter((m) => m.id !== map.id)
+                            .map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.name}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                      {pin.targetMapId && (
+                        <button onClick={() => setMapId(pin.targetMapId!)}>
+                          {text("Masuk ke peta", "Enter map")} →
+                        </button>
+                      )}
+                      <button
+                        className="danger"
+                        onClick={() =>
+                          askDelete(pin.title, () =>
+                            save({
+                              pins: map.pins.filter((p) => p.id !== pin.id),
+                            }),
+                          )
+                        }
+                      >
+                        {t.map.deletePin}
+                      </button>
+                    </section>
+                  )}
+                  <details>
+                    <summary>
+                      {text("Layer & legenda", "Layers & legend")}
+                    </summary>
+                    {[
+                      { id: "", name: text("Dasar", "Base"), color: COLORS[0] },
+                      ...(map.layers || []),
+                    ].map((l) => (
+                      <div className="map-layer" key={l.id}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={!hiddenLayers.includes(l.id)}
+                            onChange={() =>
+                              setHiddenLayers((v) =>
+                                v.includes(l.id)
+                                  ? v.filter((id) => id !== l.id)
+                                  : [...v, l.id],
+                              )
+                            }
+                          />
+                          <span style={{ color: l.color }}>●</span>
+                          {l.name}
+                        </label>
+                        {l.id && (
+                          <button
+                            aria-label={`${text("Hapus layer", "Delete layer")} ${l.name}`}
+                            onClick={() =>
+                              askDelete(l.name, () => {
+                                save({
+                                  layers: map.layers?.filter(
+                                    (x) => x.id !== l.id,
+                                  ),
+                                  pins: map.pins.map((p) =>
+                                    p.layerId === l.id
+                                      ? { ...p, layerId: undefined }
+                                      : p,
+                                  ),
+                                  shapes: map.shapes?.map((s) =>
+                                    s.layerId === l.id
+                                      ? { ...s, layerId: undefined }
+                                      : s,
+                                  ),
+                                });
+                                setActiveLayer("");
+                              })
+                            }
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <form
+                      className="map-actions"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!layerName.trim()) return;
+                        const id = generateId("layer");
+                        save({
+                          layers: [
+                            ...(map.layers || []),
+                            {
+                              id,
+                              name: layerName.trim(),
+                              color:
+                                COLORS[
+                                  (map.layers?.length || 0) % COLORS.length
+                                ],
+                            },
+                          ],
+                        });
+                        setLayerName("");
+                        setActiveLayer(id);
                       }}
-                      style={{ backgroundColor: c.value }}
-                      className={`w-4 h-4 rounded-full transition-transform hover:scale-125 cursor-pointer border ${
-                        (pin.color || '#0d99ff') === c.value
-                          ? 'border-white scale-110'
-                          : 'border-transparent opacity-80'
-                      }`}
-                      title={c.label}
+                    >
+                      <input
+                        aria-label={text("Nama layer baru", "New layer name")}
+                        placeholder={text("Nama layer baru", "New layer name")}
+                        value={layerName}
+                        onChange={(e) => setLayerName(e.target.value)}
+                      />
+                      <button
+                        type="submit"
+                        aria-label={text("Tambah layer", "Add layer")}
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </form>
+                    <label>
+                      {text("Layer untuk objek baru", "Layer for new objects")}
+                      {layerSelect(activeLayer, setActiveLayer)}
+                    </label>
+                  </details>
+                  <details open={!!shape}>
+                    <summary>
+                      {text("Wilayah & rute", "Regions & routes")} (
+                      {map.shapes?.length || 0})
+                    </summary>
+                    <div className="map-results">
+                      {(map.shapes || []).map((s) => (
+                        <button
+                          key={s.id}
+                          onClick={() => {
+                            setSelectedShape(s.id);
+                            setSelectedPin("");
+                          }}
+                        >
+                          {s.kind === "region" ? "◇" : "↝"} {s.name}
+                        </button>
+                      ))}
+                    </div>
+                    {shape && (
+                      <div className="map-inspector">
+                        <label>
+                          {text("Nama", "Name")}
+                          <input
+                            key={shape.id + shape.name}
+                            defaultValue={shape.name}
+                            onBlur={(e) => {
+                              if (
+                                e.target.value.trim() &&
+                                e.target.value !== shape.name
+                              )
+                                patchShape(shape.id, {
+                                  name: e.target.value.trim(),
+                                });
+                            }}
+                          />
+                        </label>
+                        <label>
+                          {text("Warna", "Color")}
+                          <input
+                            type="color"
+                            value={shape.color}
+                            onChange={(e) =>
+                              patchShape(shape.id, { color: e.target.value })
+                            }
+                          />
+                        </label>
+                        {layerSelect(shape.layerId, (layerId) =>
+                          patchShape(shape.id, {
+                            layerId: layerId || undefined,
+                          }),
+                        )}
+                        <label>
+                          {text("Faksi penguasa", "Controlling faction")}
+                          <select
+                            value={shape.factionId || ""}
+                            onChange={(e) =>
+                              patchShape(shape.id, {
+                                factionId: e.target.value || undefined,
+                              })
+                            }
+                          >
+                            <option value="">—</option>
+                            {cards
+                              .filter((c) => c.category === "faction")
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.title}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                        {shape.factionId && !cardById.has(shape.factionId) && <p data-broken-reference>{text("Referensi terputus", "Broken reference")}: {shape.factionId}</p>}
+                        {shape.factionId && cardById.has(shape.factionId) && (
+                          <button onClick={() => onOpenCard(shape.factionId!)}>
+                            {text("Buka faksi", "Open faction")}
+                          </button>
+                        )}
+                        {eventSelect(
+                          shape.fromEventId,
+                          (fromEventId) =>
+                            patchShape(shape.id, {
+                              fromEventId: fromEventId || undefined,
+                            }),
+                          text(
+                            "Mulai event (inklusif)",
+                            "From event (inclusive)",
+                          ),
+                        )}
+                        {eventSelect(
+                          shape.untilEventId,
+                          (untilEventId) =>
+                            patchShape(shape.id, {
+                              untilEventId: untilEventId || undefined,
+                            }),
+                          text(
+                            "Sampai event (eksklusif)",
+                            "Until event (exclusive)",
+                          ),
+                        )}
+                        <button
+                          className="danger"
+                          onClick={() =>
+                            askDelete(shape.name, () =>
+                              save({
+                                shapes: map.shapes?.filter(
+                                  (s) => s.id !== shape.id,
+                                ),
+                              }),
+                            )
+                          }
+                        >
+                          {text("Hapus objek", "Delete object")}
+                        </button>
+                      </div>
+                    )}
+                  </details>
+                  <div className="map-actions">
+                    <button
+                      onClick={() => {
+                        setError("");
+                        setForm({
+                          id: map.id,
+                          name: map.name,
+                          description: map.description || "",
+                          imageUrl: map.imageUrl,
+                          parentMapId: map.parentMapId || "",
+                        });
+                      }}
+                    >
+                      {t.map.editMap}
+                    </button>
+                    <button
+                      className="danger"
+                      onClick={() =>
+                        askDelete(map.name, () => onDeleteMap(map.id))
+                      }
+                    >
+                      {t.map.deleteMap}
+                    </button>
+                  </div>
+                  {map.description && (
+                    <p className="map-description">{map.description}</p>
+                  )}
+                </aside>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+      {menu && (
+        <>
+          <div
+            className="map-menu-dismiss"
+            onPointerDown={() => setMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu(null);
+            }}
+          />
+          <div
+            role="menu"
+            className="map-context-menu"
+            style={{ left: menu.x, top: menu.y }}
+          >
+            {menu.pinId && (
+              <>
+                <div className="map-actions">
+                  {COLORS.map((color) => (
+                    <button
+                      key={color}
+                      aria-label={color}
+                      title={color}
+                      style={{ background: color, width: 30 }}
+                      onClick={() => {
+                        patchPin(menu.pinId!, { color });
+                        setMenu(null);
+                      }}
                     />
                   ))}
                 </div>
-
-                {/* Fokus ke Pin Ini */}
                 <button
-                  type="button"
+                  role="menuitem"
                   onClick={() => {
-                    handleFocusOnPin(pin);
-                    setContextMenu((prev) => ({ ...prev, visible: false }));
+                    const p = map.pins.find((p) => p.id === menu.pinId);
+                    if (p?.cardId) onOpenCard(p.cardId);
+                    setMenu(null);
                   }}
-                  className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-200 cursor-pointer"
                 >
-                  <Icons.Crosshair size={14} className="text-[#0d99ff]" />
-                  <span>Fokus ke Pin Ini</span>
+                  {text("Buka kartu", "Open card")}
                 </button>
-
-                <div className="my-1 border-t border-[#383838]" />
-
-                {/* Hapus Pin */}
                 <button
-                  type="button"
+                  role="menuitem"
                   onClick={() => {
-                    handleDeletePin(pin.id);
-                    setContextMenu((prev) => ({ ...prev, visible: false }));
+                    const p = map.pins.find((p) => p.id === menu.pinId);
+                    const c = cards.find((c) => c.id === p?.cardId);
+                    if (c) onEditCard?.(c);
+                    setMenu(null);
                   }}
-                  className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-rose-400 cursor-pointer"
                 >
-                  <Icons.Trash2 size={14} />
-                  <span>{t.map.deletePin}</span>
+                  {text("Edit kartu", "Edit card")}
                 </button>
-              </div>
-            );
-          })() : (
-            /* Skenario 2: Klik Kanan pada Area Peta Kosong */
-            <div className="space-y-0.5">
-              {contextMenu.mapPercentX !== null && contextMenu.mapPercentY !== null && (
-                <>
-                  {/* Tambah Pin di Sini */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (currentMap && onCreatePinCard) {
-                        onCreatePinCard(currentMap.id, contextMenu.mapPercentX!, contextMenu.mapPercentY!);
-                      }
-                      setContextMenu((prev) => ({ ...prev, visible: false }));
-                    }}
-                    className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-emerald-400 font-semibold cursor-pointer"
-                  >
-                    <Icons.PlusCircle size={14} />
-                    <span>{t.map.addPinHere}</span>
-                  </button>
-
-                  {/* Tambah Kartu dari Galeri */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGalleryTargetPos({
-                        x: contextMenu.mapPercentX!,
-                        y: contextMenu.mapPercentY!,
-                      });
-                      setContextMenu((prev) => ({ ...prev, visible: false }));
-                    }}
-                    className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-[#0d99ff] font-semibold cursor-pointer"
-                  >
-                    <Icons.LayoutGrid size={14} />
-                    <span>{t.map.addFromGalleryHere}</span>
-                  </button>
-
-                  <div className="my-1 border-t border-[#383838]" />
-                </>
-              )}
-
-              {/* Pusatkan Peta ke Sini */}
-              <button
-                type="button"
-                onClick={() => {
-                  handleCenterOnPos(contextMenu.x, contextMenu.y);
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-200 cursor-pointer"
-              >
-                <Icons.Target size={14} className="text-[#0d99ff]" />
-                <span>{t.map.centerMapHere}</span>
-              </button>
-
-              {/* Reset Zoom (100%) */}
-              <button
-                type="button"
-                onClick={() => {
-                  zoomRef.current = 1;
-                  panRef.current = { x: 0, y: 0 };
-                  setZoom(1);
-                  setPan({ x: 0, y: 0 });
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="w-full px-3 py-2 text-left hover:bg-[#2e2e2e] flex items-center gap-2.5 transition-colors text-slate-200 cursor-pointer"
-              >
-                <Icons.RotateCcw size={14} className="text-amber-400" />
-                <span>{t.map.resetZoom} (100%)</span>
-              </button>
-            </div>
-          )}
-        </div>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    const p = pins.find((p) => p.id === menu.pinId);
+                    if (p) centerPin(p);
+                    setMenu(null);
+                  }}
+                >
+                  {text("Fokus ke pin", "Focus pin")}
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setSelectedPin(menu.pinId!);
+                    setPanel(true);
+                    setMenu(null);
+                  }}
+                >
+                  {text("Pengaturan pin", "Pin settings")}
+                </button>
+                <button
+                  role="menuitem"
+                  className="danger"
+                  onClick={() => {
+                    const p = map.pins.find((p) => p.id === menu.pinId);
+                    if (p)
+                      askDelete(p.title, () =>
+                        save({
+                          pins: map.pins.filter((pin) => pin.id !== p.id),
+                        }),
+                      );
+                    setMenu(null);
+                  }}
+                >
+                  {t.map.deletePin}
+                </button>
+              </>
+            )}
+            {!menu.pinId && (
+              <>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    if (
+                      menu.point &&
+                      menu.point.x >= 0 &&
+                      menu.point.x <= 100 &&
+                      menu.point.y >= 0 &&
+                      menu.point.y <= 100
+                    )
+                      onCreatePinCard?.(map.id, menu.point.x, menu.point.y);
+                    else changeMode("new");
+                    setMenu(null);
+                  }}
+                >
+                  {text("Tambah kartu baru", "Add new card")}
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    if (
+                      menu.point &&
+                      menu.point.x >= 0 &&
+                      menu.point.x <= 100 &&
+                      menu.point.y >= 0 &&
+                      menu.point.y <= 100
+                    )
+                      setGalleryPosition(menu.point);
+                    else changeMode("existing");
+                    setMenu(null);
+                  }}
+                >
+                  {text("Pilih kartu yang ada", "Choose existing card")}
+                </button>
+              </>
+            )}
+            <button
+              role="menuitem"
+              onClick={() => {
+                fit();
+                setMenu(null);
+              }}
+            >
+              {text("Muat seluruh peta", "Fit to screen")}
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setPanel(true);
+                setMenu(null);
+              }}
+            >
+              {text("Pengaturan peta", "Map settings")}
+            </button>
+          </div>
+        </>
       )}
-
-      {/* ADD CARD FROM GALLERY MODAL */}
-      <AddCardFromGalleryModal
-        isOpen={!!galleryTargetPos}
-        onClose={() => setGalleryTargetPos(null)}
-        allCards={cards}
-        allDecks={decks}
-        targetPosition={galleryTargetPos || { x: 0, y: 0 }}
-        title={t.map.addCardToMapModal}
-        description={t.map.addCardToMapDesc}
-        submitLabel={
-          language === 'en'
-            ? 'Add ($COUNT) Pins to Map'
-            : 'Tambahkan ($COUNT) Pin ke Peta'
-        }
-        onAddCardsToCanvas={(cardIds, pos) => {
-          if (!currentMap) return;
-          const selectedCards = cards.filter((c) => cardIds.includes(c.id));
-          const newPins: MapPin[] = selectedCards.map((card, index) => ({
-            id: `pin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${index}`,
-            mapId: currentMap.id,
-            cardId: card.id,
-            title: card.title,
-            description: card.summary || '',
-            x: Math.min(100, Math.max(0, pos.x + (index * 2))),
-            y: Math.min(100, Math.max(0, pos.y + (index * 2))),
-            color: '#0d99ff',
-            createdAt: Date.now(),
-          }));
-
-          onSaveMap({
-            ...currentMap,
-            pins: [...currentMap.pins, ...newPins],
-            updatedAt: Date.now(),
-          });
-          setGalleryTargetPos(null);
-        }}
-      />
-
-      {showMapModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none">
+      {galleryPosition && (
+        <AddCardFromGalleryModal
+          isOpen
+          onClose={() => setGalleryPosition(null)}
+          allCards={cards}
+          allDecks={decks}
+          targetPosition={galleryPosition}
+          title={t.map.addCardToMapModal}
+          description={t.map.addCardToMapDesc}
+          submitLabel={text("Tambahkan ($COUNT) pin", "Add ($COUNT) pins")}
+          onAddCardsToCanvas={(ids, pos) => {
+            save({
+              pins: [
+                ...map.pins,
+                ...ids.flatMap((id, index) => {
+                  const card = cardById.get(id);
+                  return card
+                    ? [
+                        {
+                          id: generateId("pin"),
+                          cardId: id,
+                          title: card.title,
+                          description: card.summary,
+                          x: clampPercent(pos.x + (index % 5) * 2),
+                          y: clampPercent(pos.y + Math.floor(index / 5) * 2),
+                          color:
+                            map.layers?.find((l) => l.id === activeLayer)
+                              ?.color || COLORS[0],
+                          layerId: activeLayer || undefined,
+                        },
+                      ]
+                    : [];
+                }),
+              ],
+            });
+            setGalleryPosition(null);
+          }}
+        />
+      )}
+      {form && (
+        <div className="map-modal-backdrop">
           <form
-            onSubmit={handleSaveMapSubmit}
-            className="bg-[#222222] border border-[#383838] rounded-2xl max-w-lg w-full p-5 text-white shadow-2xl space-y-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label={form.id ? t.map.editMapTitle : t.map.createMapTitle}
+            className="map-modal"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!form.name.trim() || !form.imageUrl || imageBusy) return;
+              const previous = worldMaps.find((m) => m.id === form.id);
+              const id = previous?.id || generateId("map");
+              if (!canParentMap(worldMaps, id, form.parentMapId)) {
+                setError(
+                  text(
+                    "Hierarki peta tidak boleh melingkar.",
+                    "Map hierarchy cannot contain a cycle.",
+                  ),
+                );
+                return;
+              }
+              onSaveMap({
+                ...previous,
+                id,
+                name: form.name.trim(),
+                description: form.description.trim(),
+                imageUrl: form.imageUrl,
+                parentMapId: form.parentMapId || undefined,
+                pins: previous?.pins || [],
+                createdAt: previous?.createdAt || Date.now(),
+                updatedAt: Date.now(),
+              });
+              setMapId(id);
+              closeForm();
+            }}
           >
-            <div className="flex items-center justify-between border-b border-[#383838] pb-3">
-              <h3 className="font-bold text-base flex items-center gap-2 text-white">
-                <Icons.Map size={18} className="text-[#0d99ff]" />
-                <span>
-                  {mapFormMode === 'create' ? t.map.createMapTitle : t.map.editMapTitle}
-                </span>
-              </h3>
+            <div className="map-panel-heading">
+              <h2>{form.id ? t.map.editMapTitle : t.map.createMapTitle}</h2>
               <button
                 type="button"
-                onClick={() => setShowMapModal(false)}
-                className="text-slate-400 hover:text-white"
+                aria-label={t.common.close}
+                onClick={closeForm}
               >
-                <Icons.X size={18} />
+                <X size={18} />
               </button>
             </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  {t.map.mapName} *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={mapName}
-                  onChange={(e) => setMapName(e.target.value)}
-                  placeholder={t.map.mapNamePlaceholder}
-                  className="w-full bg-[#181818] border border-[#383838] focus:border-[#0d99ff] rounded-xl px-3 py-2 text-white outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  {t.map.mapDescription}
-                </label>
-                <textarea
-                  value={mapDesc}
-                  onChange={(e) => setMapDesc(e.target.value)}
-                  placeholder={t.map.mapDescriptionPlaceholder}
-                  rows={2}
-                  className="w-full bg-[#181818] border border-[#383838] focus:border-[#0d99ff] rounded-xl px-3 py-2 text-white outline-none resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  {t.map.selectImageFile} *
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-2 rounded-xl bg-[#181818] hover:bg-[#383838] border border-[#383838] text-slate-200 text-xs font-semibold flex items-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <Icons.Upload size={14} className="text-[#0d99ff]" />
-                    <span>{t.map.selectImageFile}</span>
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageFileSelect}
-                    className="hidden"
-                  />
-                  <span className="text-[11px] text-slate-400 truncate max-w-[200px]">
-                    {mapImageUrl ? 'Gambar dipilih' : 'Belum ada gambar'}
-                  </span>
-                </div>
-              </div>
-
-              {mapImageUrl && (
-                <div className="border border-[#383838] rounded-xl overflow-hidden max-h-40 bg-[#121212] flex items-center justify-center p-2">
-                  <img
-                    src={mapImageUrl}
-                    alt="Map Preview"
-                    className="max-h-36 object-contain rounded-lg"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#383838]">
-              <button
-                type="button"
-                onClick={() => setShowMapModal(false)}
-                className="px-4 py-2 rounded-xl bg-[#181818] hover:bg-[#383838] text-slate-300 text-xs font-semibold cursor-pointer"
+            <label>
+              {t.map.mapName}
+              <input
+                autoFocus
+                required
+                maxLength={160}
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </label>
+            <label>
+              {t.map.mapDescription}
+              <textarea
+                rows={2}
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              {text("Peta induk", "Parent map")}
+              <select
+                value={form.parentMapId}
+                onChange={(e) =>
+                  setForm({ ...form, parentMapId: e.target.value })
+                }
               >
-                {t.map.cancel}
+                <option value="">{text("Tanpa induk", "No parent")}</option>
+                {worldMaps
+                  .filter(
+                    (m) => !form.id || canParentMap(worldMaps, form.id, m.id),
+                  )
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              {t.map.selectImageFile}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const version = ++fileVersion.current;
+                  setError("");
+                  if (
+                    ![
+                      "image/png",
+                      "image/jpeg",
+                      "image/webp",
+                      "image/gif",
+                    ].includes(file.type) ||
+                    file.size > 30 * 1024 * 1024
+                  ) {
+                    setError(
+                      text(
+                        "Gunakan PNG, JPEG, WebP, atau GIF maksimal 30 MB.",
+                        "Use PNG, JPEG, WebP, or GIF up to 30 MB.",
+                      ),
+                    );
+                    return;
+                  }
+                  setImageBusy(true);
+                  try {
+                    const url = await new Promise<string>((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onload = () => resolve(String(reader.result));
+                      reader.onerror = reject;
+                      reader.readAsDataURL(file);
+                    });
+                    await new Promise<void>((resolve, reject) => {
+                      const img = new Image();
+                      img.onload = () =>
+                        img.naturalWidth * img.naturalHeight > 100_000_000
+                          ? reject(new Error("size"))
+                          : resolve();
+                      img.onerror = reject;
+                      img.src = url;
+                    });
+                    if (version === fileVersion.current)
+                      setForm((prev) =>
+                        prev ? { ...prev, imageUrl: url } : null,
+                      );
+                  } catch {
+                    if (version === fileVersion.current)
+                      setError(
+                        text(
+                          "Gambar rusak atau melebihi 100 megapiksel.",
+                          "Image is damaged or exceeds 100 megapixels.",
+                        ),
+                      );
+                  } finally {
+                    if (version === fileVersion.current) setImageBusy(false);
+                  }
+                }}
+              />
+            </label>
+            {form.imageUrl && (
+              <img
+                className="map-preview"
+                src={form.imageUrl}
+                alt={text("Pratinjau peta", "Map preview")}
+              />
+            )}
+            {form.id && (
+              <small>
+                {text(
+                  "Mengganti gambar mempertahankan koordinat persentase pin. Periksa kembali posisinya.",
+                  "Replacing the image preserves pin percentage coordinates. Check their positions afterwards.",
+                )}
+              </small>
+            )}
+            {error && (
+              <p role="alert" className="danger">
+                {error}
+              </p>
+            )}
+            <div className="map-actions">
+              <button type="button" onClick={closeForm}>
+                {t.common.cancel}
               </button>
               <button
+                className="primary"
                 type="submit"
-                disabled={!mapImageUrl}
-                className="px-4 py-2 rounded-xl bg-[#0d99ff] hover:bg-[#0088eb] disabled:opacity-50 text-white text-xs font-bold cursor-pointer"
+                disabled={!form.imageUrl || !form.name.trim() || imageBusy}
               >
-                {t.map.saveMap}
+                {imageBusy ? text("Memuat…", "Loading…") : t.map.saveMap}
               </button>
             </div>
           </form>
         </div>
       )}
-
-      {/* CUSTOM CONFIRMATION & ALERT MODAL */}
-      <ConfirmModal
-        config={confirmModalConfig}
-        onClose={() => setConfirmModalConfig(null)}
-      />
-    </div>
+      <ConfirmModal config={confirm} onClose={() => setConfirm(null)} />
+    </section>
   );
-};
+}

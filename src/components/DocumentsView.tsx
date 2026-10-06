@@ -1,14 +1,21 @@
+import { useStableEvent } from '../utils/useStableEvent';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { WorldDocument, WorldCard } from '../types';
 import { CATEGORY_CONFIGS } from '../data/categoryConfig';
 import { generateId } from '../utils/helpers';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
+import { sanitizeDocumentHtml, documentHtmlForReading, cardMentionHtml } from '../utils/documentHtml';
+import { useDocumentDraft } from '../utils/useDocumentDraft';
+import { readDocumentBackup } from '../utils/documentDrafts';
 
 interface DocumentsViewProps {
+  workspaceId: string;
+  projectId: string;
+  focusDocumentId?: string;
   documents: WorldDocument[];
   cards: WorldCard[];
-  onSaveDocument: (doc: WorldDocument) => void;
+  onSaveDocument: (doc: WorldDocument, transactionId?: string) => Promise<unknown>;
   onDeleteDocument: (docId: string) => void;
   onCreateDocument: (doc: WorldDocument) => void;
   onOpenCard?: (card: WorldCard) => void;
@@ -17,6 +24,9 @@ interface DocumentsViewProps {
 
 export const DocumentsView: React.FC<DocumentsViewProps> = ({
   documents,
+  workspaceId,
+  projectId,
+  focusDocumentId,
   cards,
   onSaveDocument,
   onDeleteDocument,
@@ -36,6 +46,10 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   const [activeDocId, setActiveDocId] = useState<string | null>(
     documents.length > 0 ? documents[0].id : null
   );
+  const focusDocument = useStableEvent(async () => {
+    if (focusDocumentId && documents.some(d => d.id === focusDocumentId) && await draft.flush()) setActiveDocId(focusDocumentId);
+  });
+  useEffect(() => { void focusDocument(); }, [focusDocumentId, focusDocument]);
   const [searchQuery, setSearchQuery] = useState('');
   // Sidebar Visibility State (Default Open)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -160,17 +174,28 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     [documents, activeDocId]
   );
 
-  // When active document changes or mode switches to editing, sync content into contentEditable canvas
+  const activeDocRef = useRef(activeDoc); activeDocRef.current = activeDoc;
+  const draft = useDocumentDraft({ workspaceId,projectId },activeDoc,mode === 'editing',() => {
+    if (!activeDoc) return null;
+    return { ...activeDoc,title:draftTitle.trim() || t.documents.untitledDoc,content:editorRef.current ? editorRef.current.innerHTML : activeDoc.content };
+  }, onSaveDocument,() => setMode('viewing'));
+  // Initialize the DOM only when entering an editing session, never on autosave.
   useEffect(() => {
-    if (activeDoc) {
-      setDraftTitle(activeDoc.title || '');
-
-      if (mode === 'editing' && editorRef.current) {
-        editorRef.current.innerHTML = activeDoc.content || '<p><br/></p>';
-        updateToolbarState();
-      }
+    const doc = activeDocRef.current;
+    if (doc) {
+      const source = readDocumentBackup({ workspaceId,projectId,documentId:doc.id },doc) || doc;
+      setDraftTitle(source.title || '');
+      if (mode === 'editing' && editorRef.current) editorRef.current.innerHTML = sanitizeDocumentHtml(source.content || '<p><br/></p>');
     }
-  }, [activeDocId, mode]);
+  }, [activeDocId,mode,workspaceId,projectId]);
+
+  const documentChanged = useStableEvent(() => draft.changed());
+  useEffect(() => {
+    const element = editorRef.current; if (mode !== 'editing' || !element) return;
+    const observer = new MutationObserver(() => documentChanged());
+    observer.observe(element, {subtree:true, childList:true, characterData:true, attributes:true});
+    return () => observer.disconnect();
+  }, [mode, activeDocId, documentChanged]);
 
   // Update Toolbar Command Active Indicators
   const updateToolbarState = () => {
@@ -193,9 +218,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
           h3: formatBlock === 'h3',
         });
       }
-    } catch (_err) {
-      // ignore
-    }
+    } catch {}
   };
 
   // Listen to Selection Change across Document for active toolbar updates
@@ -231,7 +254,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     if (!activeDoc) return 0;
     const rawText = (editorRef.current?.innerText || activeDoc.content || '').replace(/<[^>]*>/g, '');
     return rawText.trim().split(/\s+/).filter(Boolean).length;
-  }, [activeDoc, mode]);
+  }, [activeDoc]);
 
   // Mention Suggestions Filtered Cards
   const suggestedCards = useMemo(() => {
@@ -287,7 +310,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       }
     }
     return items;
-  }, [activeDoc, mode]);
+  }, [activeDoc]);
 
   // Smooth scroll to target heading in document
   const scrollToHeading = (idx: number) => {
@@ -337,13 +360,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     editorRef.current.focus();
     document.execCommand(command, false, value);
     updateToolbarState();
+    draft.changed();
   };
 
   // Insert HTML Snippet directly at cursor
   const insertHtmlAtCursor = (htmlSnippet: string) => {
     if (!editorRef.current) return;
     editorRef.current.focus();
-    document.execCommand('insertHTML', false, htmlSnippet);
+    document.execCommand('insertHTML', false, sanitizeDocumentHtml(htmlSnippet));
+    draft.changed();
     updateToolbarState();
   };
 
@@ -414,9 +439,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       if (selection && selection.isCollapsed && selection.anchorOffset === 0) {
         try {
           execCmd('outdent');
-        } catch (_err) {
-          // ignore
-        }
+        } catch {}
       }
     }
 
@@ -458,113 +481,6 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     setMentionState({ isOpen: false, query: '', x: 0, y: 0, selectedIndex: 0 });
   }, [activeDocId, mode]);
 
-  // Ref tracking for clean auto-saving on unmount, window close, or refresh
-  const modeRef = useRef(mode);
-  const activeDocRef = useRef(activeDoc);
-  const draftTitleRef = useRef(draftTitle);
-
-  useEffect(() => {
-    modeRef.current = mode;
-    activeDocRef.current = activeDoc;
-    draftTitleRef.current = draftTitle;
-  });
-
-  // Emergency fallback auto-save on component unmount
-  useEffect(() => {
-    return () => {
-      if (modeRef.current === 'editing' && activeDocRef.current) {
-        const finalContent = editorRef.current ? editorRef.current.innerHTML : activeDocRef.current.content;
-        const updatedDoc: WorldDocument = {
-          ...activeDocRef.current,
-          title: draftTitleRef.current.trim() || 'Dokumen Tanpa Judul',
-          content: finalContent,
-          updatedAt: Date.now(),
-        };
-        onSaveDocument(updatedDoc);
-        try {
-          localStorage.removeItem(`worlddeck_draft_${activeDocRef.current.id}`);
-        } catch (_err) {
-          // ignore
-        }
-      }
-    };
-  }, []);
-
-  // Emergency fallback auto-save on window close (Alt+F4/X button), browser tab refresh, or app termination
-  useEffect(() => {
-    const handleEmergencySave = () => {
-      if (modeRef.current === 'editing' && activeDocRef.current) {
-        const finalContent = editorRef.current ? editorRef.current.innerHTML : activeDocRef.current.content;
-        const updatedDoc: WorldDocument = {
-          ...activeDocRef.current,
-          title: draftTitleRef.current.trim() || 'Dokumen Tanpa Judul',
-          content: finalContent,
-          updatedAt: Date.now(),
-        };
-        onSaveDocument(updatedDoc);
-        try {
-          localStorage.setItem(`worlddeck_draft_${activeDocRef.current.id}`, JSON.stringify(updatedDoc));
-        } catch (_err) {
-          // ignore
-        }
-      }
-    };
-
-    window.addEventListener('beforeunload', handleEmergencySave);
-    window.addEventListener('pagehide', handleEmergencySave);
-    return () => {
-      window.removeEventListener('beforeunload', handleEmergencySave);
-      window.removeEventListener('pagehide', handleEmergencySave);
-    };
-  }, []);
-
-  // Periodic draft backup to localStorage every 5s while in editing mode (crash protection)
-  useEffect(() => {
-    if (mode !== 'editing' || !activeDoc) return;
-
-    const intervalId = setInterval(() => {
-      if (editorRef.current && activeDocRef.current) {
-        const currentContent = editorRef.current.innerHTML;
-        const currentTitle = draftTitleRef.current.trim() || 'Dokumen Tanpa Judul';
-        const draftData: WorldDocument = {
-          ...activeDocRef.current,
-          title: currentTitle,
-          content: currentContent,
-          updatedAt: Date.now(),
-        };
-        try {
-          localStorage.setItem(`worlddeck_draft_${activeDocRef.current.id}`, JSON.stringify(draftData));
-        } catch (_err) {
-          // ignore
-        }
-      }
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [mode, activeDocId]);
-
-  // Restore draft backup if app was abruptly killed or crashed during editing
-  useEffect(() => {
-    if (activeDoc) {
-      try {
-        const savedDraftRaw = localStorage.getItem(`worlddeck_draft_${activeDoc.id}`);
-        if (savedDraftRaw) {
-          const savedDraft: WorldDocument = JSON.parse(savedDraftRaw);
-          if (savedDraft && savedDraft.updatedAt > activeDoc.updatedAt) {
-            onSaveDocument(savedDraft);
-            setDraftTitle(savedDraft.title);
-            if (editorRef.current) {
-              editorRef.current.innerHTML = savedDraft.content;
-            }
-          }
-          localStorage.removeItem(`worlddeck_draft_${activeDoc.id}`);
-        }
-      } catch (_err) {
-        // ignore
-      }
-    }
-  }, [activeDocId]);
-
   // Close context menu on document click & scroll
   useEffect(() => {
     const handleCloseMenu = (e: MouseEvent) => {
@@ -594,16 +510,18 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     };
   }, []);
 
+  const selectedImageNode = selectedImage?.img;
+  const selectedImageWrapper = selectedImage?.wrapper;
   // Auto-sync selectedImage rect position and dimensions with actual image DOM node
   useEffect(() => {
-    if (!selectedImage) return;
+    if (!selectedImageNode) return;
 
     const updateRect = () => {
-      if (!selectedImage.img || !document.body.contains(selectedImage.img)) {
+      if (!selectedImageNode || !document.body.contains(selectedImageNode)) {
         setSelectedImage(null);
         return;
       }
-      const currentRect = selectedImage.img.getBoundingClientRect();
+      const currentRect = selectedImageNode.getBoundingClientRect();
       setSelectedImage((prev) => {
         if (!prev) return null;
         if (
@@ -630,13 +548,13 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     }
 
     let resizeObserver: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined' && selectedImage.img) {
+    if (typeof ResizeObserver !== 'undefined' && selectedImageNode) {
       resizeObserver = new ResizeObserver(() => {
         updateRect();
       });
-      resizeObserver.observe(selectedImage.img);
-      if (selectedImage.wrapper) {
-        resizeObserver.observe(selectedImage.wrapper);
+      resizeObserver.observe(selectedImageNode);
+      if (selectedImageWrapper) {
+        resizeObserver.observe(selectedImageWrapper);
       }
     }
 
@@ -661,7 +579,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       }
       cancelAnimationFrame(animationFrameId);
     };
-  }, [selectedImage?.img, selectedImage?.wrapper]);
+  }, [selectedImageNode, selectedImageWrapper]);
 
   // Intercept & Handle Image Drag-and-Drop to Move Image without Duplicating Node
   useEffect(() => {
@@ -742,16 +660,17 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     };
   }, [mode]);
 
+  const cropImageNode = cropState?.img;
   // Auto-sync cropState rect position and dimensions with actual image DOM node
   useEffect(() => {
-    if (!cropState) return;
+    if (!cropImageNode) return;
 
     const updateCropRect = () => {
-      if (!cropState.img || !document.body.contains(cropState.img)) {
+      if (!cropImageNode || !document.body.contains(cropImageNode)) {
         setCropState(null);
         return;
       }
-      const currentRect = cropState.img.getBoundingClientRect();
+      const currentRect = cropImageNode.getBoundingClientRect();
       setCropState((prev) => {
         if (!prev) return null;
         if (
@@ -781,7 +700,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       window.removeEventListener('resize', updateCropRect);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [cropState?.img]);
+  }, [cropImageNode]);
 
   // Handle Image Click & Placement Detection (Google Docs style - Editing mode only)
   const handleDocumentClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1218,7 +1137,13 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
       const base64Data = event.target?.result as string;
       if (!base64Data) return;
 
-      const imgHtml = `\u00A0<span class="doc-img-wrapper img-mode-inline select-none" contenteditable="false" style="display: inline-block; vertical-align: middle; margin: 0.25rem 0.5rem; float: none; clear: none;"><img src="${base64Data}" alt="${file.name}" class="max-h-[350px] rounded-xl border border-slate-700/60 shadow-md object-contain w-auto inline-block align-middle" /></span>\u00A0`;
+      const wrapper = document.createElement('span');
+      wrapper.className = 'doc-img-wrapper img-mode-inline select-none'; wrapper.contentEditable = 'false';
+      wrapper.style.cssText = 'display: inline-block; vertical-align: middle; margin: 0.25rem 0.5rem; float: none; clear: none;';
+      const image = document.createElement('img'); image.src = base64Data; image.alt = file.name;
+      image.className = 'max-h-[350px] rounded-xl border border-slate-700/60 shadow-md object-contain w-auto inline-block align-middle';
+      wrapper.appendChild(image);
+      const imgHtml = sanitizeDocumentHtml(`&nbsp;${wrapper.outerHTML}&nbsp;`);
 
       if (editorRef.current) {
         editorRef.current.focus();
@@ -1228,7 +1153,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
           selection.addRange(savedRangeRef.current);
 
           const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = imgHtml;
+          tempDiv.innerHTML = sanitizeDocumentHtml(imgHtml);
           const frag = document.createDocumentFragment();
           let node;
           let lastInsertedNode: Node | null = null;
@@ -1329,55 +1254,26 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
             range.deleteContents();
             selection.removeAllRanges();
             selection.addRange(range);
-          } catch (_e) {
-            // ignore range errors
-          }
+          } catch {}
         }
       }
     }
 
-    const badgeHtml = `<span contenteditable="false" data-card-id="${card.id}" class="card-mention-badge inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs font-semibold shadow-xs select-none cursor-pointer hover:bg-blue-500/30 transition-colors">@${card.title}</span>&nbsp;`;
-    insertHtmlAtCursor(badgeHtml);
+    insertHtmlAtCursor(cardMentionHtml(card));
     setMentionState({ isOpen: false, query: '', x: 0, y: 0, selectedIndex: 0 });
   };
 
   // Handle Switching Active Document from Sidebar
-  const handleSelectDoc = (docId: string) => {
-    if (docId === activeDocId) return;
-
-    if (mode === 'editing' && activeDoc) {
-      const finalContent = editorRef.current ? editorRef.current.innerHTML : activeDoc.content;
-      const updatedDoc: WorldDocument = {
-        ...activeDoc,
-        title: draftTitle.trim() || t.documents.untitledDoc,
-        content: finalContent,
-        updatedAt: Date.now(),
-      };
-      onSaveDocument(updatedDoc);
-    }
-
-    setSelectedImage(null);
-    setImageContextMenu(null);
-    setEditorContextMenu(null);
-    setCropState(null);
-    setMentionState({ isOpen: false, query: '', x: 0, y: 0, selectedIndex: 0 });
-    setMode('viewing');
-    setActiveDocId(docId);
+  const handleSelectDoc = async (docId: string) => {
+    if (docId === activeDocId || !await draft.flush()) return;
+    setSelectedImage(null); setImageContextMenu(null); setEditorContextMenu(null);
+    setCropState(null); setMentionState({ isOpen:false,query:'',x:0,y:0,selectedIndex:0 });
+    setMode('viewing'); setActiveDocId(docId);
   };
 
   // Create New Document
-  const handleCreateDocument = () => {
-    if (mode === 'editing' && activeDoc) {
-      const finalContent = editorRef.current ? editorRef.current.innerHTML : activeDoc.content;
-      const updatedDoc: WorldDocument = {
-        ...activeDoc,
-        title: draftTitle.trim() || t.documents.untitledDoc,
-        content: finalContent,
-        updatedAt: Date.now(),
-      };
-      onSaveDocument(updatedDoc);
-    }
-
+  const handleCreateDocument = async () => {
+    if (!await draft.flush()) return;
     setSelectedImage(null);
     setImageContextMenu(null);
     setEditorContextMenu(null);
@@ -1399,26 +1295,11 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   };
 
   // Save Document and switch to Viewing Mode
-  const handleSaveDocument = () => {
-    if (!activeDoc) return;
-    const finalContent = editorRef.current ? editorRef.current.innerHTML : activeDoc.content;
-
-    const updatedDoc: WorldDocument = {
-      ...activeDoc,
-      title: draftTitle.trim() || t.documents.untitledDoc,
-      content: finalContent,
-      updatedAt: Date.now(),
-    };
-    try {
-      localStorage.removeItem(`worlddeck_draft_${activeDoc.id}`);
-    } catch (_err) {
-      // ignore
-    }
-    onSaveDocument(updatedDoc);
-    setMode('viewing');
-    setShowSaveToast(true);
-    setTimeout(() => setShowSaveToast(false), 2200);
-  };
+  const handleSaveDocument = useStableEvent(async () => {
+    if (!activeDoc || !await draft.flush()) return;
+    setMode('viewing'); setShowSaveToast(true);
+    setTimeout(() => setShowSaveToast(false),2200);
+  });
 
   // Global Keyboard Shortcut: Ctrl + S / Cmd + S to save document, Ctrl + \ to toggle sidebar
   useEffect(() => {
@@ -1435,7 +1316,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [mode, activeDoc, draftTitle]);
+  }, [mode, handleSaveDocument]);
 
   // Export Specific Markdown / HTML File
   const handleExportDocumentFor = (doc: WorldDocument) => {
@@ -1466,6 +1347,8 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
   return (
     <div className="flex-1 flex app-bg-main overflow-hidden app-text-main h-full font-sans select-none relative">
+      {draft.recovered && <div role="status" className="absolute top-2 right-4 z-50 app-bg-secondary border app-border rounded-lg p-3 text-xs">{language === 'en' ? 'Document draft recovered from local backup.' : 'Draft dokumen dipulihkan dari backup lokal.'}<button type="button" aria-label={language === 'en' ? 'Dismiss draft recovery' : 'Tutup pemberitahuan pemulihan draft'} onClick={draft.dismissRecovery} className="ml-3">×</button></div>}
+      {draft.backupFailed && <div role="alert" className="absolute bottom-4 left-4 z-50 app-bg-secondary p-3 text-xs">{language === 'en' ? 'Local draft backup failed. Save the document and check storage space.' : 'Backup draft lokal gagal. Simpan dokumen dan periksa ruang penyimpanan.'}</div>}
       {/* Hidden Image File Inputs */}
       <input
         ref={imageInputRef}
@@ -1692,10 +1575,10 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setMode('viewing')}
+                      onClick={async () => { if (await draft.flush()) setMode('viewing'); }}
                       className="px-3 py-1.5 rounded-xl text-xs text-slate-300 hover:text-white bg-[#2c2c2c] border border-[#383838] transition-colors cursor-pointer"
                     >
-                      {t.common.cancel}
+                      {language === 'en' ? 'Done' : 'Selesai'}
                     </button>
                   </div>
                 )}
@@ -2025,7 +1908,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                     <div
                       id="doc-view-rendered-content"
                       className="prose max-w-none text-base leading-relaxed text-slate-200 space-y-4 font-sans break-words [overflow-wrap:anywhere] min-w-0 flow-root after:content-[''] after:block after:clear-both [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_h1]:text-white [&_h2]:text-white [&_h3]:text-white [&_strong]:text-white [&_p]:leading-relaxed [&_img]:max-w-full [&_img]:h-auto [&_.doc-img-wrapper]:max-w-full [&_.doc-img-wrapper]:flow-root"
-                      dangerouslySetInnerHTML={{ __html: activeDoc.content || `<p class="text-slate-500 italic">${t.documents.emptyDocPlaceholder}</p>` }}
+                      dangerouslySetInnerHTML={{ __html: documentHtmlForReading(activeDoc.content,cards) || `<p class="text-slate-500 italic">${t.documents.emptyDocPlaceholder}</p>` }}
                       onClick={handleDocumentClick}
                     />
 
@@ -2083,7 +1966,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                       <input
                         type="text"
                         value={draftTitle}
-                        onChange={(e) => setDraftTitle(e.target.value)}
+                        onChange={(e) => { setDraftTitle(e.target.value); draft.changed(); }}
                         placeholder={t.documents.titlePlaceholder}
                         className="w-full text-3xl font-extrabold tracking-tight text-white bg-transparent border-0 focus:outline-none placeholder:text-slate-600 break-words [overflow-wrap:anywhere]"
                       />
@@ -2109,6 +1992,15 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                         id="doc-editor-textarea"
                         ref={editorRef}
                         contentEditable={true}
+                        role="textbox"
+                        aria-label={language === 'en' ? 'Document content' : 'Isi dokumen'}
+                        aria-multiline="true"
+                        onPaste={(event) => {
+                          event.preventDefault();
+                          const text = document.createElement('div'); text.textContent = event.clipboardData.getData('text/plain');
+                          insertHtmlAtCursor(event.clipboardData.getData('text/html') || text.innerHTML.replace(/\n/g,'<br>'));
+                        }}
+                        onInput={() => draft.changed()}
                         onKeyDown={handleEditorKeyDown}
                         onKeyUp={handleEditorKeyUp}
                         onClick={(e) => {
@@ -2786,7 +2678,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                   if (text) {
                     insertHtmlAtCursor(text.replace(/</g, '&lt;').replace(/>/g, '&gt;'));
                   }
-                } catch (_err) {
+                } catch {
                   document.execCommand('paste');
                 }
                 setEditorContextMenu(null);

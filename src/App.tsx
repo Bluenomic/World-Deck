@@ -1,22 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
-import type { WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme, WorldDocument, WorldCanvas, WorldMap, MapPin } from './types';
+import { useStableEvent } from './utils/useStableEvent';
+import { useModalAccessibility } from './utils/useModalAccessibility';
+import React, { lazy, Suspense, useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import type { TimelineTrack, TimelineNode, TimelineBranch, WorldProject, WorldCard, WorldDeck, CardConnection, ViewMode, CardCategory, AppTheme, WorldDocument, WorldCanvas, WorldMap, MapPin } from './types';
 import { SAMPLE_WORLD } from './data/sampleWorld';
 import { generateId, downloadProjectJson, getCardCanvasIds, isCardOnCanvas, getCardPositionOnCanvas } from './utils/helpers';
-import { saveLocalFileHandle, loadLocalFileHandle, loadWorkspacePreferences, saveWorkspacePreferences } from './utils/storage';
-import * as Icons from 'lucide-react';
-import {
-  readAllProjectsFromDirectory,
-  writeProjectToDirectory,
-  deleteProjectFromDirectory,
-} from './utils/localFileStorage';
+import { saveLocalFileHandle, loadLocalFileHandle, loadWorkspacePreferences, saveWorkspacePreferences, getDirectoryWorkspaceId } from './utils/storage';
+import * as Icons from './utils/icons';
 import { Navbar } from './components/Navbar';
 import { SidebarFilter } from './components/SidebarFilter';
 import { Canvas } from './components/Canvas';
-import { LibraryView } from './components/LibraryView';
+const LibraryView = lazy(() => import('./components/LibraryView').then(m => ({ default: m.LibraryView })));
 import { ImageFocalAdjusterModal } from './components/ImageFocalAdjusterModal';
-import { TimelineView } from './components/TimelineView';
-import { DocumentsView } from './components/DocumentsView';
-import { MapView } from './components/MapView';
+const TimelineView = lazy(() => import('./components/TimelineView').then(m => ({ default: m.TimelineView })));
+const DocumentsView = lazy(() => import('./components/DocumentsView').then(m => ({ default: m.DocumentsView })));
+const MapView = lazy(() => import('./components/MapView').then(m => ({ default: m.MapView })));
+import { useProjects } from './utils/useProjects';
+import { WorkspacePersistence, browserWorkspace, nativeWorkspace } from './utils/workspacePersistence';
+import type { WorkspaceAdapter } from './utils/workspacePersistence';
+import { validateProject, projectIntegrity, removeProjectCards, type ProjectIssue } from './utils/projectValidation';
+import { documentDrafts } from './utils/documentDrafts';
+import { ProjectIssuesNotice } from './components/ProjectIssuesNotice';
 import { CardEditorModal } from './components/CardEditorModal';
 import { ConnectionModal } from './components/ConnectionModal';
 import { HelpGuideModal } from './components/HelpGuideModal';
@@ -28,27 +31,25 @@ import { CardReaderSidebar } from './components/CardReaderSidebar';
 import { WorkspaceLandingScreen } from './components/WorkspaceLandingScreen';
 import {
   isTauriAvailable,
-  saveProjectToFolder,
-  listProjectsInFolder,
-  deleteProjectFromFolder,
   openWorkspaceFolderDialog,
 } from './utils/tauriStorage';
 import { ConfirmModal } from './components/ConfirmModal';
 import type { ConfirmModalConfig } from './components/ConfirmModal';
-import { useLanguage } from './i18n/LanguageContext';
+import { useLanguage } from './i18n/useLanguage';
 
 
 const STORAGE_THEME_KEY = 'worlddeck_theme_v1';
 
 export const App: React.FC = () => {
   const { language, t } = useLanguage();
+  useModalAccessibility(language);
 
   // Theme State
   const [currentTheme, setCurrentTheme] = useState<AppTheme>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_THEME_KEY);
       if (saved === 'light' || saved === 'dark') return saved;
-    } catch (e) {}
+    } catch {}
     return 'dark';
   });
 
@@ -56,7 +57,7 @@ export const App: React.FC = () => {
     document.body.className = `theme-${currentTheme}`;
     try {
       localStorage.setItem(STORAGE_THEME_KEY, currentTheme);
-    } catch (e) {}
+    } catch {}
   }, [currentTheme]);
 
   // Storage Loading Flag
@@ -71,12 +72,16 @@ export const App: React.FC = () => {
     }
   });
   const [localDirectoryHandle, setLocalDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [browserWorkspaceId, setBrowserWorkspaceId] = useState<string>();
   const [localDirectoryName, setLocalDirectoryName] = useState<string | null>(null);
   const [needDirectoryPermission, setNeedDirectoryPermission] = useState<boolean>(false);
 
   // Worlds & Active World State (Starts empty until folder is loaded)
-  const [worlds, setWorlds] = useState<WorldProject[]>([]);
-  const [activeWorldId, setActiveWorldId] = useState<string>('');
+  const projects = useProjects();
+  const {worlds,activeWorldId} = projects.state;
+  const setActiveWorldId = useStableEvent((action: React.SetStateAction<string>) => {
+    projects.send({type:'select',id:typeof action === 'function'?action(projects.stateRef.current.activeWorldId):action});
+  });
 
   // UI State initialized from workspace preferences
   const [viewMode, setViewMode] = useState<ViewMode>(() => loadWorkspacePreferences().viewMode || 'canvas');
@@ -86,15 +91,16 @@ export const App: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<CardCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const handleToggleSidebar = () => {
+  const handleToggleSidebar = useStableEvent(() => {
     setIsSidebarOpen((prev) => {
       const next = !prev;
       saveWorkspacePreferences({ isSidebarOpen: next });
       return next;
     });
-  };
+  });
 
-  const handleViewModeChange = (mode: ViewMode) => {
+  const handleViewModeChange = async (mode: ViewMode) => {
+    if (!await documentDrafts.flush()) return;
     setViewMode(mode);
     setReaderCardId(null);
     saveWorkspacePreferences({ viewMode: mode });
@@ -138,9 +144,48 @@ export const App: React.FC = () => {
   });
 
   // Undo & Redo History State
-  const [historyStack, setHistoryStack] = useState<WorldProject[]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(0);
-  const isUndoRedoRef = useRef<boolean>(false);
+  const worldsRef = projects.worldsRef;
+  const persistence = useRef(new WorkspacePersistence()).current;
+  const adapter = useMemo<WorkspaceAdapter | null>(() => {
+    if (isTauriAvailable() && selectedWorkspacePath) return nativeWorkspace(selectedWorkspacePath);
+    if (localDirectoryHandle && !needDirectoryPermission) return browserWorkspace(localDirectoryHandle,browserWorkspaceId);
+    return null;
+  }, [selectedWorkspacePath, localDirectoryHandle, needDirectoryPermission,browserWorkspaceId]);
+  const adapterRef = useRef(adapter);
+  adapterRef.current = adapter;
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | 'idle'>('idle');
+  useEffect(() => persistence.subscribe(() => {
+    setSaveStatus(persistence.failures.length ? 'error' : persistence.pendingCount ? 'saving' : 'saved');
+  }), [persistence]);
+  const [loadIssues, setLoadIssues] = useState<ProjectIssue[]>([]);
+  const readWorkspace = useStableEvent(async (target: WorkspaceAdapter) => {
+    const report = await target.load();
+    setLoadIssues(report.issues.filter(issue => issue.code !== 'broken_reference' && issue.code !== 'map_cycle'));
+    return report.projects;
+  });
+  const loadWorlds = useStableEvent((worlds: WorldProject[]) => { projects.send({type:'load',worlds}); });
+  const persistChanges = (previous: WorldProject[],next: WorldProject[]) => {
+    const target = adapterRef.current;
+    return Promise.allSettled(next.filter(project => project !== previous.find(p => p.id === project.id)).map(project => {
+      if (!target) return Promise.reject(new Error('No workspace'));
+      return persistence.save(target,project).then(acknowledgement => {
+        if (adapterRef.current?.id === target.id) projects.send({type:'ack',acknowledgement});
+        return acknowledgement;
+      });
+    }));
+  };
+  const setWorlds = (action: React.SetStateAction<WorldProject[]>,transactionId?: string) => {
+    const previous = worldsRef.current, target = adapterRef.current;
+    const proposed = typeof action === 'function' ? action(previous) : action;
+    const available = proposed.map(project => target && persistence.isDeleting(target.id,project.id)
+      ? previous.find(p=>p.id===project.id) || project : project);
+    const next = projects.send({type:'replace',worlds:available,transactionId}).worlds;
+    return persistChanges(previous,next);
+  };
+  const flushWorkspace = useCallback(async () => await documentDrafts.flush() && await persistence.flush(), [persistence]);
+  const [mapFocus, setMapFocus] = useState<{ mapId: string; pinId?: string; token: number }>();
+  const [documentFocus, setDocumentFocus] = useState<string>();
+  const [timelineFocus, setTimelineFocus] = useState<string>();
 
   // Custom Confirm & Alert Modal State
   const [confirmModalConfig, setConfirmModalConfig] = useState<ConfirmModalConfig | null>(null);
@@ -164,11 +209,11 @@ export const App: React.FC = () => {
         if (isTauriAvailable()) {
           const savedFolderPath = localStorage.getItem('worlddeck_selected_workspace_path');
           if (savedFolderPath) {
-            const projects = await listProjectsInFolder(savedFolderPath);
+            const projects = await readWorkspace(nativeWorkspace(savedFolderPath));
             if (projects && projects.length > 0) {
               setSelectedWorkspacePath(savedFolderPath);
               setLocalDirectoryName(savedFolderPath.split(/[/\\]/).pop() || 'Workspace');
-              setWorlds(projects);
+              loadWorlds(projects);
               const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
               if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
                 setActiveWorldId(savedActiveId);
@@ -186,13 +231,15 @@ export const App: React.FC = () => {
         if (handle) {
           try {
             const options = { mode: 'readwrite' };
-            const permission = await (handle as any).queryPermission(options);
+            const permission = await (handle as FileSystemDirectoryHandle & { queryPermission(options: { mode: string }): Promise<PermissionState> }).queryPermission(options);
             if (permission === 'granted') {
               setLocalDirectoryHandle(handle);
               setLocalDirectoryName(handle.name);
-              const projects = await readAllProjectsFromDirectory(handle);
+              const browserId = await getDirectoryWorkspaceId(handle);
+              setBrowserWorkspaceId(browserId);
+              const projects = await readWorkspace(browserWorkspace(handle,browserId));
               if (projects.length > 0) {
-                setWorlds(projects);
+                loadWorlds(projects);
                 const savedActiveId = localStorage.getItem('worlddeck_active_id_v2');
                 if (savedActiveId && projects.some((p) => p.id === savedActiveId)) {
                   setActiveWorldId(savedActiveId);
@@ -220,12 +267,13 @@ export const App: React.FC = () => {
     };
 
     initStorage();
-  }, []);
+  }, [setActiveWorldId, loadWorlds, readWorkspace]);
 
   // Derived Active World
-  const activeWorld = (worlds || []).filter(Boolean).find((w) => w && w.id === activeWorldId) || (worlds || []).filter(Boolean)[0] || (
+  const activeWorld = useMemo(() => (worlds || []).filter(Boolean).find((w) => w && w.id === activeWorldId) || (worlds || []).filter(Boolean)[0] || (
     selectedWorkspacePath
       ? {
+          schemaVersion: 1 as const,
           id: 'temp_empty',
           name: localDirectoryName || 'Workspace Baru',
           description: '',
@@ -241,27 +289,21 @@ export const App: React.FC = () => {
           updatedAt: Date.now(),
         }
       : SAMPLE_WORLD
-  );
+  ), [worlds, activeWorldId, selectedWorkspacePath, localDirectoryName]);
 
   // Derived active canvas cards and connections
   const activeWorldCanvases = activeWorld.canvases && activeWorld.canvases.length > 0
     ? activeWorld.canvases
     : [{ id: 'default', name: 'Kanvas Utama', createdAt: Date.now() }];
 
-  const activeCanvasCards = activeWorld.cards
-    .filter((c) => isCardOnCanvas(c, activeCanvasId))
-    .map((c) => {
-      const pos = getCardPositionOnCanvas(c, activeCanvasId);
-      return {
-        ...c,
-        x: pos.x,
-        y: pos.y,
-      };
-    });
-  const activeCanvasCardIds = activeCanvasCards.map((c) => c.id);
-  const activeCanvasConnections = activeWorld.connections.filter(
-    (conn) => activeCanvasCardIds.includes(conn.sourceId) && activeCanvasCardIds.includes(conn.targetId)
-  );
+  const activeCanvasCards = useMemo(() => activeWorld.cards.filter(c=>isCardOnCanvas(c,activeCanvasId)).map(c=>{
+    const pos = getCardPositionOnCanvas(c,activeCanvasId);
+    return pos.x===c.x && pos.y===c.y ? c : {...c,x:pos.x,y:pos.y};
+  }), [activeWorld.cards,activeCanvasId]);
+  const activeCanvasConnections = useMemo(() => {
+    const ids = new Set(activeCanvasCards.map(c=>c.id));
+    return activeWorld.connections.filter(c=>ids.has(c.sourceId) && ids.has(c.targetId));
+  }, [activeWorld.connections,activeCanvasCards]);
 
   // Auto save activeWorldId to LocalStorage
   useEffect(() => {
@@ -271,24 +313,37 @@ export const App: React.FC = () => {
 
   const isSwitchingFolderRef = useRef<boolean>(false);
 
-  // Auto save active world directly to linked local directory or Tauri workspace folder
+  // Loading does not enqueue writes. Only explicit project mutations are persisted.
   useEffect(() => {
-    if (!isLoaded || !activeWorld || isSwitchingFolderRef.current) return;
-    if (activeWorld.id === SAMPLE_WORLD.id) return;
-    const isWorldInCurrentList = (worlds || []).some((w) => w && w.id === activeWorld.id);
-    if (!isWorldInCurrentList) return;
-
-    if (selectedWorkspacePath && isTauriAvailable()) {
-      saveProjectToFolder(selectedWorkspacePath, activeWorld);
-    }
-    if (localDirectoryHandle && !needDirectoryPermission) {
-      writeProjectToDirectory(localDirectoryHandle, activeWorld);
-    }
-  }, [activeWorld, selectedWorkspacePath, worlds, localDirectoryHandle, isLoaded, needDirectoryPermission]);
+    const warn = (event: BeforeUnloadEvent) => {
+      documentDrafts.backupAll();
+      if (documentDrafts.dirty || persistence.pendingCount || persistence.failures.length) { event.preventDefault(); event.returnValue = ''; }
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [persistence]);
+  useEffect(() => {
+    if (!isTauriAvailable()) return;
+    let disposed = false;
+    let closing = false;
+    let unlisten: (() => void) | undefined;
+    void import('@tauri-apps/api/window').then(async ({ getCurrentWindow }) => {
+      const win = getCurrentWindow();
+      const stop = await win.onCloseRequested(async event => {
+        if (closing) return;
+        event.preventDefault();
+        if (await flushWorkspace() && !disposed) { closing = true; await win.close(); }
+      });
+      if (disposed) stop(); else unlisten = stop;
+    }).catch(error => console.warn('Close handler unavailable:', error));
+    return () => { disposed = true; unlisten?.(); };
+  }, [flushWorkspace]);
 
   // Create New Project explicitly in current workspace folder
   const handleCreateProjectInFolder = async (name: string, description: string) => {
+    if (!await documentDrafts.flush()) return;
     const newProject: WorldProject = {
+      schemaVersion: 1,
       id: generateId('world'),
       name: name.trim(),
       description: description.trim(),
@@ -305,189 +360,84 @@ export const App: React.FC = () => {
     };
 
     if (selectedWorkspacePath && isTauriAvailable()) {
-      await saveProjectToFolder(selectedWorkspacePath, newProject);
-      setWorlds([newProject]);
+      await setWorlds(prev => [...prev, newProject]);
       setActiveWorldId(newProject.id);
     } else if (localDirectoryHandle) {
-      await writeProjectToDirectory(localDirectoryHandle, newProject);
-      setWorlds([newProject]);
+      await setWorlds(prev => [...prev, newProject]);
       setActiveWorldId(newProject.id);
     }
   };
 
-  // Folder Directory Actions (Mandatory Workspace Picker)
+  // Flush captured targets before changing workspace; load before replacing state.
   const handleSelectWorkspaceDirectory = async () => {
+    if (!await flushWorkspace()) return;
     try {
       if (isTauriAvailable()) {
-        isSwitchingFolderRef.current = true;
         const folderPath = await openWorkspaceFolderDialog();
-        if (folderPath && typeof folderPath === 'string') {
-          const folderName = folderPath.split(/[/\\]/).pop() || 'Workspace';
-
-          // 1. Purge old worlds from state so they aren't written to the new folder
-          setWorlds([]);
-          setActiveWorldId('');
-
-          // 2. Set new workspace path
-          setSelectedWorkspacePath(folderPath);
-          setLocalDirectoryName(folderName);
-          localStorage.setItem('worlddeck_selected_workspace_path', folderPath);
-
-          // 3. Read existing projects from new folder
-          const projects = await listProjectsInFolder(folderPath);
-          if (projects && projects.length > 0) {
-            setWorlds(projects);
-            setActiveWorldId(projects[0].id);
-          } else {
-            // Keep worlds empty and automatically open WorldManagerModal for user creation
-            setWorlds([]);
-            setActiveWorldId('');
-            setShowWorldManager(true);
-          }
+        if (!folderPath) return;
+        const projects = await readWorkspace(nativeWorkspace(folderPath));
+        isSwitchingFolderRef.current = true;
+        setSelectedWorkspacePath(folderPath);
+        setLocalDirectoryHandle(null);
+        setLocalDirectoryName(folderPath.split(/[/\\]/).pop() || 'Workspace');
+        localStorage.setItem('worlddeck_selected_workspace_path', folderPath);
+        loadWorlds(projects);
+        setActiveWorldId(projects[0]?.id || '');
+        if (!projects.length) setShowWorldManager(true);
+      } else {
+        if (!('showDirectoryPicker' in window)) {
+          showAlertModal(language === 'en' ? 'Browser Unsupported' : 'Browser Tidak Didukung',
+            language === 'en' ? 'Use a browser supporting local folder access.' : 'Gunakan browser yang mendukung akses folder lokal.', 'warning');
+          return;
         }
-        isSwitchingFolderRef.current = false;
-        return;
-      }
-
-      if (!('showDirectoryPicker' in window)) {
-        showAlertModal(
-          language === 'en' ? 'Browser Unsupported' : 'Browser Tidak Didukung',
-          language === 'en'
-            ? 'Your browser does not support the File System Access API. Please use Chrome, Edge, or Opera.'
-            : 'Browser Anda tidak mendukung File System Access API. Silakan gunakan Chrome, Edge, atau Opera.',
-          'warning'
-        );
-        return;
-      }
-
-      isSwitchingFolderRef.current = true;
-      const handle = await (window as any).showDirectoryPicker({
-        mode: 'readwrite',
-      });
-      if (handle) {
-        setWorlds([]);
-        setActiveWorldId('');
+        const handle = await (window as Window & { showDirectoryPicker(options: { mode: 'readwrite' }): Promise<FileSystemDirectoryHandle> }).showDirectoryPicker({ mode: 'readwrite' });
+        const browserId = await getDirectoryWorkspaceId(handle);
+        setBrowserWorkspaceId(browserId);
+        const projects = await readWorkspace(browserWorkspace(handle,browserId));
+        isSwitchingFolderRef.current = true;
+        await saveLocalFileHandle(handle);
+        setSelectedWorkspacePath(null);
         setLocalDirectoryHandle(handle);
         setLocalDirectoryName(handle.name);
         setNeedDirectoryPermission(false);
-        await saveLocalFileHandle(handle);
-
-        const projects = await readAllProjectsFromDirectory(handle);
-        if (projects.length > 0) {
-          setWorlds(projects);
-          setActiveWorldId(projects[0].id);
-        } else {
-          setWorlds([]);
-          setActiveWorldId('');
-        }
+        loadWorlds(projects);
+        setActiveWorldId(projects[0]?.id || '');
+        if (!projects.length) setShowWorldManager(true);
       }
-      isSwitchingFolderRef.current = false;
-    } catch (err: any) {
-      isSwitchingFolderRef.current = false;
-      if (err.name !== 'AbortError') {
-        showAlertModal(
-          language === 'en' ? 'Failed to Open Folder' : 'Gagal Membuka Folder',
-          language === 'en'
-            ? 'Could not open the selected workspace folder directory.'
-            : 'Gagal membuka direktori folder workspace.',
-          'danger'
-        );
-      }
-    }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError'))
+        showAlertModal(language === 'en' ? 'Failed to Open Folder' : 'Gagal Membuka Folder',
+          language === 'en' ? 'The current workspace has been kept. Check folder access and try again.' : 'Workspace saat ini dipertahankan. Periksa akses folder dan coba lagi.', 'danger');
+    } finally { isSwitchingFolderRef.current = false; }
   };
 
-  // Initialize history stack when activeWorldId changes or on load
-  useEffect(() => {
-    const current = (worlds || []).filter(Boolean).find((w) => w.id === activeWorldId) || (worlds || []).filter(Boolean)[0];
-    if (current && isLoaded) {
-      setHistoryStack([JSON.parse(JSON.stringify(current))]);
-      setHistoryIndex(0);
-    }
-  }, [activeWorldId, isLoaded]);
-
-  // Helper to update active world in worlds array with history recording
-  const updateActiveWorld = (updater: (prevWorld: WorldProject) => WorldProject) => {
-    setWorlds((prevWorlds) => {
-      const validWorlds = (prevWorlds || []).filter(Boolean);
-      const currentWorld = validWorlds.find((w) => w.id === activeWorldId) || validWorlds[0];
-      if (!currentWorld) return prevWorlds;
-
-      const updatedWorld = updater(currentWorld);
-
-      // Record snapshot if not an undo/redo action
-      if (!isUndoRedoRef.current) {
-        try {
-          setHistoryStack((prevStack) => {
-            const currentTop = prevStack[historyIndex];
-            const isDuplicate =
-              currentTop &&
-              JSON.stringify(currentTop.cards) === JSON.stringify(updatedWorld.cards) &&
-              JSON.stringify(currentTop.connections) === JSON.stringify(updatedWorld.connections) &&
-              JSON.stringify(currentTop.canvases) === JSON.stringify(updatedWorld.canvases);
-
-            if (isDuplicate) return prevStack;
-
-            const snapshot = JSON.parse(JSON.stringify(updatedWorld));
-            const sliced = prevStack.slice(0, historyIndex + 1);
-            setHistoryIndex(sliced.length);
-            return [...sliced, snapshot];
-          });
-        } catch (err) {
-          console.warn('Failed to record history snapshot:', err);
-        }
-      }
-
-      return validWorlds.map((w) => (w.id === activeWorldId ? updatedWorld : w));
-    });
+  // Project state, history and revisions are owned by the reducer.
+  const updateActiveWorld = (updater: (project: WorldProject) => WorldProject,transactionId?: string) => {
+    const id = projects.stateRef.current.activeWorldId;
+    const current = worldsRef.current.find(w=>w.id===id), target = adapterRef.current;
+    if (!current || (target && persistence.isDeleting(target.id,id))) return;
+    const updated = updater(current);
+    return setWorlds(prev=>prev.map(w=>w.id===id?updated:w),transactionId);
   };
-
-  // Undo / Redo Actions for Canvas Card State
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < historyStack.length - 1;
-
-  const handleUndo = () => {
-    if (historyIndex <= 0 || historyStack.length === 0) return;
-    const targetIndex = historyIndex - 1;
-    const targetSnapshot = historyStack[targetIndex];
-    if (!targetSnapshot || !targetSnapshot.id) return;
-
-    isUndoRedoRef.current = true;
-    const targetCopy = JSON.parse(JSON.stringify(targetSnapshot));
-    setHistoryIndex(targetIndex);
-
-    setWorlds((prevWorlds) =>
-      (prevWorlds || []).filter(Boolean).map((w) => (w.id === activeWorldId ? targetCopy : w))
-    );
-
-    setTimeout(() => {
-      isUndoRedoRef.current = false;
-    }, 50);
+  const history = projects.state.histories[activeWorldId];
+  const canUndo = !!history && history.index>0;
+  const canRedo = !!history && history.index<history.stack.length-1;
+  const restoreHistory = async (offset: -1 | 1) => {
+    if (!await documentDrafts.finish()) return;
+    const id = projects.stateRef.current.activeWorldId, target = adapterRef.current;
+    if (target && persistence.isDeleting(target.id,id)) return;
+    const previous = worldsRef.current;
+    const next = projects.send({type:'restore',offset,updatedAt:Date.now()}).worlds;
+    await persistChanges(previous,next);
   };
-
-  const handleRedo = () => {
-    if (historyIndex >= historyStack.length - 1 || historyStack.length === 0) return;
-    const targetIndex = historyIndex + 1;
-    const targetSnapshot = historyStack[targetIndex];
-    if (!targetSnapshot || !targetSnapshot.id) return;
-
-    isUndoRedoRef.current = true;
-    const targetCopy = JSON.parse(JSON.stringify(targetSnapshot));
-    setHistoryIndex(targetIndex);
-
-    setWorlds((prevWorlds) =>
-      (prevWorlds || []).filter(Boolean).map((w) => (w.id === activeWorldId ? targetCopy : w))
-    );
-
-    setTimeout(() => {
-      isUndoRedoRef.current = false;
-    }, 50);
-  };
+  const handleUndo = useStableEvent(() => restoreHistory(-1));
+  const handleRedo = useStableEvent(() => restoreHistory(1));
 
   // Hotkey Undo/Redo & Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
-      if (['INPUT', 'TEXTAREA'].includes(tag)) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || (e.target as HTMLElement).isContentEditable) return;
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         if (e.shiftKey) {
@@ -508,7 +458,7 @@ export const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [historyIndex, historyStack, activeWorldId]);
+  }, [handleUndo, handleRedo, handleToggleSidebar]);
 
   // Disable Default Web Browser Context Menu Globally Across Application
   useEffect(() => {
@@ -570,7 +520,7 @@ export const App: React.FC = () => {
     updateActiveWorld((prev) => ({
       ...prev,
       updatedAt: Date.now(),
-      cards: prev.cards.map((c) => (c.id === id ? { ...c, width, height } : c)),
+      cards: prev.cards.map((c) => (c.id === id ? { ...c, width, height, imageHeight: c.imageHeight ? Math.min(c.imageHeight,Math.max(48,height-90)) : undefined } : c)),
     }));
   };
 
@@ -600,7 +550,7 @@ export const App: React.FC = () => {
       summary: initialData?.summary || '',
       content: initialData?.content || '',
       tags: initialData?.tags ? [...initialData.tags] : [],
-      attributes: initialData?.attributes ? JSON.parse(JSON.stringify(initialData.attributes)) : [],
+      attributes: initialData?.attributes?.map(attribute => ({...attribute,id:generateId('attr')})) || [],
       imageUrl: initialData?.imageUrl || '',
       x,
       y,
@@ -797,7 +747,7 @@ export const App: React.FC = () => {
   };
 
   // Timeline Data Management Handler
-  const handleSaveTimeline = (tracks: any[], nodes: any[], branches: any[]) => {
+  const handleSaveTimeline = (tracks: TimelineTrack[], nodes: TimelineNode[], branches: TimelineBranch[]) => {
     updateActiveWorld((prev) => ({
       ...prev,
       timelineTracks: tracks,
@@ -808,19 +758,23 @@ export const App: React.FC = () => {
   };
 
   // Document Management Handlers
-  const handleSaveDocument = (updatedDoc: WorldDocument) => {
-    updateActiveWorld((prev) => {
-      const existingDocs = prev.documents || [];
-      const exists = existingDocs.some((d) => d.id === updatedDoc.id);
-      const docs = exists
-        ? existingDocs.map((d) => (d.id === updatedDoc.id ? updatedDoc : d))
-        : [...existingDocs, updatedDoc];
-      return {
-        ...prev,
-        documents: docs,
-        updatedAt: Date.now(),
-      };
-    });
+  const handleSaveDocument = async (updatedDoc: WorldDocument, transactionId?: string) => {
+    const target = adapter, projectId = activeWorldId;
+    if (!worldsRef.current.find(project => project.id === projectId)?.documents?.some(doc => doc.id === updatedDoc.id)) throw new Error('Document no longer exists');
+    if (!target || adapterRef.current?.id !== target.id) throw new Error('Document workspace changed');
+    const result = await setWorlds(worlds => worlds.map(prev => prev.id !== projectId ? prev : ({
+      ...prev,
+      documents:(prev.documents || []).some(d => d.id === updatedDoc.id)
+        ? (prev.documents || []).map(d => d.id === updatedDoc.id ? updatedDoc : d)
+        : [...(prev.documents || []),updatedDoc], updatedAt:Date.now(),
+    })),transactionId);
+    if (result && !result.length) {
+      const current = worldsRef.current.find(p=>p.id===activeWorldId);
+      if (current) return persistence.save(target,current);
+    }
+    const saved = result?.[0];
+    if (!saved || saved.status === 'rejected') throw new Error('Document save failed');
+    return saved.value;
   };
 
   const handleCreateDocument = (newDoc: WorldDocument) => {
@@ -841,8 +795,9 @@ export const App: React.FC = () => {
       confirmLabel: t.appPrompts.deleteDocumentConfirm,
       cancelLabel: t.common.cancel,
       variant: 'danger',
-      onConfirm: () => {
-        updateActiveWorld((prev) => ({
+      onConfirm: async () => {
+        if (!await documentDrafts.finish()) return false;
+        await updateActiveWorld((prev) => ({
           ...prev,
           documents: (prev.documents || []).filter((d) => d.id !== docId),
           updatedAt: Date.now(),
@@ -869,7 +824,7 @@ export const App: React.FC = () => {
   const handleDeleteMap = (mapId: string) => {
     updateActiveWorld((prev) => ({
       ...prev,
-      worldMaps: (prev.worldMaps || []).filter((m) => m.id !== mapId),
+      worldMaps: (prev.worldMaps || []).filter((m) => m.id !== mapId).map(m => ({ ...m, parentMapId: m.parentMapId === mapId ? undefined : m.parentMapId, pins: m.pins.map(p => p.targetMapId === mapId ? { ...p, targetMapId: undefined } : p) })),
       updatedAt: Date.now(),
     }));
   };
@@ -917,11 +872,6 @@ export const App: React.FC = () => {
     };
 
     setPendingMapPin({ mapId, x, y, color: '#0d99ff' });
-    updateActiveWorld((prev) => ({
-      ...prev,
-      updatedAt: Date.now(),
-      cards: [...prev.cards, newCard],
-    }));
     setEditingCard(newCard);
   };
 
@@ -959,7 +909,7 @@ export const App: React.FC = () => {
       return {
         ...prev,
         updatedAt: Date.now(),
-        cards: prev.cards.map((c) => (c.id === updatedCard.id ? updatedCard : c)),
+        cards: prev.cards.some(c => c.id === updatedCard.id) ? prev.cards.map((c) => (c.id === updatedCard.id ? updatedCard : c)) : [...prev.cards, updatedCard],
         worldMaps: updatedMaps,
       };
     });
@@ -981,18 +931,7 @@ export const App: React.FC = () => {
     if (!cardsToDelete || cardsToDelete.length === 0) return;
     const deleteIds = cardsToDelete.map((c) => c.id);
 
-    updateActiveWorld((prev) => ({
-      ...prev,
-      updatedAt: Date.now(),
-      cards: prev.cards.filter((c) => !deleteIds.includes(c.id)),
-      connections: prev.connections.filter(
-        (conn) => !deleteIds.includes(conn.sourceId) && !deleteIds.includes(conn.targetId)
-      ),
-      worldMaps: (prev.worldMaps || []).map((m) => ({
-        ...m,
-        pins: m.pins.filter((p) => !p.cardId || !deleteIds.includes(p.cardId)),
-      })),
-    }));
+    updateActiveWorld(prev => removeProjectCards(prev, deleteIds));
 
     if (selectedCardId && deleteIds.includes(selectedCardId)) {
       setSelectedCardId(null);
@@ -1010,18 +949,7 @@ export const App: React.FC = () => {
 
   // Discard Card Instantly without double confirmation (for newly created blank cards)
   const handleDiscardCard = (cardId: string) => {
-    updateActiveWorld((prev) => ({
-      ...prev,
-      updatedAt: Date.now(),
-      cards: prev.cards.filter((c) => c.id !== cardId),
-      connections: prev.connections.filter(
-        (conn) => conn.sourceId !== cardId && conn.targetId !== cardId
-      ),
-      worldMaps: (prev.worldMaps || []).map((m) => ({
-        ...m,
-        pins: m.pins.filter((p) => !p.cardId || p.cardId !== cardId),
-      })),
-    }));
+    updateActiveWorld(prev => removeProjectCards(prev, [cardId]));
     if (selectedCardId === cardId) {
       setSelectedCardId(null);
     }
@@ -1092,12 +1020,13 @@ export const App: React.FC = () => {
   };
 
   // World Manager Actions
-  const handleCreateWorld = (newWorld: WorldProject) => {
-    setWorlds((prev) => [...prev, newWorld]);
+  const handleCreateWorld = async (newWorld: WorldProject) => {
+    if (!await documentDrafts.flush()) return;
+    await setWorlds((prev) => [...prev, newWorld]);
     setActiveWorldId(newWorld.id);
   };
 
-  const handleDeleteWorld = (worldId: string) => {
+  const handleDeleteWorld = async (worldId: string) => {
     if (worlds.length <= 1) {
       showAlertModal(
         t.appPrompts.cannotDeleteWorldTitle,
@@ -1115,26 +1044,23 @@ export const App: React.FC = () => {
       confirmLabel: t.appPrompts.deletePermanently,
       cancelLabel: t.common.cancel,
       variant: 'danger',
-      onConfirm: () => {
-        const remaining = worlds.filter((w) => w.id !== worldId);
-        setWorlds(remaining);
-        
-        // Delete project file from local directory or Tauri folder
-        if (selectedWorkspacePath && isTauriAvailable()) {
-          deleteProjectFromFolder(selectedWorkspacePath, worldId);
-        }
-        if (localDirectoryHandle) {
-          deleteProjectFromDirectory(localDirectoryHandle, worldId);
-        }
-
-        if (activeWorldId === worldId) {
-          setActiveWorldId(remaining[0].id);
-        }
+      onConfirm: async () => {
+        if (!await documentDrafts.flush()) return;
+        const target = adapterRef.current;
+        if (!target) return;
+        try {
+          await persistence.delete(target, worldId, () => {
+            if (adapterRef.current?.id !== target.id) return;
+            const remaining = worldsRef.current.filter(w => w.id !== worldId);
+            projects.send({type:'replace',worlds:remaining});
+            setActiveWorldId(current => current === worldId ? remaining[0]?.id || '' : current);
+          });
+        } catch { /* Retained in coordinator for retry; keep project visible. */ }
       },
     });
   };
 
-  const handleDuplicateWorld = (worldId: string) => {
+  const handleDuplicateWorld = async (worldId: string) => {
     const target = worlds.find((w) => w.id === worldId);
     if (!target) return;
 
@@ -1146,7 +1072,7 @@ export const App: React.FC = () => {
       updatedAt: Date.now(),
     };
 
-    setWorlds((prev) => [...prev, duplicated]);
+    await setWorlds((prev) => [...prev, duplicated]);
 
   };
 
@@ -1294,8 +1220,8 @@ export const App: React.FC = () => {
     });
   };
 
-  const handleUpdateWorldInfo = (worldId: string, name: string, description: string, author: string) => {
-    setWorlds((prev) =>
+  const handleUpdateWorldInfo = async (worldId: string, name: string, description: string, author: string) => {
+    await setWorlds((prev) =>
       prev.map((w) =>
         w.id === worldId
           ? { ...w, name, description, author, updatedAt: Date.now() }
@@ -1315,17 +1241,19 @@ export const App: React.FC = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
+      if (!await documentDrafts.flush()) return;
       try {
-        const importedData = JSON.parse(event.target?.result as string);
-        if (importedData && Array.isArray(importedData.cards)) {
+        const validation = validateProject(JSON.parse(event.target?.result as string));
+        const importedData = validation.project;
+        if (importedData) {
           const newWorld: WorldProject = {
             ...importedData,
             id: generateId('world'),
             name: importedData.name || t.appPrompts.importedWorldDefault,
             updatedAt: Date.now(),
           };
-          setWorlds((prev) => [...prev, newWorld]);
+          await setWorlds((prev) => [...prev, newWorld]);
           setActiveWorldId(newWorld.id);
 
           showAlertModal(
@@ -1334,13 +1262,14 @@ export const App: React.FC = () => {
             'success'
           );
         } else {
+          setLoadIssues(validation.issues);
           showAlertModal(
             t.appPrompts.importFailedTitle,
             t.appPrompts.importFailedDesc,
             'danger'
           );
         }
-      } catch (err) {
+      } catch {
         showAlertModal(
           t.appPrompts.failedToReadFileTitle,
           t.appPrompts.failedToReadFileDesc,
@@ -1380,7 +1309,7 @@ export const App: React.FC = () => {
   // Navigate to Card
   const handleNavigateToCard = (cardId: string) => {
     setSelectedCardId(cardId);
-    if (viewMode !== 'canvas') setViewMode('canvas');
+    if (viewMode !== 'canvas') void handleViewModeChange('canvas');
   };
 
   if (!isLoaded) {
@@ -1415,8 +1344,14 @@ export const App: React.FC = () => {
         onOpenWorldManager={() => setShowWorldManager(true)}
         localDirectoryName={localDirectoryName}
         onChangeDirectory={handleSelectWorkspaceDirectory}
+        beforeClose={flushWorkspace}
       />
 
+      {saveStatus === 'error' && <div role="alert" data-workspace-error className="fixed bottom-4 left-4 z-[300] rounded-xl border border-rose-500 bg-slate-900 p-3 text-sm text-white shadow-xl">
+        {language === 'en' ? 'Workspace operation failed. Your data has been kept.' : 'Operasi workspace gagal. Data Anda tetap dipertahankan.'}
+        <button className="ml-3 underline" onClick={() => { void persistence.retry(); }}>{language === 'en' ? 'Retry' : 'Coba lagi'}</button>
+      </div>}
+      <ProjectIssuesNotice issues={[...loadIssues, ...projectIntegrity(activeWorld)]} />
       {/* Main Workspace Area */}
       {!isWorkspaceSelected ? (
         <WorkspaceLandingScreen
@@ -1457,6 +1392,7 @@ export const App: React.FC = () => {
 
         {/* View Component Switcher */}
         <main className="flex-1 relative overflow-hidden flex flex-col">
+          <Suspense fallback={<div className="p-6" role="status">{language === 'en' ? 'Loading…' : 'Memuat…'}</div>}>
           {viewMode === 'canvas' && (
             <Canvas
               activeCanvasId={activeCanvasId}
@@ -1528,12 +1464,14 @@ export const App: React.FC = () => {
 
           {viewMode === 'timeline' && (
             <TimelineView
+              key={`${adapter?.id}:${activeWorld.id}`}
               cards={activeWorld.cards}
               connections={activeWorld.connections}
               onCardClick={(card) => setReaderCardId(card.id)}
+              focusNodeId={timelineFocus}
               activeWorldId={activeWorldId}
               timelineTracks={activeWorld.timelineTracks}
-              timelineNodes={activeWorld.timelineNodes as any}
+              timelineNodes={activeWorld.timelineNodes}
               timelineBranches={activeWorld.timelineBranches}
               onSaveTimeline={handleSaveTimeline}
             />
@@ -1541,6 +1479,10 @@ export const App: React.FC = () => {
 
           {viewMode === 'documents' && (
             <DocumentsView
+              key={`${adapter?.id}:${activeWorld.id}`}
+              workspaceId={adapter?.id || 'unlinked'}
+              projectId={activeWorld.id}
+              focusDocumentId={documentFocus}
               documents={activeWorld.documents || []}
               cards={activeWorld.cards}
               onSaveDocument={handleSaveDocument}
@@ -1559,6 +1501,11 @@ export const App: React.FC = () => {
 
           {viewMode === 'map' && (
             <MapView
+              key={activeWorld.id}
+              projectId={activeWorld.id}
+              focus={mapFocus}
+              timelineNodes={activeWorld.timelineNodes || []}
+              canUndo={canUndo} canRedo={canRedo} onUndo={handleUndo} onRedo={handleRedo}
               worldMaps={activeWorld.worldMaps || []}
               cards={activeWorld.cards}
               decks={activeWorld.decks || []}
@@ -1569,6 +1516,7 @@ export const App: React.FC = () => {
               onCreatePinCard={handleCreateLocationPinCard}
             />
           )}
+          </Suspense>
         </main>
       </div>
       )}
@@ -1594,7 +1542,7 @@ export const App: React.FC = () => {
         <WorldManagerModal
           worlds={worlds}
           activeWorldId={activeWorldId}
-          onSelectWorld={(id) => setActiveWorldId(id)}
+          onSelectWorld={async (id) => { if (await flushWorkspace()) setActiveWorldId(id); }}
           onCreateWorld={handleCreateWorld}
           onDeleteWorld={handleDeleteWorld}
           onDuplicateWorld={handleDuplicateWorld}
@@ -1613,6 +1561,10 @@ export const App: React.FC = () => {
         connections={activeWorld.connections}
         decks={activeWorld.decks || []}
         initialFullPage={isReaderFullPage}
+        world={activeWorld}
+        onOpenMap={(mapId, pinId) => { handleViewModeChange('map'); setMapFocus({ mapId, pinId, token: Date.now() }); }}
+        onOpenDocument={id => { handleViewModeChange('documents'); setDocumentFocus(id); }}
+        onOpenTimeline={id => { handleViewModeChange('timeline'); setTimelineFocus(id); }}
         onEditCard={(cardToEdit) => {
           setEditingCard(cardToEdit);
           setReaderCardId(null);
@@ -1633,7 +1585,7 @@ export const App: React.FC = () => {
           onDelete={handleDeleteCard}
           onClose={() => {
             if (pendingMapPin && editingCard) {
-              handleDiscardCard(editingCard.id);
+              setPendingMapPin(null); setEditingCard(null);
             } else {
               setEditingCard(null);
             }

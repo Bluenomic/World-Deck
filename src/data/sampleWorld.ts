@@ -1,6 +1,7 @@
 import type { WorldProject } from '../types';
 
 export const SAMPLE_WORLD: WorldProject = {
+  schemaVersion: 1,
   id: 'world-new-01',
   name: 'Dunia Baru Saya',
   description: 'Arsip worldbuilding kustom. Mulai tambahkan karakter, lokasi, faksi, item, dan peristiwa.',

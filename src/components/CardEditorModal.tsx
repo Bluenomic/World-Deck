@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import type { WorldCard, CardCategory, CustomAttribute, CardConnection } from '../types';
 import { CATEGORY_CONFIGS, PRIMARY_CATEGORIES } from '../data/categoryConfig';
 import { generateId } from '../utils/helpers';
-import { useLanguage } from '../i18n/LanguageContext';
+import { useLanguage } from '../i18n/useLanguage';
 import { ImageFocalAdjusterModal } from './ImageFocalAdjusterModal';
-import * as Icons from 'lucide-react';
+import * as Icons from '../utils/icons';
 
 const SUGGESTED_ATTRIBUTES_BY_CATEGORY: Record<string, { id: string[]; en: string[] }> = {
   character: {
@@ -235,6 +235,8 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
       onClick={handleCloseRequest}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         className="bg-[#1e1e1e] border border-[#383838] w-full max-w-4xl max-h-[92vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white transition-all cursor-default relative"
         onClick={(e) => e.stopPropagation()}
       >
@@ -318,6 +320,16 @@ export const CardEditorModal: React.FC<CardEditorModalProps> = ({
 
         {/* Form Container wrapping scrollable body and sticky action footer */}
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <div className="px-6 py-2 border-b app-border text-xs flex items-center justify-between gap-3">
+            <span className="app-text-muted">{language === 'en' ? 'Start with a template for this category' : 'Mulai dengan template kategori ini'}</span>
+            <button type="button" className="px-3 py-2 rounded-lg border app-border" onClick={() => {
+              const suggested = SUGGESTED_ATTRIBUTES_BY_CATEGORY[category];
+              const keys = suggested ? (language === 'en' ? suggested.en : suggested.id) : [];
+              setAttributes(prev => [...prev, ...keys.filter(key => !prev.some(a => a.key.toLowerCase() === key.toLowerCase())).map(key => ({ id: generateId('attr'), key, value: '' }))]);
+              if (!content.trim()) setContent(language === 'en' ? 'Overview\n\nHistory\n\nMotivations and conflicts\n\nConnections\n' : 'Gambaran umum\n\nSejarah\n\nMotivasi dan konflik\n\nKeterkaitan\n');
+              setActiveTab('properties');
+            }}>{language === 'en' ? 'Apply template' : 'Terapkan template'}</button>
+          </div>
           {/* Main Unified Scrollable Modal Body */}
           <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
             {/* Cover Photo Header (Enlarged to h-64 md:h-72 for rich vertical view) */}

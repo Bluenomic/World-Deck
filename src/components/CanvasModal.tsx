@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useLanguage } from '../i18n/LanguageContext';
-import * as Icons from 'lucide-react';
+import { useLanguage } from '../i18n/useLanguage';
+import * as Icons from '../utils/icons';
 
 interface CanvasModalProps {
   isOpen: boolean;
@@ -46,6 +46,8 @@ export const CanvasModal: React.FC<CanvasModalProps> = ({
       onClick={onClose}
     >
       <div 
+        role="dialog"
+        aria-modal="true"
         className="app-bg-secondary border app-border w-full max-w-sm rounded-2xl shadow-2xl flex flex-col overflow-hidden app-text-main transition-colors modal-animate-appear cursor-default p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
